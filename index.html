@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14342f">
+<title>Mon itinéraire</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  :root { --ink:#14342f; --paper:#f3f6f1; --line:#d5ddd3; --route:#d6336c; --go:#1f7a5c; --stop:#b3261e; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); }
+  #map { position: absolute; inset: 0; bottom: 0; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1000; background: var(--paper);
+    border-radius: 18px 18px 0 0; padding: 14px 16px calc(14px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -6px 24px rgba(20,52,47,.18); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .stat b { display: block; font-size: 1.55rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .stat span { font-size: .8rem; opacity: .7; }
+  .row { display: flex; gap: 8px; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 14px; cursor: pointer; }
+  button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+  #toggle { flex: 1; color: #fff; background: var(--go); font-size: 1.1rem; }
+  #toggle.on { background: var(--stop); }
+  .ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  #msg { font-size: .85rem; min-height: 1.2em; margin: 0 0 8px; }
+  #msg.err { color: var(--stop); }
+  .routebar { position: absolute; top: 0; left: 0; right: 0; z-index: 1000; display: flex; gap: 6px;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 10px 0; }
+  .routebar select { flex: 1; min-width: 0; font: inherit; padding: 12px; border-radius: 12px;
+    border: 1px solid var(--line); background: #fff; color: var(--ink); }
+  .routebar button { padding: 12px; box-shadow: 0 2px 8px rgba(20,52,47,.15); }
+</style>
+</head>
+<body>
+<div id="map" role="application" aria-label="Carte de l'itinéraire"></div>
+
+<div class="routebar">
+  <select id="route" aria-label="Itinéraire à suivre"></select>
+  <button id="import" class="ghost">Importer GPX</button>
+  <button id="del" class="ghost" aria-label="Supprimer cet itinéraire" hidden>✕</button>
+  <input type="file" id="file" accept=".gpx,application/gpx+xml,text/xml" multiple hidden>
+</div>
+
+<section class="sheet">
+  <p id="msg" role="status">Appuyez sur « Démarrer » et gardez l'écran allumé.</p>
+  <div class="stats">
+    <div class="stat"><b id="dist">0,00</b><span>km</span></div>
+    <div class="stat"><b id="time">00:00</b><span>durée</span></div>
+    <div class="stat"><b id="speed">0,0</b><span>km/h moyenne</span></div>
+  </div>
+  <div class="row">
+    <button id="toggle">Démarrer</button>
+    <button id="gpx" class="ghost">Exporter GPX</button>
+    <button id="clear" class="ghost">Effacer</button>
+  </div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function () {
+  var KEY = "itineraire-v1";
+  var MAX_ACCURACY = 50;   // mètres : on ignore les points moins précis
+  var MIN_STEP = 5;        // mètres : on ignore les micro-déplacements
+
+  var map = L.map("map", { zoomControl: false }).setView([46.6, 2.5], 6);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap"
+  }).addTo(map);
+  var refLine = L.polyline([], { color: "#1d6fd8", weight: 7, opacity: .65 }).addTo(map);  // itinéraire à suivre
+  var line = L.polyline([], { color: "#d6336c", weight: 5 }).addTo(map);                    // trajet réel
+  var marker = null;
+
+  var points = [];        // {lat, lon, t}
+  var elapsed = 0;        // ms cumulées
+  var startedAt = null;   // horodatage du dernier démarrage
+  var watchId = null, wakeLock = null, timer = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+  function say(text, err) { $("msg").textContent = text; $("msg").className = err ? "err" : ""; }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ points: points, elapsed: currentElapsed() })); } catch (e) {}
+  }
+  function load() {
+    try {
+      var d = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (d && d.points) { points = d.points; elapsed = d.elapsed || 0; }
+    } catch (e) {}
+  }
+
+  function haversine(a, b) {
+    var R = 6371000, r = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+    var x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(x));
+  }
+  function totalMeters() {
+    var d = 0;
+    for (var i = 1; i < points.length; i++) d += haversine(points[i - 1], points[i]);
+    return d;
+  }
+  function currentElapsed() { return elapsed + (startedAt ? Date.now() - startedAt : 0); }
+
+  function render() {
+    var km = totalMeters() / 1000, ms = currentElapsed(), s = Math.floor(ms / 1000);
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    var pad = function (n) { return String(n).padStart(2, "0"); };
+    $("dist").textContent = km.toFixed(2).replace(".", ",");
+    $("time").textContent = (h ? h + ":" : "") + pad(m) + ":" + pad(sec);
+    $("speed").textContent = (ms > 0 ? km / (ms / 3600000) : 0).toFixed(1).replace(".", ",");
+  }
+
+  function drawAll() {
+    line.setLatLngs(points.map(function (p) { return [p.lat, p.lon]; }));
+    if (points.length) map.fitBounds(line.getBounds(), { paddingTopLeft: [20, 70], paddingBottomRight: [20, 200], maxZoom: 17 });
+  }
+
+  function onPosition(pos) {
+    var c = pos.coords;
+    var p = { lat: c.latitude, lon: c.longitude, t: pos.timestamp };
+    if (!marker) marker = L.circleMarker([p.lat, p.lon], { radius: 8, color: "#fff", weight: 3, fillColor: "#14342f", fillOpacity: 1 }).addTo(map);
+    marker.setLatLng([p.lat, p.lon]);
+    if (c.accuracy > MAX_ACCURACY) { say("Signal GPS faible (±" + Math.round(c.accuracy) + " m)…"); return; }
+    var last = points[points.length - 1];
+    if (!last || haversine(last, p) >= MIN_STEP) {
+      points.push(p);
+      line.addLatLng([p.lat, p.lon]);
+      map.panTo([p.lat, p.lon]);
+      save();
+    }
+    followMsg(p);
+  }
+
+  function onError(err) {
+    var texts = {
+      1: "Localisation refusée. Autorisez-la dans les réglages du navigateur.",
+      2: "Position introuvable. Vérifiez que le GPS est activé.",
+      3: "Délai dépassé, nouvelle tentative…"
+    };
+    say(texts[err.code] || "Erreur de localisation.", err.code !== 3);
+  }
+
+  async function lockScreen() {
+    try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+  }
+
+  function start() {
+    if (!("geolocation" in navigator)) { say("Ce navigateur ne gère pas la géolocalisation.", true); return; }
+    startedAt = Date.now();
+    watchId = navigator.geolocation.watchPosition(onPosition, onError, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    lockScreen();
+    timer = setInterval(render, 1000);
+    $("toggle").textContent = "Arrêter"; $("toggle").className = "on";
+    say("Recherche du signal GPS…");
+  }
+
+  function stop() {
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    elapsed = currentElapsed(); startedAt = null;
+    clearInterval(timer);
+    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    save(); render();
+    $("toggle").textContent = points.length ? "Reprendre" : "Démarrer"; $("toggle").className = "";
+    say("Suivi arrêté. Exportez le tracé si besoin.");
+  }
+
+  $("toggle").onclick = function () { watchId === null ? start() : stop(); };
+
+  $("clear").onclick = function () {
+    if (!confirm("Effacer l'itinéraire enregistré ?")) return;
+    if (watchId !== null) stop();
+    points = []; elapsed = 0; line.setLatLngs([]);
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    $("toggle").textContent = "Démarrer"; render(); say("Itinéraire effacé.");
+  };
+
+  $("gpx").onclick = function () {
+    if (points.length < 2) { say("Pas assez de points à exporter.", true); return; }
+    var trkpts = points.map(function (p) {
+      return '<trkpt lat="' + p.lat + '" lon="' + p.lon + '"><time>' + new Date(p.t).toISOString() + "</time></trkpt>";
+    }).join("");
+    var gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Mon itinéraire" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Itinéraire</name><trkseg>' + trkpts + "</trkseg></trk></gpx>";
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([gpx], { type: "application/gpx+xml" }));
+    a.download = "itineraire-" + new Date().toISOString().slice(0, 10) + ".gpx";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  };
+
+  // Le verrou d'écran est libéré quand la page passe en arrière-plan : on le reprend au retour.
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && watchId !== null) lockScreen();
+  });
+
+  // ---------- Itinéraires à suivre ----------
+  var RKEY = "itineraires-v1", SKEY = "itineraire-choisi-v1", OFF_ROUTE = 50;
+  var routes = [], routeId = "";
+
+  function currentRoute() { return routes.find(function (r) { return r.id === routeId; }); }
+  function saveRoutes() {
+    try { localStorage.setItem(RKEY, JSON.stringify(routes.filter(function (r) { return !r.file; }))); return true; }
+    catch (e) { say("Mémoire pleine : supprimez un itinéraire.", true); return false; }
+  }
+  function thin(pts) {   // garde un point tous les 10 m pour alléger le stockage
+    var out = [], last = null;
+    pts.forEach(function (q, i) {
+      var o = { lat: q[0], lon: q[1] };
+      if (!last || haversine(last, o) >= 10 || i === pts.length - 1) { out.push(q); last = o; }
+    });
+    return out;
+  }
+  function parseGpx(text, fallback) {
+    var doc = new DOMParser().parseFromString(text, "application/xml");
+    if (doc.querySelector("parsererror")) return null;
+    var pts = [];
+    doc.querySelectorAll("trkpt, rtept").forEach(function (n) {
+      var la = parseFloat(n.getAttribute("lat")), lo = parseFloat(n.getAttribute("lon"));
+      if (!isNaN(la) && !isNaN(lo)) pts.push([la, lo]);
+    });
+    if (pts.length < 2) return null;
+    var nm = doc.querySelector("trk > name, rte > name, metadata > name");
+    return { name: (nm && nm.textContent.trim()) || fallback, pts: thin(pts) };
+  }
+  function fillSelect() {
+    var sel = $("route");
+    sel.innerHTML = "";
+    sel.add(new Option("Tracé libre (aucun itinéraire)", ""));
+    routes.forEach(function (r) { sel.add(new Option(r.name, r.id)); });
+    sel.value = routeId;
+  }
+  function remember() { try { localStorage.setItem(SKEY, routeId); } catch (e) {} }
+  function applyRoute(fit) {
+    var r = currentRoute();
+    $("del").hidden = !r || !!r.file;          // les itinéraires du dépôt ne se suppriment pas ici
+    if (r && !r.pts) {                          // itinéraire du dépôt : chargé à la demande
+      refLine.setLatLngs([]);
+      say("Chargement de l'itinéraire…");
+      fetch(r.file).then(function (res) { if (!res.ok) throw 0; return res.text(); })
+        .then(function (t) {
+          var g = parseGpx(t, r.name);
+          if (!g) throw 0;
+          r.pts = g.pts;
+          if (currentRoute() === r) { applyRoute(fit); say("Itinéraire chargé."); }
+        })
+        .catch(function () { say("Impossible de charger « " + r.name + " ».", true); });
+      return;
+    }
+    refLine.setLatLngs(r ? r.pts : []);
+    if (r && fit) map.fitBounds(refLine.getBounds(), { paddingTopLeft: [20, 70], paddingBottomRight: [20, 200] });
+  }
+  function followMsg(p) {
+    var r = currentRoute();
+    if (!r || !r.pts) { say("Suivi en cours."); return; }
+    var min = Infinity;
+    r.pts.forEach(function (q) { var d = haversine(p, { lat: q[0], lon: q[1] }); if (d < min) min = d; });
+    if (min > OFF_ROUTE) say("Hors itinéraire : " + Math.round(min) + " m du tracé.", true);
+    else say("Sur l'itinéraire (écart " + Math.round(min) + " m).");
+  }
+
+  $("route").onchange = function () { routeId = this.value; remember(); applyRoute(true); };
+  $("import").onclick = function () { $("file").click(); };
+  $("file").onchange = function () {
+    var input = this;
+    var jobs = [].slice.call(input.files).map(function (f) {
+      return f.text().then(function (t) {
+        var g = parseGpx(t, f.name.replace(/\.gpx$/i, ""));
+        if (!g) return false;
+        g.id = "r" + Date.now() + Math.random().toString(36).slice(2, 6);
+        routes.push(g); routeId = g.id;
+        return true;
+      });
+    });
+    Promise.all(jobs).then(function (res) {
+      var ok = res.filter(Boolean).length;
+      input.value = "";
+      if (ok) { saveRoutes(); remember(); fillSelect(); applyRoute(true); say(ok + " itinéraire(s) importé(s)."); }
+      else say("Fichier GPX illisible.", true);
+    });
+  };
+  $("del").onclick = function () {
+    var r = currentRoute();
+    if (!r || !confirm("Supprimer « " + r.name + " » ?")) return;
+    routes = routes.filter(function (x) { return x.id !== r.id; });
+    routeId = ""; saveRoutes(); remember(); fillSelect(); applyRoute(false);
+  };
+  function initRoutes() {
+    var saved = "";
+    try {
+      routes = JSON.parse(localStorage.getItem(RKEY) || "[]");
+      saved = localStorage.getItem(SKEY) || "";
+    } catch (e) { routes = []; }
+    function has(id) { return routes.some(function (r) { return r.id === id; }); }
+    routeId = has(saved) ? saved : "";
+    fillSelect(); applyRoute(true);
+
+    // Itinéraires du dépôt : liste dans itineraires.json, fichiers GPX dans le dossier itineraires/
+    fetch("itineraires.json", { cache: "no-cache" })
+      .then(function (res) { return res.ok ? res.json() : []; })
+      .then(function (list) {
+        var remote = list.filter(function (x) { return x && x.file; })
+          .map(function (x) { return { id: "f:" + x.file, name: x.name || x.file, file: x.file }; });
+        if (!remote.length) return;
+        routes = remote.concat(routes);
+        if (!routeId && has(saved)) routeId = saved;
+        fillSelect(); applyRoute(true);
+      })
+      .catch(function () {});
+  }
+
+  load(); render(); initRoutes();
+  if (points.length) { drawAll(); $("toggle").textContent = "Reprendre"; say("Itinéraire précédent restauré."); }
+})();
+</script>
+</body>
+</html>
