@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14342f">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Mon itinéraire</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
@@ -30,6 +35,11 @@
   .routebar select { flex: 1; min-width: 0; font: inherit; padding: 12px; border-radius: 12px;
     border: 1px solid var(--line); background: #fff; color: var(--ink); }
   .routebar button { padding: 12px; box-shadow: 0 2px 8px rgba(20,52,47,.15); }
+  dialog { border: 0; border-radius: 16px; padding: 16px; width: min(92vw, 420px); background: var(--paper); color: var(--ink); }
+  dialog::backdrop { background: rgba(20,52,47,.45); }
+  dialog h2 { margin: 0 0 10px; font-size: 1.1rem; }
+  #srvlist { list-style: none; margin: 0 0 12px; padding: 0; max-height: 50vh; overflow: auto; display: grid; gap: 6px; }
+  #srvlist button { width: 100%; text-align: left; }
 </style>
 </head>
 <body>
@@ -55,6 +65,15 @@
     <button id="clear" class="ghost">Effacer</button>
   </div>
 </section>
+
+<dialog id="srv">
+  <h2>Itinéraires du serveur</h2>
+  <ul id="srvlist"></ul>
+  <div class="row">
+    <button id="srvlocal" class="ghost">Depuis mon appareil</button>
+    <button id="srvclose" class="ghost">Fermer</button>
+  </div>
+</dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -260,7 +279,61 @@
   }
 
   $("route").onchange = function () { routeId = this.value; remember(); applyRoute(true); };
-  $("import").onclick = function () { $("file").click(); };
+  function serverRepo() {   // https://pseudo.github.io/depot/ -> { owner, repo }
+    var m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    var repo = location.pathname.split("/")[1];
+    return m && repo && !/\.html?$/i.test(repo) ? { owner: m[1], repo: repo } : null;
+  }
+  function listServer() {
+    var gh = serverRepo();
+    var viaApi = gh
+      ? fetch("https://api.github.com/repos/" + gh.owner + "/" + gh.repo + "/contents/itineraires")
+          .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+          .then(function (items) {
+            return items.filter(function (i) { return /\.gpx$/i.test(i.name); })
+              .map(function (i) { return { name: i.name.replace(/\.gpx$/i, ""), file: "itineraires/" + i.name }; });
+          })
+      : Promise.reject();
+    return viaApi.catch(function () {   // repli : liste écrite à la main
+      return fetch("itineraires.json", { cache: "no-cache" })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (l) { return l.filter(function (x) { return x && x.file; }); })
+        .catch(function () { return []; });
+    });
+  }
+  function importFromServer(it) {
+    say("Téléchargement…");
+    fetch(encodeURI(it.file))
+      .then(function (r) { if (!r.ok) throw 0; return r.text(); })
+      .then(function (t) {
+        var g = parseGpx(t, it.name);
+        if (!g) throw 0;
+        g.id = "s:" + it.file;   // même fichier réimporté = mise à jour, pas de doublon
+        routes = routes.filter(function (x) { return x.id !== g.id; });
+        routes.push(g); routeId = g.id;
+        saveRoutes(); remember(); fillSelect(); applyRoute(true);
+        $("srv").close();
+        say("« " + g.name + " » importé.");
+      })
+      .catch(function () { $("srv").close(); say("Impossible de charger « " + it.name + " ».", true); });
+  }
+  $("import").onclick = function () {
+    var ul = $("srvlist");
+    ul.innerHTML = "<li>Recherche des fichiers…</li>";
+    $("srv").showModal();
+    listServer().then(function (list) {
+      ul.innerHTML = "";
+      if (!list.length) { ul.innerHTML = "<li>Aucun fichier GPX trouvé sur le serveur.</li>"; return; }
+      list.forEach(function (it) {
+        var li = document.createElement("li"), b = document.createElement("button");
+        b.className = "ghost"; b.textContent = it.name;
+        b.onclick = function () { importFromServer(it); };
+        li.appendChild(b); ul.appendChild(li);
+      });
+    });
+  };
+  $("srvlocal").onclick = function () { $("srv").close(); $("file").click(); };
+  $("srvclose").onclick = function () { $("srv").close(); };
   $("file").onchange = function () {
     var input = this;
     var jobs = [].slice.call(input.files).map(function (f) {
@@ -294,19 +367,6 @@
     function has(id) { return routes.some(function (r) { return r.id === id; }); }
     routeId = has(saved) ? saved : "";
     fillSelect(); applyRoute(true);
-
-    // Itinéraires du dépôt : liste dans itineraires.json, fichiers GPX dans le dossier itineraires/
-    fetch("itineraires.json", { cache: "no-cache" })
-      .then(function (res) { return res.ok ? res.json() : []; })
-      .then(function (list) {
-        var remote = list.filter(function (x) { return x && x.file; })
-          .map(function (x) { return { id: "f:" + x.file, name: x.name || x.file, file: x.file }; });
-        if (!remote.length) return;
-        routes = remote.concat(routes);
-        if (!routeId && has(saved)) routeId = saved;
-        fillSelect(); applyRoute(true);
-      })
-      .catch(function () {});
   }
 
   load(); render(); initRoutes();
