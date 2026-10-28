@@ -51,6 +51,11 @@
     display: grid; justify-items: center; gap: 2px; padding: 3px 0 5px; background: rgba(255,255,255,.94);
     border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 2px 8px rgba(20,52,47,.18); }
   .compass span { font-size: .8rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .legend { position: absolute; z-index: 1000; left: 10px; top: calc(160px + env(safe-area-inset-top, 0px));
+    max-width: min(60vw, 240px); max-height: 28vh; overflow: auto; padding: 6px 8px; font-size: .78rem;
+    background: rgba(255,255,255,.94); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 2px 8px rgba(20,52,47,.18); }
+  .legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .legend i { flex: none; width: 18px; height: 6px; border-radius: 3px; }
   .me { position: relative; width: 26px; height: 26px; }
   .me i { position: absolute; inset: 3px; border-radius: 50%; background: var(--ink); border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.35); }
   .me .dir { position: absolute; inset: -10px; display: none; transition: transform .35s; }
@@ -77,6 +82,8 @@
   </svg>
   <span id="hdg">--</span>
 </div>
+
+<div class="legend" id="legend" hidden></div>
 
 <div class="tools">
   <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
@@ -117,7 +124,7 @@
   L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19, attribution: "&copy; OpenStreetMap"
   }).addTo(map);
-  var refLine = L.polyline([], { color: "#1d6fd8", weight: 7, opacity: .65 }).addTo(map);  // itinéraire à suivre
+  var refLayer = L.featureGroup().addTo(map);                                               // itinéraire à suivre (segments colorés)
   var line = L.polyline([], { color: "#d6336c", weight: 5 }).addTo(map);                    // trajet réel
   var marker = null;
 
@@ -282,7 +289,14 @@
 
   function currentRoute() { return routes.find(function (r) { return r.id === routeId; }); }
   function saveRoutes() {
-    try { localStorage.setItem(RKEY, JSON.stringify(routes.filter(function (r) { return !r.file; }))); return true; }
+    try {
+      localStorage.setItem(RKEY, JSON.stringify(routes.filter(function (r) { return !r.file; }).map(function (r) {
+        var o = { id: r.id, name: r.name };
+        if (r.segs) o.segs = r.segs; else o.pts = r.pts;
+        return o;
+      })));
+      return true;
+    }
     catch (e) { say("Mémoire pleine : supprimez un itinéraire.", true); return false; }
   }
   function thin(pts) {   // garde un point tous les 10 m pour alléger le stockage
@@ -293,17 +307,70 @@
     });
     return out;
   }
+  var REF_COLOR = "#1d6fd8";
+  var PALETTE = ["#1d6fd8", "#e8590c", "#2f9e44", "#7048e8", "#c2255c", "#0b7285", "#f08c00", "#495057"];
+  var GARMIN = {   // gpxx:DisplayColor (Garmin)
+    black: "#000000", darkred: "#8b0000", darkgreen: "#006400", darkyellow: "#b8860b", darkblue: "#00008b",
+    darkmagenta: "#8b008b", darkcyan: "#008b8b", lightgray: "#d3d3d3", darkgray: "#a9a9a9",
+    red: "#e03131", green: "#2f9e44", yellow: "#f2b800", blue: "#1c7ed6", magenta: "#e64fd0", cyan: "#00b8d9"
+  };
+  function normColor(v) {
+    if (!v) return null;
+    v = v.trim();
+    var k = v.toLowerCase().replace(/[\s_-]/g, "");
+    if (GARMIN[k]) return GARMIN[k];
+    var h = k.replace(/^#|^0x/, "");
+    if (/^[0-9a-f]{8}$/.test(h)) h = h.slice(2);                 // AARRGGBB (OsmAnd) : on ignore l'opacité
+    if (/^[0-9a-f]{6}$/.test(h)) return "#" + h;
+    if (/^[a-z]+$/.test(k)) { var o = new Option().style; o.color = k; if (o.color) return k; }   // nom CSS (orange…)
+    return null;
+  }
+  function childText(el, tag) {
+    for (var i = 0; i < el.children.length; i++) if (el.children[i].localName === tag) return el.children[i].textContent.trim();
+    return "";
+  }
+  function colorOf(el) {   // <extensions> … <DisplayColor> ou <color> (Garmin, OsmAnd, GPX style)
+    for (var i = 0; i < el.children.length; i++) {
+      if (el.children[i].localName !== "extensions") continue;
+      var all = el.children[i].getElementsByTagName("*");
+      for (var j = 0; j < all.length; j++) {
+        var n = all[j].localName.toLowerCase();
+        if (n === "displaycolor" || n === "color") { var c = normColor(all[j].textContent); if (c) return c; }
+      }
+    }
+    return null;
+  }
+  function readPts(parent, tag) {
+    var out = [];
+    parent.querySelectorAll(tag).forEach(function (n) {
+      var la = parseFloat(n.getAttribute("lat")), lo = parseFloat(n.getAttribute("lon"));
+      if (!isNaN(la) && !isNaN(lo)) out.push([la, lo]);
+    });
+    return out;
+  }
   function parseGpx(text, fallback) {
     var doc = new DOMParser().parseFromString(text, "application/xml");
     if (doc.querySelector("parsererror")) return null;
-    var pts = [];
-    doc.querySelectorAll("trkpt, rtept").forEach(function (n) {
-      var la = parseFloat(n.getAttribute("lat")), lo = parseFloat(n.getAttribute("lon"));
-      if (!isNaN(la) && !isNaN(lo)) pts.push([la, lo]);
+    var items = [].slice.call(doc.querySelectorAll("trk")).map(function (el) { return { el: el, trk: true }; })
+      .concat([].slice.call(doc.querySelectorAll("rte")).map(function (el) { return { el: el, trk: false }; }));
+    var segs = [];
+    items.forEach(function (it) {
+      var nm = childText(it.el, "name"), col = colorOf(it.el);
+      var parts = it.trk ? [].slice.call(it.el.querySelectorAll("trkseg")) : [it.el];
+      parts.forEach(function (part, k) {
+        var p = readPts(part, it.trk ? "trkpt" : "rtept");
+        if (p.length < 2) return;
+        var name = nm || ("Segment " + (segs.length + 1));
+        if (parts.length > 1) name += " (" + (k + 1) + "/" + parts.length + ")";
+        segs.push({ name: name, pts: thin(p), color: (part !== it.el && colorOf(part)) || col });
+      });
     });
-    if (pts.length < 2) return null;
-    var nm = doc.querySelector("trk > name, rte > name, metadata > name");
-    return { name: (nm && nm.textContent.trim()) || fallback, pts: thin(pts) };
+    if (!segs.length) return null;
+    segs.forEach(function (s, i) { if (!s.color) s.color = segs.length > 1 ? PALETTE[i % PALETTE.length] : REF_COLOR; });
+    var metaName = ""; var meta = doc.querySelector("metadata");
+    if (meta) metaName = childText(meta, "name");
+    var single = items.length === 1 ? childText(items[0].el, "name") : "";
+    return { name: metaName || single || fallback, segs: segs };
   }
   function fillSelect() {
     var sel = $("route");
@@ -313,32 +380,54 @@
     sel.value = routeId;
   }
   function remember() { try { localStorage.setItem(SKEY, routeId); } catch (e) {} }
+  function segsOf(r) { return r.segs || (r.pts ? [{ pts: r.pts, color: REF_COLOR, name: "" }] : []); }
+  function drawRoute(r) {
+    refLayer.clearLayers();
+    var leg = $("legend"); leg.innerHTML = "";
+    if (!r) { leg.hidden = true; return; }
+    var segs = segsOf(r);
+    segs.forEach(function (s) {
+      var pl = L.polyline(s.pts, { color: s.color || REF_COLOR, weight: 7, opacity: .8 }).addTo(refLayer);
+      if (s.name) pl.bindTooltip(s.name, { sticky: true });
+    });
+    line.bringToFront();   // le trajet réel reste au-dessus
+    leg.hidden = segs.length < 2;
+    if (segs.length > 1) segs.forEach(function (s) {
+      var row = document.createElement("div"), sw = document.createElement("i");
+      sw.style.background = s.color || REF_COLOR;
+      row.appendChild(sw); row.appendChild(document.createTextNode(s.name || "-"));
+      leg.appendChild(row);
+    });
+  }
   function applyRoute(fit) {
     var r = currentRoute();
     $("del").hidden = !r || !!r.file;          // les itinéraires du dépôt ne se suppriment pas ici
-    if (r && !r.pts) {                          // itinéraire du dépôt : chargé à la demande
-      refLine.setLatLngs([]);
+    if (r && r.file && !r.segs && !r.pts) {     // itinéraire du dépôt : chargé à la demande
+      drawRoute(null);
       say("Chargement de l'itinéraire…");
       fetch(r.file).then(function (res) { if (!res.ok) throw 0; return res.text(); })
         .then(function (t) {
           var g = parseGpx(t, r.name);
           if (!g) throw 0;
-          r.pts = g.pts;
+          r.segs = g.segs;
           if (currentRoute() === r) { applyRoute(fit); say("Itinéraire chargé."); }
         })
         .catch(function () { say("Impossible de charger « " + r.name + " ».", true); });
       return;
     }
-    refLine.setLatLngs(r ? r.pts : []);
-    if (r && fit) map.fitBounds(refLine.getBounds(), { paddingTopLeft: [20, 70], paddingBottomRight: [20, 200] });
+    drawRoute(r);
+    if (r && fit && refLayer.getLayers().length) map.fitBounds(refLayer.getBounds(), { paddingTopLeft: [20, 70], paddingBottomRight: [20, 200] });
   }
   function followMsg(p) {
-    var r = currentRoute();
-    if (!r || !r.pts) { say("Suivi en cours."); return; }
-    var min = Infinity;
-    r.pts.forEach(function (q) { var d = haversine(p, { lat: q[0], lon: q[1] }); if (d < min) min = d; });
+    var r = currentRoute(), segs = r ? segsOf(r) : [];
+    if (!segs.length) { say("Suivi en cours."); return; }
+    var min = Infinity, best = null;
+    segs.forEach(function (s) {
+      s.pts.forEach(function (q) { var d = haversine(p, { lat: q[0], lon: q[1] }); if (d < min) { min = d; best = s; } });
+    });
+    var where = best && segs.length > 1 && best.name ? " : " + best.name : "";
     if (min > OFF_ROUTE) say("Hors itinéraire : " + Math.round(min) + " m du tracé.", true);
-    else say("Sur l'itinéraire (écart " + Math.round(min) + " m).");
+    else say("Sur l'itinéraire" + where + " (écart " + Math.round(min) + " m).");
   }
 
   $("route").onchange = function () { routeId = this.value; remember(); applyRoute(true); };
