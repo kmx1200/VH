@@ -391,8 +391,13 @@
       if (s.name) pl.bindTooltip(s.name, { sticky: true });
     });
     line.bringToFront();   // le trajet réel reste au-dessus
-    leg.hidden = segs.length < 2;
-    if (segs.length > 1) segs.forEach(function (s) {
+    var uniq = [], seen = {};   // une seule ligne par couple (couleur, nom)
+    segs.forEach(function (s) {
+      var k = (s.color || REF_COLOR) + "|" + (s.name || "");
+      if (!seen[k]) { seen[k] = true; uniq.push(s); }
+    });
+    leg.hidden = uniq.length < 2;
+    if (uniq.length > 1) uniq.forEach(function (s) {
       var row = document.createElement("div"), sw = document.createElement("i");
       sw.style.background = s.color || REF_COLOR;
       row.appendChild(sw); row.appendChild(document.createTextNode(s.name || "-"));
@@ -455,11 +460,12 @@
   }
   function importFromServer(it) {
     say("Téléchargement…");
-    fetch(encodeURI(it.file))
-      .then(function (r) { if (!r.ok) throw 0; return r.text(); })
+    fetch(encodeURI(it.file), { cache: "no-cache" })
+      .then(function (r) { if (!r.ok) { var e = new Error("HTTP " + r.status); e.kind = "http"; throw e; } return r.text(); })
       .then(function (t) {
         var g = parseGpx(t, it.name);
-        if (!g) throw 0;
+        if (!g) { var e = new Error("illisible"); e.kind = "parse"; throw e; }
+        g.name = it.name;        // le nom du fichier choisi dans la liste sert de nom d'itinéraire
         g.id = "s:" + it.file;   // même fichier réimporté = mise à jour, pas de doublon
         routes = routes.filter(function (x) { return x.id !== g.id; });
         routes.push(g); routeId = g.id;
@@ -467,7 +473,14 @@
         $("srv").close();
         say("« " + g.name + " » importé.");
       })
-      .catch(function () { $("srv").close(); say("Impossible de charger « " + it.name + " ».", true); });
+      .catch(function (e) {
+        $("srv").close();
+        var why = e && e.kind === "http" ? "fichier introuvable sur le serveur (" + e.message + ")"
+          : e && e.kind === "parse" ? "fichier GPX illisible"
+          : e && e.name === "TypeError" ? "réseau indisponible"
+          : "erreur : " + (e && e.message ? e.message : e);
+        say("Impossible de charger « " + it.name + " » : " + why + ".", true);
+      });
   }
   $("import").onclick = function () {
     var ul = $("srvlist");
