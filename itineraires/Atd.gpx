@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="QGIS export VHMaps" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:gpx_style="http://www.topografix.com/GPX/gpx_style/0/2">
+  <metadata><name>Nouvelle couche en mémoire</name></metadata>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0C50FC</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.666705" lon="-2.451217"/>
+      <trkpt lat="47.666703" lon="-2.451024"/>
+      <trkpt lat="47.666647" lon="-2.450847"/>
+      <trkpt lat="47.666604" lon="-2.450695"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Pas de  salage</name>
+    <extensions><gpx_style:line><gpx_style:color>F4E803</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Yellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.666604" lon="-2.450695"/>
+      <trkpt lat="47.666582" lon="-2.450422"/>
+      <trkpt lat="47.666568" lon="-2.450238"/>
+      <trkpt lat="47.666431" lon="-2.450221"/>
+      <trkpt lat="47.666226" lon="-2.450219"/>
+      <trkpt lat="47.666213" lon="-2.450542"/>
+      <trkpt lat="47.666331" lon="-2.450534"/>
+      <trkpt lat="47.666342" lon="-2.450303"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0C50FC</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.666342" lon="-2.450303"/>
+      <trkpt lat="47.666553" lon="-2.450319"/>
+      <trkpt lat="47.666567" lon="-2.450679"/>
+      <trkpt lat="47.666657" lon="-2.451032"/>
+      <trkpt lat="47.666664" lon="-2.451204"/>
+    </trkseg>
+  </trk>
+</gpx>
