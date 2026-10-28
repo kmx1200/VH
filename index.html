@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#14342f">
+<script>try{var t=localStorage.getItem("vhmaps-theme");if(t!=="dark"&&t!=="light")t=(window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches)?"dark":"light";document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -14,7 +15,22 @@
 <title>VHMaps</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-  :root { --ink:#14342f; --paper:#f3f6f1; --line:#d5ddd3; --route:#d6336c; --go:#1f7a5c; --stop:#b3261e; }
+  :root { color-scheme: light; --ink:#14342f; --paper:#f3f6f1; --line:#d5ddd3; --route:#d6336c; --go:#1f7a5c; --stop:#b3261e;
+    --surface:#ffffff; --surface-a:rgba(255,255,255,.94); --err:#b3261e; --me:#14342f; --map-bg:#dddddd; }
+  :root[data-theme="dark"] { color-scheme: dark; --ink:#e4ede8; --paper:#17211f; --line:#36463f; --route:#ff6b9d; --go:#2b8a67; --stop:#d6453d;
+    --surface:#212e2b; --surface-a:rgba(33,46,43,.94); --err:#ff8a80; --me:#4dabf7; --map-bg:#1b2523; }
+  :root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+  .leaflet-container { background: var(--map-bg); }
+  .leaflet-tooltip { background: var(--surface); color: var(--ink); border-color: var(--line); }
+  .leaflet-tooltip-top:before { border-top-color: var(--surface); }
+  .leaflet-tooltip-bottom:before { border-bottom-color: var(--surface); }
+  .leaflet-tooltip-left:before { border-left-color: var(--surface); }
+  .leaflet-tooltip-right:before { border-right-color: var(--surface); }
+  .leaflet-control-attribution { background: var(--surface-a); color: var(--ink); }
+  .leaflet-control-attribution a { color: var(--go); }
+  .c-bg { fill: var(--surface); stroke: var(--line); }
+  .c-n { fill: var(--err); }
+  .c-needle { fill: var(--ink); }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); }
   #map { position: absolute; inset: 0; bottom: 0; }
@@ -29,13 +45,13 @@
   button:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
   #toggle { flex: 1; color: #fff; background: var(--go); font-size: 1.1rem; }
   #toggle.on { background: var(--stop); }
-  .ghost { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
   #msg { font-size: .85rem; min-height: 1.2em; margin: 0 0 8px; }
-  #msg.err { color: var(--stop); }
+  #msg.err { color: var(--err); }
   .routebar { position: absolute; top: 0; left: 0; right: 0; z-index: 1000; display: flex; gap: 6px;
     padding: calc(10px + env(safe-area-inset-top, 0px)) 10px 0; }
   .routebar select { flex: 1; min-width: 0; font: inherit; padding: 12px; border-radius: 12px;
-    border: 1px solid var(--line); background: #fff; color: var(--ink); }
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
   .routebar button { padding: 12px; box-shadow: 0 2px 8px rgba(20,52,47,.15); }
   dialog { border: 0; border-radius: 16px; padding: 16px; width: min(92vw, 420px); background: var(--paper); color: var(--ink); }
   dialog::backdrop { background: rgba(20,52,47,.45); }
@@ -44,20 +60,20 @@
   #srvlist button { width: 100%; text-align: left; }
   [hidden] { display: none !important; }
   .tools { position: absolute; z-index: 1000; right: 10px; top: calc(66px + env(safe-area-inset-top, 0px)); display: grid; gap: 8px; }
-  .tool { width: 46px; height: 46px; padding: 0; display: grid; place-items: center; background: #fff; color: var(--ink);
+  .tool { width: 46px; height: 46px; padding: 0; display: grid; place-items: center; background: var(--surface); color: var(--ink);
     border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(20,52,47,.18); }
-  .tool[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .tool[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   .compass { position: absolute; z-index: 1000; left: 10px; top: calc(66px + env(safe-area-inset-top, 0px)); width: 70px;
-    display: grid; justify-items: center; gap: 2px; padding: 3px 0 5px; background: rgba(255,255,255,.94);
+    display: grid; justify-items: center; gap: 2px; padding: 3px 0 5px; background: var(--surface-a);
     border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 2px 8px rgba(20,52,47,.18); }
   .compass span { font-size: .8rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .legend { position: absolute; z-index: 1000; left: 10px; top: calc(160px + env(safe-area-inset-top, 0px));
     max-width: min(60vw, 240px); max-height: 28vh; overflow: auto; padding: 6px 8px; font-size: .78rem;
-    background: rgba(255,255,255,.94); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 2px 8px rgba(20,52,47,.18); }
+    background: var(--surface-a); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 2px 8px rgba(20,52,47,.18); }
   .legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
   .legend i { flex: none; width: 18px; height: 6px; border-radius: 3px; }
   .me { position: relative; width: 26px; height: 26px; }
-  .me i { position: absolute; inset: 3px; border-radius: 50%; background: var(--ink); border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.35); }
+  .me i { position: absolute; inset: 3px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.35); }
   .me .dir { position: absolute; inset: -10px; display: none; transition: transform .35s; }
   .me.has .dir { display: block; }
   .me .dir::before { content: ""; position: absolute; left: 50%; top: 0; margin-left: -8px; border-left: 8px solid transparent;
@@ -76,9 +92,9 @@
 
 <div class="compass" id="compass" role="img" aria-label="Direction">
   <svg viewBox="0 0 64 64" width="60" height="60" aria-hidden="true">
-    <circle cx="32" cy="32" r="30" fill="#ffffff" stroke="#d5ddd3" stroke-width="2"/>
-    <text x="32" y="14" text-anchor="middle" font-size="11" font-weight="700" fill="#b3261e" font-family="system-ui,sans-serif">N</text>
-    <g id="needle"><path d="M32 18 L40 42 L32 36 L24 42 Z" fill="#14342f"/></g>
+    <circle class="c-bg" cx="32" cy="32" r="30" stroke-width="2"/>
+    <text class="c-n" x="32" y="14" text-anchor="middle" font-size="11" font-weight="700" font-family="system-ui,sans-serif">N</text>
+    <g id="needle"><path class="c-needle" d="M32 18 L40 42 L32 36 L24 42 Z"/></g>
   </svg>
   <span id="hdg">--</span>
 </div>
@@ -87,6 +103,7 @@
 
 <div class="tools">
   <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
+  <button id="theme" class="tool" aria-label="Mode sombre"></button>
   <button id="install" class="tool" aria-label="Installer l'application"></button>
 </div>
 
@@ -574,6 +591,31 @@
     else if (ios) say("Safari : touchez Partager, puis « Sur l'écran d'accueil ».");
     else say("Menu du navigateur : « Installer l'application » ou « Ajouter à l'écran d'accueil ».");
   };
+  // ---------- Thème clair / sombre ----------
+  var TKEY = "vhmaps-theme", themeBtn = $("theme");
+  var I_MOON = ICON("M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z");
+  var I_SUN = ICON("M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4");
+  var mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
+  function systemTheme() { return mq && mq.matches ? "dark" : "light"; }
+  function storedTheme() {
+    try { var t = localStorage.getItem(TKEY); return t === "dark" || t === "light" ? t : null; } catch (e) { return null; }
+  }
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute("content", t === "dark" ? "#0f1917" : "#14342f");
+    themeBtn.innerHTML = t === "dark" ? I_SUN : I_MOON;
+    themeBtn.setAttribute("aria-label", t === "dark" ? "Passer en mode clair" : "Passer en mode sombre");
+  }
+  applyTheme(storedTheme() || systemTheme());
+  themeBtn.onclick = function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    // choisir le thème du système = retour au mode automatique
+    try { if (next === systemTheme()) localStorage.removeItem(TKEY); else localStorage.setItem(TKEY, next); } catch (e) {}
+    applyTheme(next);
+  };
+  if (mq && mq.addEventListener) mq.addEventListener("change", function () { if (!storedTheme()) applyTheme(systemTheme()); });
+
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
   }
