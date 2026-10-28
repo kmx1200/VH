@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="VHMaps" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3">
+  <metadata><name>Exemple en couleurs</name></metadata>
+  <!-- Couleur au format Garmin : nom de couleur -->
+  <trk>
+    <name>Secteur Nord</name>
+    <extensions><gpxx:TrackExtension><gpxx:DisplayColor>Red</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="48.8675" lon="2.3636"/>
+      <trkpt lat="48.8690" lon="2.3660"/>
+      <trkpt lat="48.8700" lon="2.3640"/>
+    </trkseg>
+  </trk>
+  <!-- Couleur en hexadécimal -->
+  <trk>
+    <name>Secteur Est</name>
+    <extensions><color>#1f7a5c</color></extensions>
+    <trkseg>
+      <trkpt lat="48.8700" lon="2.3640"/>
+      <trkpt lat="48.8693" lon="2.3625"/>
+      <trkpt lat="48.8685" lon="2.3615"/>
+    </trkseg>
+  </trk>
+  <!-- Couleur au format OsmAnd : AARRGGBB -->
+  <trk>
+    <name>Secteur Sud</name>
+    <extensions><color>#FFFF9900</color></extensions>
+    <trkseg>
+      <trkpt lat="48.8685" lon="2.3615"/>
+      <trkpt lat="48.8676" lon="2.3622"/>
+      <trkpt lat="48.8675" lon="2.3636"/>
+    </trkseg>
+  </trk>
+  <!-- Sans couleur : une couleur est attribuée automatiquement -->
+  <trk>
+    <name>Branche</name>
+    <trkseg>
+      <trkpt lat="48.8690" lon="2.3660"/>
+      <trkpt lat="48.8696" lon="2.3680"/>
+      <trkpt lat="48.8702" lon="2.3695"/>
+    </trkseg>
+  </trk>
+</gpx>
