@@ -1,12 +1,14 @@
-# Mon itinéraire
+# VHMaps
 
-Appli web de suivi GPS (Leaflet + OpenStreetMap) : suivi d'un itinéraire de référence, enregistrement du tracé réel, export GPX.
+Appli web (PWA) de suivi GPS : itinéraire de référence, tracé réel, direction (cap), export GPX.
+Fonctionne hors ligne une fois installée (fonds de carte déjà consultés mis en cache).
 
 ## Structure
 
 ```
 index.html
 manifest.json
+sw.js                 ← service worker (hors ligne)
 itineraires.json      ← liste de repli (facultative)
 itineraires/          ← déposer ici les fichiers .gpx
 icons/
@@ -15,16 +17,12 @@ icons/
 
 ## Publier sur GitHub Pages
 
-1. Créer un dépôt public et y envoyer tout le contenu de ce dossier (à la racine).
-2. Settings → Pages → Source : « Deploy from a branch », branche `main`, dossier `/ (root)`.
-3. L'appli est disponible sur `https://PSEUDO.github.io/NOM-DU-DEPOT/` (HTTPS requis pour la géolocalisation).
+1. Envoyer tout le contenu de ce dossier à la racine d'un dépôt public.
+2. Settings → Pages → « Deploy from a branch », branche `main`, dossier `/ (root)`.
+3. Ouvrir `https://PSEUDO.github.io/NOM-DU-DEPOT/` (HTTPS requis pour le GPS).
 
-## Ajouter un itinéraire
+## Utilisation
 
-Déposer le `.gpx` dans `itineraires/` puis commit. Le bouton « Importer GPX » liste automatiquement
-les fichiers du dossier (via l'API GitHub). Sur un domaine personnalisé, la liste est lue dans
-`itineraires.json` :
-
-```json
-[ { "name": "Boucle du lac", "file": "itineraires/boucle-lac.gpx" } ]
-```
+- Bouton plein écran : masque la barre du navigateur (Android, ordinateur, iPad).
+- Bouton installer : ajoute VHMaps à l'écran d'accueil (iPhone : Partager → Sur l'écran d'accueil).
+- Ajouter un itinéraire : déposer le `.gpx` dans `itineraires/`, puis « Importer GPX » dans l'appli.

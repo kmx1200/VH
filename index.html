@@ -8,8 +8,10 @@
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VHMaps">
+<meta name="application-name" content="VHMaps">
 <meta name="mobile-web-app-capable" content="yes">
-<title>Mon itinéraire</title>
+<title>VHMaps</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root { --ink:#14342f; --paper:#f3f6f1; --line:#d5ddd3; --route:#d6336c; --go:#1f7a5c; --stop:#b3261e; }
@@ -40,16 +42,45 @@
   dialog h2 { margin: 0 0 10px; font-size: 1.1rem; }
   #srvlist { list-style: none; margin: 0 0 12px; padding: 0; max-height: 50vh; overflow: auto; display: grid; gap: 6px; }
   #srvlist button { width: 100%; text-align: left; }
+  [hidden] { display: none !important; }
+  .tools { position: absolute; z-index: 1000; right: 10px; top: calc(66px + env(safe-area-inset-top, 0px)); display: grid; gap: 8px; }
+  .tool { width: 46px; height: 46px; padding: 0; display: grid; place-items: center; background: #fff; color: var(--ink);
+    border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(20,52,47,.18); }
+  .tool[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .compass { position: absolute; z-index: 1000; left: 10px; top: calc(66px + env(safe-area-inset-top, 0px)); width: 70px;
+    display: grid; justify-items: center; gap: 2px; padding: 3px 0 5px; background: rgba(255,255,255,.94);
+    border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 2px 8px rgba(20,52,47,.18); }
+  .compass span { font-size: .8rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .me { position: relative; width: 26px; height: 26px; }
+  .me i { position: absolute; inset: 3px; border-radius: 50%; background: var(--ink); border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.35); }
+  .me .dir { position: absolute; inset: -10px; display: none; transition: transform .35s; }
+  .me.has .dir { display: block; }
+  .me .dir::before { content: ""; position: absolute; left: 50%; top: 0; margin-left: -8px; border-left: 8px solid transparent;
+    border-right: 8px solid transparent; border-bottom: 14px solid var(--route); }
 </style>
 </head>
 <body>
-<div id="map" role="application" aria-label="Carte de l'itinéraire"></div>
+<div id="map" role="application" aria-label="Carte VHMaps"></div>
 
 <div class="routebar">
   <select id="route" aria-label="Itinéraire à suivre"></select>
   <button id="import" class="ghost">Importer GPX</button>
   <button id="del" class="ghost" aria-label="Supprimer cet itinéraire" hidden>✕</button>
   <input type="file" id="file" accept=".gpx,application/gpx+xml,text/xml" multiple hidden>
+</div>
+
+<div class="compass" id="compass" role="img" aria-label="Direction">
+  <svg viewBox="0 0 64 64" width="60" height="60" aria-hidden="true">
+    <circle cx="32" cy="32" r="30" fill="#ffffff" stroke="#d5ddd3" stroke-width="2"/>
+    <text x="32" y="14" text-anchor="middle" font-size="11" font-weight="700" fill="#b3261e" font-family="system-ui,sans-serif">N</text>
+    <g id="needle"><path d="M32 18 L40 42 L32 36 L24 42 Z" fill="#14342f"/></g>
+  </svg>
+  <span id="hdg">--</span>
+</div>
+
+<div class="tools">
+  <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
+  <button id="install" class="tool" aria-label="Installer l'application"></button>
 </div>
 
 <section class="sheet">
@@ -114,6 +145,35 @@
     var x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
     return 2 * R * Math.asin(Math.sqrt(x));
   }
+  // ---------- Direction ----------
+  var shown = 0, hasHeading = false;
+  var CARDS = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+  function bearing(a, b) {
+    var r = Math.PI / 180, dl = (b.lon - a.lon) * r;
+    var y = Math.sin(dl) * Math.cos(b.lat * r);
+    var x = Math.cos(a.lat * r) * Math.sin(b.lat * r) - Math.sin(a.lat * r) * Math.cos(b.lat * r) * Math.cos(dl);
+    return (Math.atan2(y, x) / r + 360) % 360;
+  }
+  function setHeading(h) {
+    h = (h + 360) % 360;
+    shown += ((h - shown + 540) % 360) - 180;   // rotation par le plus court chemin
+    hasHeading = true;
+    $("needle").setAttribute("transform", "rotate(" + shown.toFixed(1) + " 32 32)");
+    $("hdg").textContent = CARDS[Math.round(h / 45) % 8] + " " + Math.round(h) + "°";
+    $("compass").setAttribute("aria-label", "Direction " + CARDS[Math.round(h / 45) % 8] + " " + Math.round(h) + " degrés");
+    if (marker && marker.getElement()) {
+      var el = marker.getElement().querySelector(".me");
+      el.className = "me has";
+      el.querySelector(".dir").style.transform = "rotate(" + shown.toFixed(1) + "deg)";
+    }
+  }
+  function resetHeading() {
+    shown = 0; hasHeading = false;
+    $("needle").setAttribute("transform", "rotate(0 32 32)");
+    $("hdg").textContent = "--";
+    if (marker && marker.getElement()) marker.getElement().querySelector(".me").className = "me";
+  }
+
   function totalMeters() {
     var d = 0;
     for (var i = 1; i < points.length; i++) d += haversine(points[i - 1], points[i]);
@@ -138,10 +198,13 @@
   function onPosition(pos) {
     var c = pos.coords;
     var p = { lat: c.latitude, lon: c.longitude, t: pos.timestamp };
-    if (!marker) marker = L.circleMarker([p.lat, p.lon], { radius: 8, color: "#fff", weight: 3, fillColor: "#14342f", fillOpacity: 1 }).addTo(map);
+    if (!marker) marker = L.marker([p.lat, p.lon], { interactive: false, keyboard: false, icon: L.divIcon({
+      className: "", iconSize: [26, 26], iconAnchor: [13, 13], html: '<div class="me"><span class="dir"></span><i></i></div>' }) }).addTo(map);
     marker.setLatLng([p.lat, p.lon]);
     if (c.accuracy > MAX_ACCURACY) { say("Signal GPS faible (±" + Math.round(c.accuracy) + " m)…"); return; }
     var last = points[points.length - 1];
+    if (typeof c.heading === "number" && !isNaN(c.heading) && (c.speed == null || c.speed > 0.5)) setHeading(c.heading);
+    else if (last && haversine(last, p) >= MIN_STEP) setHeading(bearing(last, p));
     if (!last || haversine(last, p) >= MIN_STEP) {
       points.push(p);
       line.addLatLng([p.lat, p.lon]);
@@ -190,7 +253,7 @@
   $("clear").onclick = function () {
     if (!confirm("Effacer l'itinéraire enregistré ?")) return;
     if (watchId !== null) stop();
-    points = []; elapsed = 0; line.setLatLngs([]);
+    points = []; elapsed = 0; line.setLatLngs([]); resetHeading();
     try { localStorage.removeItem(KEY); } catch (e) {}
     $("toggle").textContent = "Démarrer"; render(); say("Itinéraire effacé.");
   };
@@ -200,10 +263,10 @@
     var trkpts = points.map(function (p) {
       return '<trkpt lat="' + p.lat + '" lon="' + p.lon + '"><time>' + new Date(p.t).toISOString() + "</time></trkpt>";
     }).join("");
-    var gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="Mon itinéraire" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Itinéraire</name><trkseg>' + trkpts + "</trkseg></trk></gpx>";
+    var gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="VHMaps" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Itinéraire</name><trkseg>' + trkpts + "</trkseg></trk></gpx>";
     var a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([gpx], { type: "application/gpx+xml" }));
-    a.download = "itineraire-" + new Date().toISOString().slice(0, 10) + ".gpx";
+    a.download = "vhmaps-" + new Date().toISOString().slice(0, 10) + ".gpx";
     a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   };
@@ -367,6 +430,50 @@
     function has(id) { return routes.some(function (r) { return r.id === id; }); }
     routeId = has(saved) ? saved : "";
     fillSelect(); applyRoute(true);
+  }
+
+  // ---------- Plein écran ----------
+  var ICON = function (d) { return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>'; };
+  var I_ENTER = ICON("M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5");
+  var I_EXIT = ICON("M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5");
+  var I_INSTALL = ICON("M12 4v11M7 11l5 5 5-5M5 20h14");
+  var fsBtn = $("fs");
+  var canFs = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function syncFs() {
+    var on = isFs();
+    fsBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    fsBtn.setAttribute("aria-label", on ? "Quitter le plein écran" : "Plein écran");
+    fsBtn.innerHTML = on ? I_EXIT : I_ENTER;
+    setTimeout(function () { map.invalidateSize(); }, 250);
+  }
+  fsBtn.hidden = !canFs;   // iPhone : pas d'API plein écran, utiliser l'écran d'accueil
+  syncFs();
+  fsBtn.onclick = function () {
+    if (isFs()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+    var el = document.documentElement, f = el.requestFullscreen || el.webkitRequestFullscreen;
+    var r = f.call(el);
+    if (r && r.catch) r.catch(function () { say("Plein écran refusé par le navigateur.", true); });
+  };
+  document.addEventListener("fullscreenchange", syncFs);
+  document.addEventListener("webkitfullscreenchange", syncFs);
+  window.addEventListener("resize", function () { map.invalidateSize(); });
+
+  // ---------- Installation (PWA) ----------
+  var deferred = null, installBtn = $("install");
+  var standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  installBtn.innerHTML = I_INSTALL;
+  installBtn.hidden = standalone;
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; });
+  window.addEventListener("appinstalled", function () { installBtn.hidden = true; deferred = null; say("VHMaps est installée."); });
+  installBtn.onclick = function () {
+    if (deferred) { deferred.prompt(); deferred.userChoice.then(function () { deferred = null; }); }
+    else if (ios) say("Safari : touchez Partager, puis « Sur l'écran d'accueil ».");
+    else say("Menu du navigateur : « Installer l'application » ou « Ajouter à l'écran d'accueil ».");
+  };
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
   }
 
   load(); render(); initRoutes();

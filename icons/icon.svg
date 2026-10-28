@@ -1,6 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#14342f"/>
-  <path d="M130 380 C 190 380, 170 250, 256 250 S 330 130, 382 132" fill="none" stroke="#d6336c" stroke-width="30" stroke-linecap="round"/>
-  <circle cx="130" cy="380" r="28" fill="#1f7a5c" stroke="#fff" stroke-width="10"/>
-  <circle cx="382" cy="132" r="28" fill="#fff"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="VHMaps">
+<clipPath id="c"><rect width="512" height="512" rx="96"/></clipPath><rect width="512" height="512" rx="96" fill="#14342f"/>
+<g clip-path="url(#c)">
+<polygon points="0,392 90,384 200,390 320,382 430,388 512,383 512,512 0,512" fill="#e9f2f6"/>
+<circle cx="96" cy="104" r="8" fill="#ffffff"/>
+<circle cx="190" cy="64" r="6" fill="#ffffff"/>
+<circle cx="320" cy="96" r="9" fill="#ffffff"/>
+<circle cx="420" cy="140" r="6" fill="#ffffff"/>
+<circle cx="58" cy="186" r="6" fill="#ffffff"/>
+<circle cx="250" cy="132" r="5" fill="#ffffff"/>
+<circle cx="450" cy="70" r="5" fill="#ffffff"/>
+<circle cx="140" cy="160" r="4" fill="#ffffff"/>
+<g transform="translate(256 256) scale(1.0) translate(-274 -286)">
+<rect x="70" y="332" width="322" height="16" rx="0" fill="#2b2f33"/>
+<rect x="70" y="240" width="184" height="94" rx="8" fill="#ffb400"/>
+<rect x="70" y="320" width="184" height="14" rx="0" fill="#d98f00"/>
+<polygon points="82,240 242,240 226,212 98,212" fill="#e4eaec"/>
+<polygon points="256,232 340,232 372,286 392,292 392,334 256,334" fill="#ffb400"/>
+<polygon points="268,244 332,244 356,284 268,284" fill="#bfe3f2"/>
+<rect x="288" y="214" width="44" height="16" rx="4" fill="#ff6a00"/>
+<rect x="370" y="314" width="44" height="14" rx="0" fill="#4a5258"/>
+<polygon points="398,228 452,204 478,214 470,372 446,380 398,350" fill="#ffb400"/>
+<polygon points="398,228 412,222 412,356 398,350" fill="#d98f00"/>
+<polygon points="420,262 466,242 467,258 421,278" fill="#14342f"/>
+<circle cx="388" cy="306" r="6" fill="#fff6c0"/>
+<circle cx="150" cy="352" r="38" fill="#1d1f21"/>
+<circle cx="150" cy="352" r="16" fill="#c9d1d5"/>
+<circle cx="320" cy="352" r="38" fill="#1d1f21"/>
+<circle cx="320" cy="352" r="16" fill="#c9d1d5"/>
+<polygon points="440,386 472,350 512,386" fill="#ffffff"/>
+</g></g></svg>

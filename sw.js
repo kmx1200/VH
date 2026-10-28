@@ -1,0 +1,82 @@
+/* VHMaps — service worker : fonctionnement hors ligne */
+const VERSION = "vhmaps-v1";
+const SHELL = VERSION + "-shell";
+const TILES = VERSION + "-tiles";
+const DATA = VERSION + "-data";
+const MAX_TILES = 800;
+const LEAFLET = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/";
+const PRECACHE = [
+  "./", "index.html", "manifest.json",
+  "icons/icon.svg", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png",
+  LEAFLET + "leaflet.min.js", LEAFLET + "leaflet.min.css"
+];
+
+self.addEventListener("install", (e) => {
+  e.waitUntil(
+    caches.open(SHELL).then((c) => Promise.allSettled(PRECACHE.map((u) => c.add(u)))).then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener("activate", (e) => {
+  e.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
+  );
+});
+
+async function trim(cacheName, max) {
+  const c = await caches.open(cacheName);
+  const keys = await c.keys();
+  for (let i = 0; i < keys.length - max; i++) await c.delete(keys[i]);
+}
+
+async function networkFirst(req, cacheName) {
+  const c = await caches.open(cacheName);
+  try {
+    const res = await fetch(req);
+    if (res && res.ok) c.put(req, res.clone());
+    return res;
+  } catch (err) {
+    const hit = await c.match(req, { ignoreSearch: true });
+    if (hit) return hit;
+    throw err;
+  }
+}
+
+async function cacheFirst(req, cacheName, makeReq) {
+  const c = await caches.open(cacheName);
+  const hit = await c.match(req);
+  if (hit) return hit;
+  const res = await fetch(makeReq ? makeReq(req) : req);
+  if (res && (res.ok || res.type === "opaque")) {
+    c.put(req, res.clone());
+    if (cacheName === TILES) trim(TILES, MAX_TILES);
+  }
+  return res;
+}
+
+self.addEventListener("fetch", (e) => {
+  const req = e.request;
+  if (req.method !== "GET") return;
+  const url = new URL(req.url);
+
+  if (url.hostname === "tile.openstreetmap.org") {          // fonds de carte : déjà vus = disponibles hors ligne
+    e.respondWith(cacheFirst(req, TILES, (r) => new Request(r.url, { mode: "cors", credentials: "omit" })).catch(() => Response.error()));
+    return;
+  }
+  if (url.hostname === "api.github.com") {                  // liste des GPX du serveur
+    e.respondWith(networkFirst(req, DATA).catch(() => Response.error()));
+    return;
+  }
+  if (url.hostname === "cdnjs.cloudflare.com") {            // Leaflet
+    e.respondWith(cacheFirst(req, SHELL));
+    return;
+  }
+  if (url.origin === location.origin) {                     // appli, GPX, icônes : version en ligne d'abord
+    const cache = req.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith("/") ? SHELL : url.pathname.includes("/itineraires") ? DATA : SHELL;
+    e.respondWith(
+      networkFirst(req, cache).catch(async () => (req.mode === "navigate" ? (await caches.match("index.html")) || (await caches.match("./")) : Response.error()))
+    );
+  }
+});
