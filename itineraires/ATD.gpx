@@ -13,7 +13,7 @@
   </trk>
   <trk>
     <name>Pas de  salage</name>
-    <extensions><gpx_style:line><gpx_style:color>C97B36</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>DarkYellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <extensions><gpx_style:line><gpx_style:color>F4E803</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Yellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
     <trkseg>
       <trkpt lat="47.666604" lon="-2.450695"/>
       <trkpt lat="47.666582" lon="-2.450422"/>
