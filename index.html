@@ -19,7 +19,7 @@
     --surface:#ffffff; --surface-a:rgba(255,255,255,.94); --err:#b3261e; --me:#14342f; --map-bg:#dddddd; }
   :root[data-theme="dark"] { color-scheme: dark; --ink:#e4ede8; --paper:#17211f; --line:#36463f; --route:#ff6b9d; --go:#2b8a67; --stop:#d6453d;
     --surface:#212e2b; --surface-a:rgba(33,46,43,.94); --err:#ff8a80; --me:#4dabf7; --map-bg:#1b2523; }
-  :root[data-theme="dark"]:not([data-base="ortho"]) .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+  :root[data-theme="dark"] .vh-invert { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
   .leaflet-container { background: var(--map-bg); }
   .leaflet-tooltip { background: var(--surface); color: var(--ink); border-color: var(--line); }
   .leaflet-tooltip-top:before { border-top-color: var(--surface); }
@@ -81,6 +81,11 @@
   .leaflet-bottom { bottom: var(--sheet-h, 0px); }   /* l'attribution reste visible au-dessus du panneau */
   dialog label { display: grid; gap: 4px; margin: 0 0 10px; font-size: .85rem; }
   dialog select { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  dialog { max-height: 90vh; overflow: auto; }
+  dialog h3 { margin: 12px 0 6px; font-size: .95rem; }
+  dialog label.chk { display: flex; align-items: center; gap: 8px; }
+  dialog input[type="range"] { width: 100%; }
+  dialog .hint { font-size: .8rem; opacity: .75; margin: 0 0 8px; }
   dialog .row { flex-wrap: wrap; }
   dialog progress { width: 100%; }
   #offEst, #offInfo { font-size: .85rem; margin: 0 0 8px; }
@@ -113,7 +118,7 @@
 <div class="tools">
   <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
   <button id="theme" class="tool" aria-label="Mode sombre"></button>
-  <button id="offline" class="tool" aria-label="Cartes hors ligne"></button>
+  <button id="offline" class="tool" aria-label="Cartes et hors ligne"></button>
   <button id="install" class="tool" aria-label="Installer l'application"></button>
 </div>
 
@@ -141,7 +146,7 @@
 </dialog>
 
 <dialog id="off">
-  <h2>Cartes hors ligne</h2>
+  <h2>Cartes</h2>
   <label>Fond de carte
     <select id="offBase">
       <option value="ign">Plan IGN</option>
@@ -149,6 +154,12 @@
       <option value="osm">OpenStreetMap (en ligne uniquement)</option>
     </select>
   </label>
+  <h3>Superpositions</h3>
+  <label class="chk"><input type="checkbox" id="ovPcrs"> PCRS (plan de corps de rue simplifié)</label>
+  <label class="chk"><input type="checkbox" id="ovCover"> Emprise des données PCRS</label>
+  <label>Opacité du PCRS <input type="range" id="ovOp" min="20" max="100" step="10" value="100"></label>
+  <p class="hint">Le PCRS s'affiche à partir du zoom 16, seulement là où il est diffusé en open data, et en ligne uniquement.</p>
+  <h3>Hors ligne</h3>
   <label>Zone à télécharger
     <select id="offArea">
       <option value="route">Autour de l'itinéraire sélectionné</option>
@@ -185,11 +196,11 @@
   var IGN = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&LAYER=";
   var BASES = {
     ign:   { url: IGN + "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
-             native: 18, kb: 16, offline: true, attr: "Plan IGN &copy; IGN / G&eacute;oplateforme" },
+             native: 18, kb: 16, offline: true, cls: "vh-invert", attr: "Plan IGN &copy; IGN / G&eacute;oplateforme" },
     ortho: { url: IGN + "ORTHOIMAGERY.ORTHOPHOTOS&FORMAT=image/jpeg&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
-             native: 19, kb: 30, offline: true, attr: "Photographies a&eacute;riennes &copy; IGN / G&eacute;oplateforme" },
+             native: 19, kb: 30, offline: true, cls: "", attr: "Photographies a&eacute;riennes &copy; IGN / G&eacute;oplateforme" },
     osm:   { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
-             native: 19, kb: 20, offline: false, attr: "&copy; OpenStreetMap" }
+             native: 19, kb: 20, offline: false, cls: "vh-invert", attr: "&copy; OpenStreetMap" }
   };
   var BKEY = "vhmaps-base", baseKey = "ign", baseLayer = null;
   try { var sb = localStorage.getItem(BKEY); if (BASES[sb]) baseKey = sb; } catch (e) {}
@@ -197,7 +208,7 @@
     if (!BASES[k]) return;
     baseKey = k;
     if (baseLayer) map.removeLayer(baseLayer);
-    baseLayer = L.tileLayer(BASES[k].url, { maxZoom: 19, maxNativeZoom: BASES[k].native, attribution: BASES[k].attr }).addTo(map);
+    baseLayer = L.tileLayer(BASES[k].url, { maxZoom: 21, maxNativeZoom: BASES[k].native, className: BASES[k].cls, attribution: BASES[k].attr }).addTo(map);
     baseLayer.bringToBack();
     document.documentElement.setAttribute("data-base", k);
     try { localStorage.setItem(BKEY, k); } catch (e) {}
@@ -801,8 +812,46 @@
       return Promise.all([worker(), worker(), worker(), worker()]);
     }).then(finish, function () { streak = 25; finish(); });
   }
+  // ---------- Superpositions (PCRS) ----------
+  var PCRS_LAYER = "PCRS.LAMB93", COVER_LAYER = "PCRS.GRAPHE-MOSAIQUAGE";   // noms de couches de la Géoplateforme
+  var OKEY = "vhmaps-overlays", ov = { pcrs: false, cover: false, op: 100 }, ovLayers = {};
+  try {
+    var so = JSON.parse(localStorage.getItem(OKEY) || "null");
+    if (so) ov = { pcrs: !!so.pcrs, cover: !!so.cover, op: so.op >= 20 && so.op <= 100 ? so.op : 100 };
+  } catch (e) {}
+  function mkWms(url, layer, attr, z, label) {
+    var l = L.tileLayer.wms(url, { layers: layer, styles: "", format: "image/png", transparent: true, version: "1.3.0",
+      minZoom: 16, maxZoom: 21, zIndex: z, attribution: attr });
+    var ok = 0, ko = 0;
+    l.on("tileload", function () { ok++; });
+    l.on("tileerror", function () {   // aucune image reçue : service indisponible ou nom de couche inexact
+      ko++;
+      if (ko === 4 && ok === 0) say(label + " : aucune image reçue (service indisponible ou connexion coupée).", true);
+    });
+    return l;
+  }
+  var OVERLAYS = [
+    ["pcrs", "https://data.geopf.fr/wms-r", PCRS_LAYER, "PCRS &copy; IGN / G&eacute;oplateforme", 5, "PCRS"],
+    ["cover", "https://data.geopf.fr/wms-v", COVER_LAYER, "Emprise PCRS &copy; IGN", 6, "Emprise PCRS"]
+  ];
+  function syncOverlays() {
+    OVERLAYS.forEach(function (d) {
+      var l = ovLayers[d[0]];
+      if (ov[d[0]] && !l) { ovLayers[d[0]] = mkWms(d[1], d[2], d[3], d[4], d[5]); ovLayers[d[0]].addTo(map); }
+      else if (!ov[d[0]] && l) { map.removeLayer(l); delete ovLayers[d[0]]; }
+    });
+    if (ovLayers.pcrs) ovLayers.pcrs.setOpacity(ov.op / 100);
+    try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {}
+  }
+  function zoomHint() { if (map.getZoom() < 16) say("PCRS : zoomez à partir du niveau 16 pour l'afficher."); }
+  $("ovPcrs").onchange = function () { ov.pcrs = this.checked; syncOverlays(); if (ov.pcrs) zoomHint(); };
+  $("ovCover").onchange = function () { ov.cover = this.checked; syncOverlays(); if (ov.cover) zoomHint(); };
+  $("ovOp").oninput = function () { ov.op = parseInt(this.value, 10) || 100; syncOverlays(); };
+  syncOverlays();
+
   $("offline").onclick = function () {
     $("offBase").value = baseKey; updateEst(); updateStorage();
+    $("ovPcrs").checked = ov.pcrs; $("ovCover").checked = ov.cover; $("ovOp").value = ov.op;
     $("off").showModal();
   };
   $("offBase").onchange = function () { setBase(this.value); updateEst(); };
