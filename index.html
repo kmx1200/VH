@@ -19,7 +19,7 @@
     --surface:#ffffff; --surface-a:rgba(255,255,255,.94); --err:#b3261e; --me:#14342f; --map-bg:#dddddd; }
   :root[data-theme="dark"] { color-scheme: dark; --ink:#e4ede8; --paper:#17211f; --line:#36463f; --route:#ff6b9d; --go:#2b8a67; --stop:#d6453d;
     --surface:#212e2b; --surface-a:rgba(33,46,43,.94); --err:#ff8a80; --me:#4dabf7; --map-bg:#1b2523; }
-  :root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+  :root[data-theme="dark"]:not([data-base="ortho"]) .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
   .leaflet-container { background: var(--map-bg); }
   .leaflet-tooltip { background: var(--surface); color: var(--ink); border-color: var(--line); }
   .leaflet-tooltip-top:before { border-top-color: var(--surface); }
@@ -78,6 +78,15 @@
   .me.has .dir { display: block; }
   .me .dir::before { content: ""; position: absolute; left: 50%; top: 0; margin-left: -8px; border-left: 8px solid transparent;
     border-right: 8px solid transparent; border-bottom: 14px solid var(--route); }
+  .leaflet-bottom { bottom: var(--sheet-h, 0px); }   /* l'attribution reste visible au-dessus du panneau */
+  dialog label { display: grid; gap: 4px; margin: 0 0 10px; font-size: .85rem; }
+  dialog select { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  dialog .row { flex-wrap: wrap; }
+  dialog progress { width: 100%; }
+  #offEst, #offInfo { font-size: .85rem; margin: 0 0 8px; }
+  #offGo { flex: 1; color: #fff; background: var(--go); }
+  #offGo:disabled { opacity: .45; cursor: not-allowed; }
+  @media (max-height: 520px) { .tools { grid-auto-flow: column; } }   /* paysage : boutons en ligne */
 </style>
 </head>
 <body>
@@ -104,6 +113,7 @@
 <div class="tools">
   <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
   <button id="theme" class="tool" aria-label="Mode sombre"></button>
+  <button id="offline" class="tool" aria-label="Cartes hors ligne"></button>
   <button id="install" class="tool" aria-label="Installer l'application"></button>
 </div>
 
@@ -130,6 +140,40 @@
   </div>
 </dialog>
 
+<dialog id="off">
+  <h2>Cartes hors ligne</h2>
+  <label>Fond de carte
+    <select id="offBase">
+      <option value="ign">Plan IGN</option>
+      <option value="ortho">Photographies aériennes IGN</option>
+      <option value="osm">OpenStreetMap (en ligne uniquement)</option>
+    </select>
+  </label>
+  <label>Zone à télécharger
+    <select id="offArea">
+      <option value="route">Autour de l'itinéraire sélectionné</option>
+      <option value="view">Zone affichée à l'écran</option>
+    </select>
+  </label>
+  <label>Niveau de détail maximal
+    <select id="offZoom">
+      <option value="15">Moyen (zoom 15)</option>
+      <option value="16" selected>Fin (zoom 16)</option>
+      <option value="17">Très fin (zoom 17)</option>
+      <option value="18">Maximal (zoom 18)</option>
+    </select>
+  </label>
+  <p id="offEst" role="status"></p>
+  <progress id="offBar" hidden></progress>
+  <p id="offInfo"></p>
+  <div class="row">
+    <button id="offGo">Télécharger</button>
+    <button id="offStop" class="ghost" hidden>Arrêter</button>
+    <button id="offDel" class="ghost">Tout supprimer</button>
+    <button id="offClose" class="ghost">Fermer</button>
+  </div>
+</dialog>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (function () {
@@ -138,9 +182,27 @@
   var MIN_STEP = 5;        // mètres : on ignore les micro-déplacements
 
   var map = L.map("map", { zoomControl: false }).setView([46.6, 2.5], 6);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19, attribution: "&copy; OpenStreetMap"
-  }).addTo(map);
+  var IGN = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&LAYER=";
+  var BASES = {
+    ign:   { url: IGN + "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+             native: 18, kb: 16, offline: true, attr: "Plan IGN &copy; IGN / G&eacute;oplateforme" },
+    ortho: { url: IGN + "ORTHOIMAGERY.ORTHOPHOTOS&FORMAT=image/jpeg&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+             native: 19, kb: 30, offline: true, attr: "Photographies a&eacute;riennes &copy; IGN / G&eacute;oplateforme" },
+    osm:   { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+             native: 19, kb: 20, offline: false, attr: "&copy; OpenStreetMap" }
+  };
+  var BKEY = "vhmaps-base", baseKey = "ign", baseLayer = null;
+  try { var sb = localStorage.getItem(BKEY); if (BASES[sb]) baseKey = sb; } catch (e) {}
+  function setBase(k) {
+    if (!BASES[k]) return;
+    baseKey = k;
+    if (baseLayer) map.removeLayer(baseLayer);
+    baseLayer = L.tileLayer(BASES[k].url, { maxZoom: 19, maxNativeZoom: BASES[k].native, attribution: BASES[k].attr }).addTo(map);
+    baseLayer.bringToBack();
+    document.documentElement.setAttribute("data-base", k);
+    try { localStorage.setItem(BKEY, k); } catch (e) {}
+  }
+  setBase(baseKey);
   var refLayer = L.featureGroup().addTo(map);                                               // itinéraire à suivre (segments colorés)
   var line = L.polyline([], { color: "#d6336c", weight: 5 }).addTo(map);                    // trajet réel
   var marker = null;
@@ -615,6 +677,153 @@
     applyTheme(next);
   };
   if (mq && mq.addEventListener) mq.addEventListener("change", function () { if (!storedTheme()) applyTheme(systemTheme()); });
+
+  // ---------- Cartes hors ligne ----------
+  var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
+  var offBusy = false, offAbort = null;
+  $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
+
+  function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
+  function lat2y(lat, z) {
+    var r = lat * Math.PI / 180;
+    return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z));
+  }
+  function clampT(v, z) { return Math.max(0, Math.min(Math.pow(2, z) - 1, v)); }
+  function tileMeters(lat, z) { return 40075016.686 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z); }
+
+  function viewTiles(z0, z1) {            // tous les carreaux de l'emprise affichée
+    var b = map.getBounds(), out = [], total = 0, z, x, y;
+    for (z = z0; z <= z1; z++) {
+      var x0 = clampT(lon2x(b.getWest(), z), z), x1 = clampT(lon2x(b.getEast(), z), z);
+      var y0 = clampT(lat2y(Math.min(b.getNorth(), 85), z), z), y1 = clampT(lat2y(Math.max(b.getSouth(), -85), z), z);
+      total += (x1 - x0 + 1) * (y1 - y0 + 1);
+      if (total > MAX_TILES) return { tiles: [], count: total, tooMany: true };
+      for (x = x0; x <= x1; x++) for (y = y0; y <= y1; y++) out.push({ z: z, x: x, y: y });
+    }
+    return { tiles: out, count: out.length, tooMany: false };
+  }
+  function routeTiles(segs, z0, z1) {     // couloir d'un carreau de chaque côté de l'itinéraire
+    var seen = {}, out = [];
+    function add(lat, lon, z) {
+      var cx = lon2x(lon, z), cy = lat2y(lat, z);
+      for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) {
+        var x = clampT(cx + dx, z), y = clampT(cy + dy, z), k = z + "/" + x + "/" + y;
+        if (!seen[k]) { seen[k] = 1; out.push({ z: z, x: x, y: y }); }
+      }
+    }
+    for (var z = z0; z <= z1; z++) {
+      segs.forEach(function (s) {
+        var prev = null;
+        s.pts.forEach(function (q) {
+          if (prev) {
+            var d = haversine({ lat: prev[0], lon: prev[1] }, { lat: q[0], lon: q[1] });
+            var n = Math.max(1, Math.ceil(d / (tileMeters(q[0], z) / 2)));
+            for (var i = 1; i <= n; i++) add(prev[0] + (q[0] - prev[0]) * i / n, prev[1] + (q[1] - prev[1]) * i / n, z);
+          } else add(q[0], q[1], z);
+          prev = q;
+        });
+      });
+      if (out.length > MAX_TILES) return { tiles: [], count: out.length, tooMany: true };
+    }
+    return { tiles: out, count: out.length, tooMany: false };
+  }
+  function plan() {
+    var base = BASES[$("offBase").value], z1 = parseInt($("offZoom").value, 10), p;
+    if ($("offArea").value === "route") {
+      var r = currentRoute();
+      if (!r || !segsOf(r).length) return { error: "Aucun itinéraire sélectionné : choisissez-en un, ou prenez « zone affichée »." };
+      p = routeTiles(segsOf(r), Math.min(10, z1), z1);
+    } else {
+      p = viewTiles(Math.max(6, Math.min(Math.floor(map.getZoom()) - 2, z1)), z1);
+    }
+    p.base = base;
+    return p;
+  }
+  function updateEst() {
+    if (offBusy) return;
+    var b = BASES[$("offBase").value], est = $("offEst"), go = $("offGo");
+    if (!b.offline) {
+      est.textContent = "Le téléchargement n'est pas autorisé sur les serveurs d'OpenStreetMap : choisissez Plan IGN ou Photographies aériennes IGN.";
+      go.disabled = true; return;
+    }
+    var p = plan();
+    if (p.error) { est.textContent = p.error; go.disabled = true; return; }
+    if (p.tooMany) { est.textContent = "Zone trop étendue (plus de " + MAX_TILES + " tuiles) : réduisez le niveau de détail ou la zone."; go.disabled = true; return; }
+    est.textContent = "≈ " + p.count + " tuiles, environ " + Math.max(1, Math.round(p.count * b.kb / 1024)) + " Mo.";
+    go.disabled = false;
+  }
+  function updateStorage() {
+    var info = $("offInfo");
+    if (!window.caches) { info.textContent = "Stockage hors ligne indisponible sur ce navigateur."; return; }
+    caches.open(OFFLINE).then(function (c) { return c.keys(); }).then(function (k) {
+      var txt = k.length + " tuile(s) enregistrée(s) hors ligne";
+      if (navigator.storage && navigator.storage.estimate) {
+        return navigator.storage.estimate().then(function (e) {
+          info.textContent = txt + " · espace utilisé par VHMaps : " + Math.round((e.usage || 0) / 1048576) + " Mo";
+        });
+      }
+      info.textContent = txt;
+    }).catch(function () { info.textContent = ""; });
+  }
+  function download() {
+    var p = plan();
+    if (offBusy || p.error || p.tooMany || !window.caches) return;
+    offBusy = true; offAbort = new AbortController();
+    var bar = $("offBar"), est = $("offEst");
+    bar.hidden = false; bar.max = p.count; bar.value = 0;
+    $("offGo").hidden = true; $("offStop").hidden = false;
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
+    var queue = p.tiles.slice(), done = 0, ok = 0, skipped = 0, fail = 0, streak = 0;
+    function urlOf(t) { return p.base.url.replace("{z}", t.z).replace("{x}", t.x).replace("{y}", t.y); }
+    function finish() {
+      var stopped = offAbort.signal.aborted, msg;
+      offBusy = false; bar.hidden = true; $("offGo").hidden = false; $("offStop").hidden = true;
+      if (stopped) msg = "Téléchargement interrompu : " + ok + " tuile(s) enregistrée(s).";
+      else if (streak >= 25 || (ok === 0 && skipped === 0 && fail > 0)) msg = "Échec : le serveur de cartes ne répond pas ou refuse le téléchargement (" + fail + " erreurs). Vérifiez la connexion.";
+      else msg = "Terminé : " + ok + " tuile(s) téléchargée(s)" + (skipped ? ", " + skipped + " déjà présente(s)" : "") + (fail ? ", " + fail + " en échec" : "") + ".";
+      est.textContent = msg; updateStorage();
+    }
+    caches.open(OFFLINE).then(function (cache) {
+      function worker() {
+        if (!queue.length || offAbort.signal.aborted || streak >= 25) return Promise.resolve();
+        var u = urlOf(queue.shift());
+        return cache.match(u).then(function (hit) {
+          if (hit) { skipped++; return; }
+          return fetch(u, { mode: "cors", credentials: "omit", signal: offAbort.signal })
+            .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return cache.put(u, res); })
+            .then(function () { ok++; streak = 0; })
+            .catch(function () { if (!offAbort.signal.aborted) { fail++; streak++; } });
+        }).then(function () {
+          done++; bar.value = done; est.textContent = done + " / " + p.count + " tuiles…";
+          return worker();
+        });
+      }
+      return Promise.all([worker(), worker(), worker(), worker()]);
+    }).then(finish, function () { streak = 25; finish(); });
+  }
+  $("offline").onclick = function () {
+    $("offBase").value = baseKey; updateEst(); updateStorage();
+    $("off").showModal();
+  };
+  $("offBase").onchange = function () { setBase(this.value); updateEst(); };
+  $("offArea").onchange = updateEst;
+  $("offZoom").onchange = updateEst;
+  $("offGo").onclick = download;
+  $("offStop").onclick = function () { if (offAbort) offAbort.abort(); };
+  $("offDel").onclick = function () {
+    if (!window.caches || !confirm("Supprimer toutes les cartes hors ligne enregistrées ?")) return;
+    caches.delete(OFFLINE).then(function () { updateStorage(); $("offEst").textContent = "Cartes hors ligne supprimées."; });
+  };
+  $("offClose").onclick = function () { $("off").close(); };
+
+  // L'attribution des cartes reste visible au-dessus du panneau du bas
+  function syncSheet() {
+    var sh = document.querySelector(".sheet");
+    if (sh) document.documentElement.style.setProperty("--sheet-h", sh.offsetHeight + "px");
+  }
+  syncSheet();
+  window.addEventListener("resize", syncSheet);
+  if (window.ResizeObserver) new ResizeObserver(syncSheet).observe(document.querySelector(".sheet"));
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
