@@ -91,6 +91,7 @@
   #offEst, #offInfo { font-size: .85rem; margin: 0 0 8px; }
   #offGo { flex: 1; color: #fff; background: var(--go); }
   #offGo:disabled { opacity: .45; cursor: not-allowed; }
+  .tool.live { color: var(--go); border-color: var(--go); }
   @media (max-height: 520px) { .tools { grid-auto-flow: column; } }   /* paysage : boutons en ligne */
 </style>
 </head>
@@ -116,6 +117,7 @@
 <div class="legend" id="legend" hidden></div>
 
 <div class="tools">
+  <button id="locate" class="tool" aria-pressed="false" aria-label="Activer ma position"></button>
   <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
   <button id="theme" class="tool" aria-label="Mode sombre"></button>
   <button id="offline" class="tool" aria-label="Cartes et hors ligne"></button>
@@ -222,6 +224,7 @@
   var elapsed = 0;        // ms cumulées
   var startedAt = null;   // horodatage du dernier démarrage
   var watchId = null, wakeLock = null, timer = null;
+  var locating = false, following = true, firstCenter = false, lastFix = null, prevFix = null;   // bouton « position »
 
   var $ = function (id) { return document.getElementById(id); };
   function say(text, err) { $("msg").textContent = text; $("msg").className = err ? "err" : ""; }
@@ -298,17 +301,38 @@
     if (!marker) marker = L.marker([p.lat, p.lon], { interactive: false, keyboard: false, icon: L.divIcon({
       className: "", iconSize: [26, 26], iconAnchor: [13, 13], html: '<div class="me"><span class="dir"></span><i></i></div>' }) }).addTo(map);
     marker.setLatLng([p.lat, p.lon]);
+    lastFix = p;
+    if (following && (c.accuracy <= MAX_ACCURACY || firstCenter)) { centerOn(p, firstCenter); firstCenter = false; }
     if (c.accuracy > MAX_ACCURACY) { say("Signal GPS faible (±" + Math.round(c.accuracy) + " m)…"); return; }
-    var last = points[points.length - 1];
     if (typeof c.heading === "number" && !isNaN(c.heading) && (c.speed == null || c.speed > 0.5)) setHeading(c.heading);
-    else if (last && haversine(last, p) >= MIN_STEP) setHeading(bearing(last, p));
-    if (!last || haversine(last, p) >= MIN_STEP) {
-      points.push(p);
-      line.addLatLng([p.lat, p.lon]);
-      map.panTo([p.lat, p.lon]);
-      save();
+    else if (prevFix && haversine(prevFix, p) >= MIN_STEP) setHeading(bearing(prevFix, p));
+    if (!prevFix || haversine(prevFix, p) >= MIN_STEP) prevFix = p;
+    if (startedAt !== null) {            // enregistrement du tracé : seulement après « Démarrer »
+      var last = points[points.length - 1];
+      if (!last || haversine(last, p) >= MIN_STEP) {
+        points.push(p);
+        line.addLatLng([p.lat, p.lon]);
+        save();
+      }
     }
     followMsg(p);
+  }
+  function centerOn(p, zoomIn) {
+    if (zoomIn && map.getZoom() < 16) map.setView([p.lat, p.lon], 17);
+    else map.panTo([p.lat, p.lon]);
+  }
+  function watchStart() {                // une seule surveillance GPS, partagée par le suivi et le bouton position
+    if (watchId !== null) return true;
+    if (!("geolocation" in navigator)) { say("Ce navigateur ne gère pas la géolocalisation.", true); return false; }
+    prevFix = null;
+    watchId = navigator.geolocation.watchPosition(onPosition, onError, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    return true;
+  }
+  function watchStop() {                 // coupée seulement si plus personne n'en a besoin
+    if (watchId !== null && !locating && startedAt === null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null; lastFix = null; prevFix = null;
+    }
   }
 
   function onError(err) {
@@ -318,6 +342,11 @@
       3: "Délai dépassé, nouvelle tentative…"
     };
     say(texts[err.code] || "Erreur de localisation.", err.code !== 3);
+    if (err.code === 1) {
+      locating = false; following = false;
+      if (startedAt === null && watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; lastFix = null; prevFix = null; }
+      syncLoc();
+    }
   }
 
   async function lockScreen() {
@@ -325,19 +354,17 @@
   }
 
   function start() {
-    if (!("geolocation" in navigator)) { say("Ce navigateur ne gère pas la géolocalisation.", true); return; }
-    startedAt = Date.now();
-    watchId = navigator.geolocation.watchPosition(onPosition, onError, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    if (!watchStart()) return;
+    startedAt = Date.now(); following = true;
     lockScreen();
     timer = setInterval(render, 1000);
     $("toggle").textContent = "Arrêter"; $("toggle").className = "on";
-    say("Recherche du signal GPS…");
+    say(lastFix ? "Suivi en cours." : "Recherche du signal GPS…");
   }
 
   function stop() {
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    watchId = null;
     elapsed = currentElapsed(); startedAt = null;
+    watchStop();
     clearInterval(timer);
     if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
     save(); render();
@@ -345,11 +372,11 @@
     say("Suivi arrêté. Exportez le tracé si besoin.");
   }
 
-  $("toggle").onclick = function () { watchId === null ? start() : stop(); };
+  $("toggle").onclick = function () { startedAt === null ? start() : stop(); };
 
   $("clear").onclick = function () {
     if (!confirm("Effacer l'itinéraire enregistré ?")) return;
-    if (watchId !== null) stop();
+    if (startedAt !== null) stop();
     points = []; elapsed = 0; line.setLatLngs([]); resetHeading();
     try { localStorage.removeItem(KEY); } catch (e) {}
     $("toggle").textContent = "Démarrer"; render(); say("Itinéraire effacé.");
@@ -370,7 +397,7 @@
 
   // Le verrou d'écran est libéré quand la page passe en arrière-plan : on le reprend au retour.
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible" && watchId !== null) lockScreen();
+    if (document.visibilityState === "visible" && startedAt !== null) lockScreen();
   });
 
   // ---------- Itinéraires à suivre ----------
@@ -515,7 +542,7 @@
   }
   function followMsg(p) {
     var r = currentRoute(), segs = r ? segsOf(r) : [];
-    if (!segs.length) { say("Suivi en cours."); return; }
+    if (!segs.length) { say(startedAt !== null ? "Suivi en cours." : "Position active."); return; }
     var min = Infinity, best = null;
     segs.forEach(function (s) {
       s.pts.forEach(function (q) { var d = haversine(p, { lat: q[0], lon: q[1] }); if (d < min) { min = d; best = s; } });
@@ -623,6 +650,39 @@
     routeId = has(saved) ? saved : "";
     fillSelect(); applyRoute(true);
   }
+
+  // ---------- Bouton position (réticule) ----------
+  var RET = "M5 12a7 7 0 1 0 14 0a7 7 0 1 0-14 0M12 2v4M12 18v4M2 12h4M18 12h4";
+  function syncLoc() {
+    var ic = function (d) { return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>'; };
+    var b = $("locate");
+    b.innerHTML = locating && following ? ic(RET + "M12 12h.01") : ic(RET);   // point central = carte centrée sur moi
+    b.setAttribute("aria-pressed", locating && following ? "true" : "false");
+    b.classList.toggle("live", locating && !following);
+    b.setAttribute("aria-label", !locating ? "Activer ma position" : following ? "Désactiver ma position" : "Recentrer sur ma position");
+  }
+  $("locate").onclick = function () {
+    if (!locating) {                      // activer : position + carte centrée
+      if (!watchStart()) return;
+      locating = true; following = true;
+      if (lastFix) { centerOn(lastFix, true); firstCenter = false; }
+      else { firstCenter = true; say("Recherche du signal GPS…"); }
+    } else if (!following) {              // carte déplacée à la main : recentrer
+      following = true;
+      if (lastFix) centerOn(lastFix, false);
+    } else {                              // désactiver
+      locating = false; following = false;
+      watchStop();
+      if (startedAt === null) {
+        if (marker) { map.removeLayer(marker); marker = null; }
+        resetHeading();
+        say("Position désactivée.");
+      }
+    }
+    syncLoc();
+  };
+  map.on("dragstart", function () { if (following) { following = false; syncLoc(); } });
+  syncLoc();
 
   // ---------- Plein écran ----------
   var ICON = function (d) { return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>'; };
