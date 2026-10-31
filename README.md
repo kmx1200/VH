@@ -58,12 +58,24 @@ Les tuiles sont enregistrées dans le téléphone (Cache API) et servies par `sw
 ## Superpositions : PCRS
 
 Dans le dialogue « Cartes » : cocher « PCRS » pour superposer le plan de corps de rue simplifié
-(images très haute résolution de la Géoplateforme, WMS `data.geopf.fr/wms-r`, couche `PCRS.LAMB93`),
-et « Emprise des données PCRS » pour voir où il est diffusé (couche `PCRS.GRAPHE-MOSAIQUAGE`).
+(images très haute résolution de la Géoplateforme, WMS `data.geopf.fr/wms-r`, couche `PCRS.LAMB93`).
 
 - Visible à partir du zoom 16, en ligne uniquement (non inclus dans les téléchargements hors ligne).
 - Couverture partielle : uniquement là où le PCRS est diffusé en open data.
-- Si le service change de nom de couche, modifier `PCRS_LAYER` / `COVER_LAYER` dans `index.html`.
+- Si le service change de nom de couche, modifier `PCRS_LAYER` dans `index.html`.
+
+## Superposition : OLD (obligations légales de débroussaillement)
+
+Dans le dialogue « Cartes » : cocher « OLD » (avec un curseur d'opacité, comme pour les parcelles cadastrales).
+Les 277 zones (polygones verts) viennent de `donnees/old.json` ; toucher une zone affiche son numéro, la route,
+le site, la surface, le traitement prévu (super-épareuse, bras long, manuel, évacuation, zone non OLD en %),
+la contrainte, les observations et la justification, avec un lien Street View.
+
+Fonctionne hors ligne (données enregistrées dans le téléphone après le premier chargement). Pour mettre à jour la couche :
+
+```
+python outils/preparer_old.py old.gpkg donnees/old.json
+```
 
 ## Bouton position (réticule)
 
@@ -82,7 +94,7 @@ Dans le dialogue « Cartes » :
   Grand-Champ vert, La Gacilly jaune, Vannes bleu), avec légende ; toucher une ligne affiche l'axe et les PR de début et de fin.
 - « PR (points et numéros) » : points à partir du zoom 12, numéros à partir du zoom 14 (route + numéro à partir du zoom 16).
 
-Les données sont dans `donnees/` (`dalle-morbihan.pack`, `lineaire.json`, `pr.json`). Elles sont enregistrées dans le téléphone
+Les données sont dans `donnees/` (`dalle-morbihan.pack`, `lineaire.json`, `pr.json`, `old.json`). Elles sont enregistrées dans le téléphone
 après le premier chargement (fonctionnement hors ligne) et mises à jour en arrière-plan quand elles changent sur le serveur.
 
 ### Régénérer les données
