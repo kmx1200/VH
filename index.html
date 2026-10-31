@@ -1008,8 +1008,11 @@
       var cp=L.LineUtil.closestPointOnSegment(click,a,b),d=click.distanceTo(cp);
       if(d<best){best=d;bestIndex=i;bestPoint=map.layerPointToLatLng(cp);}
     }
-    if(bestIndex<0||best>(L.Browser.touch?30:22))return;
+    // N'insère un sommet que si le clic est suffisamment proche d'un segment.
+    // La projection sur le segment garantit une insertion exactement sur celui-ci.
+    if(bestIndex<0||best>(L.Browser.touch?34:24))return false;
     measurePoints.splice(bestIndex+1,0,bestPoint);measureSelected=bestIndex+1;drawMeasure();
+    return true;
   }
   function drawMeasure(){
     measureLayer.clearLayers();measureShape=null;measureMarkers=[];
@@ -1040,7 +1043,14 @@
     if(mode){say("Mode mesure activé : cliquez pour ajouter des points, déplacez les poignées pour modifier le tracé.");}
     drawMeasure();
   }
-  map.on("click",function(e){if(!measureMode)return;measurePoints.push(e.latlng);measureSelected=-1;drawMeasure();});
+  map.on("click",function(e){
+    if(!measureMode)return;
+    // Près d'un segment, insérer le sommet à cet endroit (y compris le segment
+    // de fermeture du polygone) plutôt que de l'ajouter à la fin du tracé.
+    if(insertMeasurePoint(e))return;
+    // Sinon, conserver le comportement de création du prochain sommet.
+    measurePoints.push(e.latlng);measureSelected=-1;drawMeasure();
+  });
   $("measureLine").onclick=function(){setMeasure(measureMode==="line"?null:"line");};
   $("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
   $("measureUndo").onclick=function(){if(measurePoints.length){measurePoints.pop();measureSelected=-1;drawMeasure();}};
