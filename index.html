@@ -75,4 +75,1340 @@
   .legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
   .legend i { flex: none; width: 18px; height: 6px; border-radius: 3px; }
   .legend h4 { margin: 0 0 2px; font-size: .75rem; opacity: .75; }
-  .pr-label span { position: absolute; left: 7px
+  .pr-label span { position: absolute; left: 7px; top: -9px; padding: 0 4px; font: 700 11px/16px system-ui, sans-serif; white-space: nowrap;
+    color: #111; background: rgba(255,255,255,.9); border: 1px solid rgba(0,0,0,.35); border-radius: 4px; }
+  .me { position: relative; width: 26px; height: 26px; }
+  .me i { position: absolute; inset: 3px; border-radius: 50%; background: var(--me); border: 3px solid #fff; box-shadow: 0 1px 6px rgba(0,0,0,.35); }
+  .me .dir { position: absolute; inset: -10px; display: none; transition: transform .35s; }
+  .me.has .dir { display: block; }
+  .me .dir::before { content: ""; position: absolute; left: 50%; top: 0; margin-left: -8px; border-left: 8px solid transparent;
+    border-right: 8px solid transparent; border-bottom: 14px solid var(--route); }
+  .leaflet-bottom { bottom: var(--sheet-h, 0px); }
+  dialog label { display: grid; gap: 4px; margin: 0 0 10px; font-size: .85rem; }
+  dialog select { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  dialog { max-height: 90vh; overflow: auto; }
+  dialog h3 { margin: 12px 0 6px; font-size: .95rem; }
+  dialog label.chk { display: flex; align-items: center; gap: 8px; }
+  dialog input[type="range"] { width: 100%; }
+  dialog .hint { font-size: .8rem; opacity: .75; margin: 0 0 8px; }
+  dialog .row { flex-wrap: wrap; }
+  dialog progress { width: 100%; }
+  #offEst, #offInfo { font-size: .85rem; margin: 0 0 8px; }
+  #offGo { flex: 1; color: #fff; background: var(--go); }
+  #offGo:disabled { opacity: .45; cursor: not-allowed; }
+  #map.sv-armed, #map.sv-armed.leaflet-grab, #map.sv-armed .leaflet-interactive { cursor: crosshair; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--ink); }
+  .leaflet-popup-content a { color: var(--go); font-weight: 600; }
+  .searchbar { position: absolute; z-index: 1100; left: 10px; right: 10px; top: calc(62px + env(safe-area-inset-top, 0px));
+    display: grid; gap: 6px; max-width: 520px; padding: 8px; background: var(--surface-a); border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: 0 4px 16px rgba(20,52,47,.25); }
+  .searchbar .srow { display: flex; gap: 6px; }
+  .searchbar input { flex: 1; min-width: 0; font: inherit; font-size: 1rem; padding: 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  .searchbar .srow button { padding: 0 14px; }
+  #qres { list-style: none; margin: 0; padding: 0; max-height: 42vh; overflow: auto; display: grid; gap: 4px; }
+  #qres button { width: 100%; text-align: left; font-weight: 500; padding: 11px 12px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+  #qres .qmsg { font-size: .85rem; opacity: .8; padding: 4px 6px; }
+  .pin { width: 26px; height: 26px; border-radius: 50% 50% 50% 0; background: var(--route); border: 3px solid #fff;
+    transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  .pin::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #fff; }
+  @media (max-height: 720px) and (orientation: portrait) { .tools { grid-auto-flow: column; grid-template-rows: repeat(4, 46px); } }
+  .tool.live { color: var(--go); border-color: var(--go); }
+  .measure-panel { position:absolute; z-index:1200; left:10px; right:10px; bottom:calc(var(--sheet-h, 0px) + 12px); max-width:460px;
+    padding:12px; display:grid; gap:8px; background:var(--surface-a); color:var(--ink); border:1px solid var(--line);
+    border-radius:14px; box-shadow:0 3px 14px rgba(0,0,0,.22); }
+  .measure-panel .row { display:flex; flex-wrap:wrap; gap:6px; }
+  .measure-panel button { padding:9px 11px; }
+  .measure-panel button:disabled { opacity:.45; cursor:not-allowed; }
+  .measure-vertex { width:22px; height:22px; box-sizing:border-box; border:3px solid #fff; border-radius:50%;
+    background:#e07a28; box-shadow:0 1px 5px rgba(0,0,0,.55); cursor:move; touch-action:none; }
+  .measure-vertex.selected { width:27px; height:27px; margin:-2.5px; border-width:3px; background:#1976d2; }
+  @media(max-width:520px){ .tools { top:calc(116px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
+  @media (max-height: 520px) { .tools { grid-auto-flow: column; } }
+</style>
+</head>
+<body>
+<div id="map" role="application" aria-label="Carte VHMaps"></div>
+
+<div class="routebar">
+  <select id="route" aria-label="Itinéraire à suivre"></select>
+  <button id="import" class="ghost">Importer GPX</button>
+  <button id="del" class="ghost" aria-label="Supprimer cet itinéraire" hidden>✕</button>
+  <input type="file" id="file" accept=".gpx,application/gpx+xml,text/xml" multiple hidden>
+</div>
+
+<div class="compass" id="compass" role="img" aria-label="Direction">
+  <svg viewBox="0 0 64 64" width="60" height="60" aria-hidden="true">
+    <circle class="c-bg" cx="32" cy="32" r="30" stroke-width="2"/>
+    <text class="c-n" x="32" y="14" text-anchor="middle" font-size="11" font-weight="700" font-family="system-ui,sans-serif">N</text>
+    <g id="needle"><path class="c-needle" d="M32 18 L40 42 L32 36 L24 42 Z"/></g>
+  </svg>
+  <span id="hdg">--</span>
+</div>
+
+<div class="legends">
+  <div class="legend" id="legend" hidden></div>
+  <div class="legend" id="legendRef" hidden></div>
+</div>
+
+<div class="searchbar" id="searchbar" role="search" hidden>
+  <div class="srow">
+    <input id="q" type="search" placeholder="Adresse, lieu ou coordonnées" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Rechercher une adresse ou un lieu">
+    <button id="qclose" class="ghost" aria-label="Fermer la recherche">&#10005;</button>
+  </div>
+  <ul id="qres" aria-live="polite"></ul>
+</div>
+
+<div class="tools">
+  <button id="search" class="tool" aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
+  <button id="locate" class="tool" aria-pressed="false" aria-label="Activer ma position"></button>
+  <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
+  <button id="sv" class="tool" aria-pressed="false" aria-label="Street View : choisir un point"></button>
+  <button id="theme" class="tool" aria-label="Mode sombre"></button>
+  <button id="offline" class="tool" aria-label="Cartes et hors ligne"></button>
+  <button id="install" class="tool" aria-label="Installer l'application"></button>
+  <button id="measureLine" class="tool" aria-label="Mesurer une distance">↔</button>
+  <button id="measureArea" class="tool" aria-label="Mesurer une surface">□</button>
+</div>
+<div id="measurePanel" class="measure-panel" hidden>
+  <b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span>
+  <div class="row"><button id="measureUndo" class="ghost">Annuler point</button><button id="measureDelete" class="ghost" disabled>Supprimer sommet</button><button id="measureReset" class="ghost">Réinitialiser</button><button id="measureClose" class="ghost">Terminer</button></div>
+  <small id="measureHelp">Déplacez les poignées pour ajuster le tracé. Touchez un segment pour ajouter un sommet.</small>
+</div>
+
+<section class="sheet">
+  <p id="msg" role="status">Appuyez sur « Démarrer » et gardez l'écran allumé.</p>
+  <div class="stats">
+    <div class="stat"><b id="dist">0,00</b><span>km</span></div>
+    <div class="stat"><b id="time">00:00</b><span>durée</span></div>
+    <div class="stat"><b id="speed">0,0</b><span>km/h moyenne</span></div>
+  </div>
+  <div class="row">
+    <button id="toggle">Démarrer</button>
+    <button id="gpx" class="ghost">Exporter GPX</button>
+    <button id="clear" class="ghost">Effacer</button>
+  </div>
+</section>
+
+<dialog id="srv">
+  <h2>Itinéraires du serveur</h2>
+  <ul id="srvlist"></ul>
+  <div class="row">
+    <button id="srvlocal" class="ghost">Depuis mon appareil</button>
+    <button id="srvclose" class="ghost">Fermer</button>
+  </div>
+</dialog>
+
+<dialog id="off">
+  <h2>Cartes</h2>
+  <label>Fond de carte
+    <select id="offBase">
+      <option value="ign">Plan IGN</option>
+      <option value="ortho">Photographies aériennes IGN</option>
+      <option value="atd">Carte du Morbihan (dalle ATD 2019)</option>
+      <option value="osm">OpenStreetMap (en ligne uniquement)</option>
+    </select>
+  </label>
+  <h3>Superpositions</h3>
+  <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
+  <label class="chk"><input type="checkbox" id="ovPr"> PR (points et numéros)</label>
+  <label class="chk"><input type="checkbox" id="ovCadastre"> Parcelles cadastrales (IGN)</label>
+  <label>Opacité du cadastre <input type="range" id="ovCadastreOp" min="20" max="100" step="10" value="85"></label>
+  <label class="chk"><input type="checkbox" id="ovPcrs"> PCRS (plan de corps de rue simplifié)</label>
+  <label class="chk"><input type="checkbox" id="ovCover"> Emprise des données PCRS</label>
+  <label>Opacité du PCRS <input type="range" id="ovOp" min="20" max="100" step="10" value="100"></label>
+  <p class="hint">Le PCRS s'affiche à partir du zoom 16, seulement là où il est diffusé en open data, et en ligne uniquement.</p>
+  <h3>Hors ligne</h3>
+  <label>Zone à télécharger
+    <select id="offArea">
+      <option value="route">Autour de l'itinéraire sélectionné</option>
+      <option value="view">Zone affichée à l'écran</option>
+    </select>
+  </label>
+  <label>Niveau de détail maximal
+    <select id="offZoom">
+      <option value="15">Moyen (zoom 15)</option>
+      <option value="16" selected>Fin (zoom 16)</option>
+      <option value="17">Très fin (zoom 17)</option>
+      <option value="18">Maximal (zoom 18)</option>
+    </select>
+  </label>
+  <p id="offEst" role="status"></p>
+  <progress id="offBar" hidden></progress>
+  <p id="offInfo"></p>
+  <div class="row">
+    <button id="offGo">Télécharger</button>
+    <button id="offStop" class="ghost" hidden>Arrêter</button>
+    <button id="offDel" class="ghost">Tout supprimer</button>
+    <button id="offClose" class="ghost">Fermer</button>
+  </div>
+</dialog>
+
+<dialog id="shareDlg">
+  <h2 id="shareTitle">Partager l’itinéraire</h2>
+  <p class="hint" id="shareDescription">Choisissez une application pour transmettre la destination et l’itinéraire.</p>
+  <div class="row">
+    <button id="shareNative">Partager avec une application…</button>
+    <button id="shareCopy" class="ghost">Copier le lien</button>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <a id="shareWhatsApp" class="ghost" style="display:block;text-decoration:none;padding:12px;border-radius:12px" target="_blank" rel="noopener">WhatsApp</a>
+    <a id="shareEmail" class="ghost" style="display:block;text-decoration:none;padding:12px;border-radius:12px">E-mail</a>
+    <a id="shareSms" class="ghost" style="display:block;text-decoration:none;padding:12px;border-radius:12px">SMS</a>
+  </div>
+  <div class="row" style="margin-top:8px"><button id="shareClose" class="ghost">Fermer</button></div>
+</dialog>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function () {
+  var KEY = "itineraire-v1";
+  var MAX_ACCURACY = 50;
+  var MIN_STEP = 5;
+
+  var map = L.map("map", { zoomControl: false }).setView([46.6, 2.5], 6);
+  var IGN = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&LAYER=";
+  var BASES = {
+    ign:   { url: IGN + "GEOGRAPHICALGRIDSYSTEMS.PLANIGNV2&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+             native: 18, kb: 16, offline: true, cls: "vh-invert", attr: "Plan IGN &copy; IGN / G&eacute;oplateforme" },
+    ortho: { url: IGN + "ORTHOIMAGERY.ORTHOPHOTOS&FORMAT=image/jpeg&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+             native: 19, kb: 30, offline: true, cls: "", attr: "Photographies a&eacute;riennes &copy; IGN / G&eacute;oplateforme" },
+    osm:   { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+             native: 19, kb: 20, offline: false, cls: "vh-invert", attr: "&copy; OpenStreetMap" },
+    atd:   { pack: "donnees/dalle-morbihan.pack", native: 13, kb: 0, offline: false, local: true, cls: "vh-dim",
+             attr: "Carte du Morbihan &copy; ATD 2019" }
+  };
+
+  var packPromise = null;
+  function loadPack(url) {
+    if (packPromise) return packPromise;
+    packPromise = fetch(url).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.arrayBuffer(); })
+      .then(function (buf) {
+        var dv = new DataView(buf);
+        if (dv.getUint8(0) !== 86 || dv.getUint8(1) !== 72 || dv.getUint8(2) !== 80) throw new Error("fichier de dalle invalide");
+        var n = dv.getUint32(4, true);
+        return { buf: buf, base: 8 + n, idx: JSON.parse(new TextDecoder("utf-8").decode(new Uint8Array(buf, 8, n))) };
+      });
+    packPromise.catch(function () { packPromise = null; });
+    return packPromise;
+  }
+  var PackLayer = L.GridLayer.extend({
+    createTile: function (coords, done) {
+      var tile = document.createElement("img");
+      tile.alt = ""; tile.style.visibility = "hidden";
+      loadPack(this.options.pack).then(function (p) {
+        var e = p.idx.tiles[coords.z + "/" + coords.x + "/" + coords.y];
+        if (!e) { done(null, tile); return; }
+        var url = URL.createObjectURL(new Blob([p.buf.slice(p.base + e[0], p.base + e[0] + e[1])], { type: p.idx.mime }));
+        tile.onload = function () { URL.revokeObjectURL(url); tile.style.visibility = ""; done(null, tile); };
+        tile.onerror = function () { URL.revokeObjectURL(url); done(new Error("tuile illisible"), tile); };
+        tile.src = url;
+      }).catch(function (err) { done(err, tile); });
+      return tile;
+    }
+  });
+  var BKEY = "vhmaps-base", baseKey = "ign", baseLayer = null;
+  try { var sb = localStorage.getItem(BKEY); if (BASES[sb]) baseKey = sb; } catch (e) {}
+  function setBase(k, fit) {
+    if (!BASES[k]) return;
+    var b = BASES[k];
+    baseKey = k;
+    if (baseLayer) map.removeLayer(baseLayer);
+    baseLayer = (b.pack
+      ? new PackLayer({ pack: b.pack, maxZoom: 21, maxNativeZoom: b.native, minZoom: 0, className: b.cls, attribution: b.attr })
+      : L.tileLayer(b.url, { maxZoom: 21, maxNativeZoom: b.native, className: b.cls, attribution: b.attr })).addTo(map);
+    baseLayer.bringToBack();
+    if (b.pack) setTimeout(function () {
+      if (baseKey !== k) return;
+      say("Chargement de la dalle (≈ 9 Mo)…");
+      loadPack(b.pack).then(function (p) {
+        if (baseKey !== k) return;
+        say("Dalle chargée.");
+        var bb = p.idx.bounds, box = L.latLngBounds([bb[1], bb[0]], [bb[3], bb[2]]);
+        if (fit && (!box.intersects(map.getBounds()) || map.getZoom() < p.idx.minZoom)) map.fitBounds(box);
+      }).catch(function () { if (baseKey === k) say("Dalle indisponible : une connexion est nécessaire au premier chargement.", true); });
+    }, 0);
+    document.documentElement.setAttribute("data-base", k);
+    try { localStorage.setItem(BKEY, k); } catch (e) {}
+  }
+  setBase(baseKey);
+  var refLayer = L.featureGroup().addTo(map);
+  var line = L.polyline([], { color: "#d6336c", weight: 5 }).addTo(map);
+  var marker = null;
+
+  var points = [];
+  var elapsed = 0;
+  var startedAt = null;
+  var watchId = null, wakeLock = null, timer = null;
+  var locating = false, following = true, firstCenter = false, lastFix = null, prevFix = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+  function say(text, err) { $("msg").textContent = text; $("msg").className = err ? "err" : ""; }
+
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify({ points: points, elapsed: currentElapsed() })); } catch (e) {}
+  }
+  function load() {
+    try {
+      var d = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (d && d.points) { points = d.points; elapsed = d.elapsed || 0; }
+    } catch (e) {}
+  }
+
+  function haversine(a, b) {
+    var R = 6371000, r = Math.PI / 180;
+    var dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+    var x = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(x));
+  }
+
+  var shown = 0, hasHeading = false;
+  var CARDS = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
+  function bearing(a, b) {
+    var r = Math.PI / 180, dl = (b.lon - a.lon) * r;
+    var y = Math.sin(dl) * Math.cos(b.lat * r);
+    var x = Math.cos(a.lat * r) * Math.sin(b.lat * r) - Math.sin(a.lat * r) * Math.cos(b.lat * r) * Math.cos(dl);
+    return (Math.atan2(y, x) / r + 360) % 360;
+  }
+  function setHeading(h) {
+    h = (h + 360) % 360;
+    shown += ((h - shown + 540) % 360) - 180;
+    hasHeading = true;
+    $("needle").setAttribute("transform", "rotate(" + shown.toFixed(1) + " 32 32)");
+    $("hdg").textContent = CARDS[Math.round(h / 45) % 8] + " " + Math.round(h) + "°";
+    $("compass").setAttribute("aria-label", "Direction " + CARDS[Math.round(h / 45) % 8] + " " + Math.round(h) + " degrés");
+    if (marker && marker.getElement()) {
+      var el = marker.getElement().querySelector(".me");
+      el.className = "me has";
+      el.querySelector(".dir").style.transform = "rotate(" + shown.toFixed(1) + "deg)";
+    }
+  }
+  function resetHeading() {
+    shown = 0; hasHeading = false;
+    $("needle").setAttribute("transform", "rotate(0 32 32)");
+    $("hdg").textContent = "--";
+    if (marker && marker.getElement()) marker.getElement().querySelector(".me").className = "me";
+  }
+
+  function totalMeters() {
+    var d = 0;
+    for (var i = 1; i < points.length; i++) d += haversine(points[i - 1], points[i]);
+    return d;
+  }
+  function currentElapsed() { return elapsed + (startedAt ? Date.now() - startedAt : 0); }
+
+  function render() {
+    var km = totalMeters() / 1000, ms = currentElapsed(), s = Math.floor(ms / 1000);
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    var pad = function (n) { return String(n).padStart(2, "0"); };
+    $("dist").textContent = km.toFixed(2).replace(".", ",");
+    $("time").textContent = (h ? h + ":" : "") + pad(m) + ":" + pad(sec);
+    $("speed").textContent = (ms > 0 ? km / (ms / 3600000) : 0).toFixed(1).replace(".", ",");
+  }
+
+  function drawAll() {
+    line.setLatLngs(points.map(function (p) { return [p.lat, p.lon]; }));
+    if (points.length) map.fitBounds(line.getBounds(), { paddingTopLeft: [20, 70], paddingBottomRight: [20, 200], maxZoom: 17 });
+  }
+
+  function onPosition(pos) {
+    var c = pos.coords;
+    var p = { lat: c.latitude, lon: c.longitude, t: pos.timestamp };
+    if (!marker) marker = L.marker([p.lat, p.lon], { interactive: false, keyboard: false, zIndexOffset: 1000, icon: L.divIcon({
+      className: "", iconSize: [26, 26], iconAnchor: [13, 13], html: '<div class="me"><span class="dir"></span><i></i></div>' }) }).addTo(map);
+    marker.setLatLng([p.lat, p.lon]);
+    lastFix = p;
+    if (following && (c.accuracy <= MAX_ACCURACY || firstCenter)) { centerOn(p, firstCenter); firstCenter = false; }
+    if (c.accuracy > MAX_ACCURACY) { say("Signal GPS faible (±" + Math.round(c.accuracy) + " m)…"); return; }
+    if (typeof c.heading === "number" && !isNaN(c.heading) && (c.speed == null || c.speed > 0.5)) setHeading(c.heading);
+    else if (prevFix && haversine(prevFix, p) >= MIN_STEP) setHeading(bearing(prevFix, p));
+    if (!prevFix || haversine(prevFix, p) >= MIN_STEP) prevFix = p;
+    if (startedAt !== null) {
+      var last = points[points.length - 1];
+      if (!last || haversine(last, p) >= MIN_STEP) {
+        points.push(p);
+        line.addLatLng([p.lat, p.lon]);
+        save();
+      }
+    }
+    followMsg(p);
+  }
+  function centerOn(p, zoomIn) {
+    if (zoomIn && map.getZoom() < 16) map.setView([p.lat, p.lon], 17);
+    else map.panTo([p.lat, p.lon]);
+  }
+  function watchStart() {
+    if (watchId !== null) return true;
+    if (!("geolocation" in navigator)) { say("Ce navigateur ne gère pas la géolocalisation.", true); return false; }
+    prevFix = null;
+    watchId = navigator.geolocation.watchPosition(onPosition, onError, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    return true;
+  }
+  function watchStop() {
+    if (watchId !== null && !locating && startedAt === null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null; lastFix = null; prevFix = null;
+    }
+  }
+
+  function onError(err) {
+    var texts = {
+      1: "Localisation refusée. Autorisez-la dans les réglages du navigateur.",
+      2: "Position introuvable. Vérifiez que le GPS est activé.",
+      3: "Délai dépassé, nouvelle tentative…"
+    };
+    say(texts[err.code] || "Erreur de localisation.", err.code !== 3);
+    if (err.code === 1) {
+      locating = false; following = false;
+      if (startedAt === null && watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; lastFix = null; prevFix = null; }
+      syncLoc();
+    }
+  }
+
+  async function lockScreen() {
+    try { if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+  }
+
+  function start() {
+    if (!watchStart()) return;
+    startedAt = Date.now(); following = true;
+    lockScreen();
+    timer = setInterval(render, 1000);
+    $("toggle").textContent = "Arrêter"; $("toggle").className = "on";
+    say(lastFix ? "Suivi en cours." : "Recherche du signal GPS…");
+  }
+
+  function stop() {
+    elapsed = currentElapsed(); startedAt = null;
+    watchStop();
+    clearInterval(timer);
+    if (wakeLock) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    save(); render();
+    $("toggle").textContent = points.length ? "Reprendre" : "Démarrer"; $("toggle").className = "";
+    say("Suivi arrêté. Exportez le tracé si besoin.");
+  }
+
+  $("toggle").onclick = function () { startedAt === null ? start() : stop(); };
+
+  $("clear").onclick = function () {
+    if (!confirm("Effacer l'itinéraire enregistré ?")) return;
+    if (startedAt !== null) stop();
+    points = []; elapsed = 0; line.setLatLngs([]); resetHeading();
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    $("toggle").textContent = "Démarrer"; render(); say("Itinéraire effacé.");
+  };
+
+  $("gpx").onclick = function () {
+    if (points.length < 2) { say("Pas assez de points à exporter.", true); return; }
+    var trkpts = points.map(function (p) {
+      return '<trkpt lat="' + p.lat + '" lon="' + p.lon + '"><time>' + new Date(p.t).toISOString() + "</time></trkpt>";
+    }).join("");
+    var gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="VHMaps" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Itinéraire</name><trkseg>' + trkpts + "</trkseg></trk></gpx>";
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([gpx], { type: "application/gpx+xml" }));
+    a.download = "vhmaps-" + new Date().toISOString().slice(0, 10) + ".gpx";
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  };
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && startedAt !== null) lockScreen();
+  });
+
+  // ---------- Itinéraires à suivre ----------
+  var RKEY = "itineraires-v1", SKEY = "itineraire-choisi-v1", OFF_ROUTE = 50;
+  var routes = [], routeId = "";
+
+  function currentRoute() { return routes.find(function (r) { return r.id === routeId; }); }
+  function saveRoutes() {
+    try {
+      localStorage.setItem(RKEY, JSON.stringify(routes.filter(function (r) { return !r.file; }).map(function (r) {
+        var o = { id: r.id, name: r.name };
+        if (r.segs) o.segs = r.segs; else o.pts = r.pts;
+        return o;
+      })));
+      return true;
+    }
+    catch (e) { say("Mémoire pleine : supprimez un itinéraire.", true); return false; }
+  }
+  function thin(pts) {
+    var out = [], last = null;
+    pts.forEach(function (q, i) {
+      var o = { lat: q[0], lon: q[1] };
+      if (!last || haversine(last, o) >= 10 || i === pts.length - 1) { out.push(q); last = o; }
+    });
+    return out;
+  }
+  var REF_COLOR = "#1d6fd8";
+  var PALETTE = ["#1d6fd8", "#e8590c", "#2f9e44", "#7048e8", "#c2255c", "#0b7285", "#f08c00", "#495057"];
+  var GARMIN = {
+    black: "#000000", darkred: "#8b0000", darkgreen: "#006400", darkyellow: "#b8860b", darkblue: "#00008b",
+    darkmagenta: "#8b008b", darkcyan: "#008b8b", lightgray: "#d3d3d3", darkgray: "#a9a9a9",
+    red: "#e03131", green: "#2f9e44", yellow: "#f2b800", blue: "#1c7ed6", magenta: "#e64fd0", cyan: "#00b8d9"
+  };
+  function normColor(v) {
+    if (!v) return null;
+    v = v.trim();
+    var k = v.toLowerCase().replace(/[\s_-]/g, "");
+    if (GARMIN[k]) return GARMIN[k];
+    var h = k.replace(/^#|^0x/, "");
+    if (/^[0-9a-f]{8}$/.test(h)) h = h.slice(2);
+    if (/^[0-9a-f]{6}$/.test(h)) return "#" + h;
+    if (/^[a-z]+$/.test(k)) { var o = new Option().style; o.color = k; if (o.color) return k; }
+    return null;
+  }
+  function childText(el, tag) {
+    for (var i = 0; i < el.children.length; i++) if (el.children[i].localName === tag) return el.children[i].textContent.trim();
+    return "";
+  }
+  function colorOf(el) {
+    for (var i = 0; i < el.children.length; i++) {
+      if (el.children[i].localName !== "extensions") continue;
+      var all = el.children[i].getElementsByTagName("*");
+      for (var j = 0; j < all.length; j++) {
+        var n = all[j].localName.toLowerCase();
+        if (n === "displaycolor" || n === "color") { var c = normColor(all[j].textContent); if (c) return c; }
+      }
+    }
+    return null;
+  }
+  function readPts(parent, tag) {
+    var out = [];
+    parent.querySelectorAll(tag).forEach(function (n) {
+      var la = parseFloat(n.getAttribute("lat")), lo = parseFloat(n.getAttribute("lon"));
+      if (!isNaN(la) && !isNaN(lo)) out.push([la, lo]);
+    });
+    return out;
+  }
+  function parseGpx(text, fallback) {
+    var doc = new DOMParser().parseFromString(text, "application/xml");
+    if (doc.querySelector("parsererror")) return null;
+    var items = [].slice.call(doc.querySelectorAll("trk")).map(function (el) { return { el: el, trk: true }; })
+      .concat([].slice.call(doc.querySelectorAll("rte")).map(function (el) { return { el: el, trk: false }; }));
+    var segs = [];
+    items.forEach(function (it) {
+      var nm = childText(it.el, "name"), col = colorOf(it.el);
+      var parts = it.trk ? [].slice.call(it.el.querySelectorAll("trkseg")) : [it.el];
+      parts.forEach(function (part, k) {
+        var p = readPts(part, it.trk ? "trkpt" : "rtept");
+        if (p.length < 2) return;
+        var name = nm || ("Segment " + (segs.length + 1));
+        if (parts.length > 1) name += " (" + (k + 1) + "/" + parts.length + ")";
+        segs.push({ name: name, pts: thin(p), color: (part !== it.el && colorOf(part)) || col });
+      });
+    });
+    if (!segs.length) return null;
+    segs.forEach(function (s, i) { if (!s.color) s.color = segs.length > 1 ? PALETTE[i % PALETTE.length] : REF_COLOR; });
+    var metaName = ""; var meta = doc.querySelector("metadata");
+    if (meta) metaName = childText(meta, "name");
+    var single = items.length === 1 ? childText(items[0].el, "name") : "";
+    return { name: metaName || single || fallback, segs: segs };
+  }
+  function fillSelect() {
+    var sel = $("route");
+    sel.innerHTML = "";
+    sel.add(new Option("Tracé libre (aucun itinéraire)", ""));
+    routes.forEach(function (r) { sel.add(new Option(r.name, r.id)); });
+    sel.value = routeId;
+  }
+  function remember() { try { localStorage.setItem(SKEY, routeId); } catch (e) {} }
+  function segsOf(r) { return r.segs || (r.pts ? [{ pts: r.pts, color: REF_COLOR, name: "" }] : []); }
+  function drawRoute(r) {
+    refLayer.clearLayers();
+    var leg = $("legend"); leg.innerHTML = "";
+    if (!r) { leg.hidden = true; return; }
+    var segs = segsOf(r);
+    segs.forEach(function (s) {
+      var pl = L.polyline(s.pts, { color: s.color || REF_COLOR, weight: 7, opacity: .8 }).addTo(refLayer);
+      if (s.name) pl.bindTooltip(s.name, { sticky: true });
+    });
+    line.bringToFront();
+    var uniq = [], seen = {};
+    segs.forEach(function (s) {
+      var k = (s.color || REF_COLOR) + "|" + (s.name || "");
+      if (!seen[k]) { seen[k] = true; uniq.push(s); }
+    });
+    leg.hidden = uniq.length < 2;
+    if (uniq.length > 1) uniq.forEach(function (s) {
+      var row = document.createElement("div"), sw = document.createElement("i");
+      sw.style.background = s.color || REF_COLOR;
+      row.appendChild(sw); row.appendChild(document.createTextNode(s.name || "-"));
+      leg.appendChild(row);
+    });
+  }
+  function applyRoute(fit) {
+    var r = currentRoute();
+    $("del").hidden = !r || !!r.file;
+    if (r && r.file && !r.segs && !r.pts) {
+      drawRoute(null);
+      say("Chargement de l'itinéraire…");
+      fetch(r.file).then(function (res) { if (!res.ok) throw 0; return res.text(); })
+        .then(function (t) {
+          var g = parseGpx(t, r.name);
+          if (!g) throw 0;
+          r.segs = g.segs;
+          if (currentRoute() === r) { applyRoute(fit); say("Itinéraire chargé."); }
+        })
+        .catch(function () { say("Impossible de charger « " + r.name + " ».", true); });
+      return;
+    }
+    drawRoute(r);
+    if (r && fit && refLayer.getLayers().length) map.fitBounds(refLayer.getBounds(), { paddingTopLeft: [20, 70], paddingBottomRight: [20, 200] });
+  }
+  function followMsg(p) {
+    var r = currentRoute(), segs = r ? segsOf(r) : [];
+    if (!segs.length) { say(startedAt !== null ? "Suivi en cours." : "Position active."); return; }
+    var min = Infinity, best = null;
+    segs.forEach(function (s) {
+      s.pts.forEach(function (q) { var d = haversine(p, { lat: q[0], lon: q[1] }); if (d < min) { min = d; best = s; } });
+    });
+    var where = best && segs.length > 1 && best.name ? " : " + best.name : "";
+    if (min > OFF_ROUTE) say("Hors itinéraire : " + Math.round(min) + " m du tracé.", true);
+    else say("Sur l'itinéraire" + where + " (écart " + Math.round(min) + " m).");
+  }
+
+  $("route").onchange = function () { routeId = this.value; remember(); applyRoute(true); };
+  function serverRepo() {
+    var m = location.hostname.match(/^([^.]+)\.github\.io$/);
+    var repo = location.pathname.split("/")[1];
+    return m && repo && !/\.html?$/i.test(repo) ? { owner: m[1], repo: repo } : null;
+  }
+  function listServer() {
+    var gh = serverRepo();
+    var viaApi = gh
+      ? fetch("https://api.github.com/repos/" + gh.owner + "/" + gh.repo + "/contents/itineraires")
+          .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+          .then(function (items) {
+            return items.filter(function (i) { return /\.gpx$/i.test(i.name); })
+              .map(function (i) { return { name: i.name.replace(/\.gpx$/i, ""), file: "itineraires/" + i.name }; });
+          })
+      : Promise.reject();
+    return viaApi.catch(function () {
+      return fetch("itineraires.json", { cache: "no-cache" })
+        .then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (l) { return l.filter(function (x) { return x && x.file; }); })
+        .catch(function () { return []; });
+    });
+  }
+  function importFromServer(it) {
+    say("Téléchargement…");
+    fetch(encodeURI(it.file), { cache: "no-cache" })
+      .then(function (r) { if (!r.ok) { var e = new Error("HTTP " + r.status); e.kind = "http"; throw e; } return r.text(); })
+      .then(function (t) {
+        var g = parseGpx(t, it.name);
+        if (!g) { var e = new Error("illisible"); e.kind = "parse"; throw e; }
+        g.name = it.name;
+        g.id = "s:" + it.file;
+        routes = routes.filter(function (x) { return x.id !== g.id; });
+        routes.push(g); routeId = g.id;
+        saveRoutes(); remember(); fillSelect(); applyRoute(true);
+        $("srv").close();
+        say("« " + g.name + " » importé.");
+      })
+      .catch(function (e) {
+        $("srv").close();
+        var why = e && e.kind === "http" ? "fichier introuvable sur le serveur (" + e.message + ")"
+          : e && e.kind === "parse" ? "fichier GPX illisible"
+          : e && e.name === "TypeError" ? "réseau indisponible"
+          : "erreur : " + (e && e.message ? e.message : e);
+        say("Impossible de charger « " + it.name + " » : " + why + ".", true);
+      });
+  }
+  $("import").onclick = function () {
+    var ul = $("srvlist");
+    ul.innerHTML = "<li>Recherche des fichiers…</li>";
+    $("srv").showModal();
+    listServer().then(function (list) {
+      ul.innerHTML = "";
+      if (!list.length) { ul.innerHTML = "<li>Aucun fichier GPX trouvé sur le serveur.</li>"; return; }
+      list.forEach(function (it) {
+        var li = document.createElement("li"), b = document.createElement("button");
+        b.className = "ghost"; b.textContent = it.name;
+        b.onclick = function () { importFromServer(it); };
+        li.appendChild(b); ul.appendChild(li);
+      });
+    });
+  };
+  $("srvlocal").onclick = function () { $("srv").close(); $("file").click(); };
+  $("srvclose").onclick = function () { $("srv").close(); };
+  $("file").onchange = function () {
+    var input = this;
+    var jobs = [].slice.call(input.files).map(function (f) {
+      return f.text().then(function (t) {
+        var g = parseGpx(t, f.name.replace(/\.gpx$/i, ""));
+        if (!g) return false;
+        g.id = "r" + Date.now() + Math.random().toString(36).slice(2, 6);
+        routes.push(g); routeId = g.id;
+        return true;
+      });
+    });
+    Promise.all(jobs).then(function (res) {
+      var ok = res.filter(Boolean).length;
+      input.value = "";
+      if (ok) { saveRoutes(); remember(); fillSelect(); applyRoute(true); say(ok + " itinéraire(s) importé(s)."); }
+      else say("Fichier GPX illisible.", true);
+    });
+  };
+  $("del").onclick = function () {
+    var r = currentRoute();
+    if (!r || !confirm("Supprimer « " + r.name + " » ?")) return;
+    routes = routes.filter(function (x) { return x.id !== r.id; });
+    routeId = ""; saveRoutes(); remember(); fillSelect(); applyRoute(false);
+  };
+  function initRoutes() {
+    var saved = "";
+    try {
+      routes = JSON.parse(localStorage.getItem(RKEY) || "[]");
+      saved = localStorage.getItem(SKEY) || "";
+    } catch (e) { routes = []; }
+    function has(id) { return routes.some(function (r) { return r.id === id; }); }
+    routeId = has(saved) ? saved : "";
+    fillSelect(); applyRoute(true);
+  }
+
+  // ---------- Bouton position (réticule) ----------
+  var RET = "M5 12a7 7 0 1 0 14 0a7 7 0 1 0-14 0M12 2v4M12 18v4M2 12h4M18 12h4";
+  function syncLoc() {
+    var ic = function (d) { return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>'; };
+    var b = $("locate");
+    b.innerHTML = locating && following ? ic(RET + "M12 12h.01") : ic(RET);
+    b.setAttribute("aria-pressed", locating && following ? "true" : "false");
+    b.classList.toggle("live", locating && !following);
+    b.setAttribute("aria-label", !locating ? "Activer ma position" : following ? "Désactiver ma position" : "Recentrer sur ma position");
+  }
+  $("locate").onclick = function () {
+    if (!locating) {
+      if (!watchStart()) return;
+      locating = true; following = true;
+      if (lastFix) { centerOn(lastFix, true); firstCenter = false; }
+      else { firstCenter = true; say("Recherche du signal GPS…"); }
+    } else if (!following) {
+      following = true;
+      if (lastFix) centerOn(lastFix, false);
+    } else {
+      locating = false; following = false;
+      watchStop();
+      if (startedAt === null) {
+        if (marker) { map.removeLayer(marker); marker = null; }
+        resetHeading();
+        say("Position désactivée.");
+      }
+    }
+    syncLoc();
+  };
+  map.on("dragstart", function () { if (following) { following = false; syncLoc(); } });
+  syncLoc();
+
+  // ---------- Plein écran ----------
+  var ICON = function (d) { return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="' + d + '"/></svg>'; };
+  var I_ENTER = ICON("M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5");
+  var I_EXIT = ICON("M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5");
+  var I_INSTALL = ICON("M12 4v11M7 11l5 5 5-5M5 20h14");
+  var fsBtn = $("fs");
+  var canFs = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+  function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function syncFs() {
+    var on = isFs();
+    fsBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    fsBtn.setAttribute("aria-label", on ? "Quitter le plein écran" : "Plein écran");
+    fsBtn.innerHTML = on ? I_EXIT : I_ENTER;
+    setTimeout(function () { map.invalidateSize(); }, 250);
+  }
+  fsBtn.hidden = !canFs;
+  syncFs();
+  fsBtn.onclick = function () {
+    if (isFs()) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+    var el = document.documentElement, f = el.requestFullscreen || el.webkitRequestFullscreen;
+    var r = f.call(el);
+    if (r && r.catch) r.catch(function () { say("Plein écran refusé par le navigateur.", true); });
+  };
+  document.addEventListener("fullscreenchange", syncFs);
+  document.addEventListener("webkitfullscreenchange", syncFs);
+  window.addEventListener("resize", function () { map.invalidateSize(); });
+
+  // ---------- Installation (PWA) ----------
+  var deferred = null, installBtn = $("install");
+  var standalone = (window.matchMedia && matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+  var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  installBtn.innerHTML = I_INSTALL;
+  installBtn.hidden = standalone;
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferred = e; });
+  window.addEventListener("appinstalled", function () { installBtn.hidden = true; deferred = null; say("VHMaps est installée."); });
+  installBtn.onclick = function () {
+    if (deferred) { deferred.prompt(); deferred.userChoice.then(function () { deferred = null; }); }
+    else if (ios) say("Safari : touchez Partager, puis « Sur l'écran d'accueil ».");
+    else say("Menu du navigateur : « Installer l'application » ou « Ajouter à l'écran d'accueil ».");
+  };
+
+  // ---------- Thème clair / sombre ----------
+  var TKEY = "vhmaps-theme", themeBtn = $("theme");
+  var I_MOON = ICON("M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z");
+  var I_SUN = ICON("M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4");
+  var mq = window.matchMedia ? matchMedia("(prefers-color-scheme: dark)") : null;
+  function systemTheme() { return mq && mq.matches ? "dark" : "light"; }
+  function storedTheme() {
+    try { var t = localStorage.getItem(TKEY); return t === "dark" || t === "light" ? t : null; } catch (e) { return null; }
+  }
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute("content", t === "dark" ? "#0f1917" : "#14342f");
+    themeBtn.innerHTML = t === "dark" ? I_SUN : I_MOON;
+    themeBtn.setAttribute("aria-label", t === "dark" ? "Passer en mode clair" : "Passer en mode sombre");
+  }
+  applyTheme(storedTheme() || systemTheme());
+  themeBtn.onclick = function () {
+    var next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    try { if (next === systemTheme()) localStorage.removeItem(TKEY); else localStorage.setItem(TKEY, next); } catch (e) {}
+    applyTheme(next);
+  };
+  if (mq && mq.addEventListener) mq.addEventListener("change", function () { if (!storedTheme()) applyTheme(systemTheme()); });
+
+  // ---------- Street View ----------
+  var svArmed = false, svPin = null;
+  function svUrl(ll) { return "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + ll.lat.toFixed(6) + "," + ll.lng.toFixed(6); }
+  function svLink(ll) { return '<br><a href="' + svUrl(ll) + '" target="_blank" rel="noopener">Ouvrir Street View ici</a>'; }
+  function openStreetView(ll) {
+    if (navigator.onLine === false) { say("Street View nécessite une connexion.", true); return; }
+    if (svPin) map.removeLayer(svPin);
+    svPin = L.circleMarker(ll, { radius: 9, color: "#fff", weight: 3, fillColor: "#f76707", fillOpacity: 1, interactive: false }).addTo(map);
+    setTimeout(function () { if (svPin) { map.removeLayer(svPin); svPin = null; } }, 6000);
+    var w = window.open(svUrl(ll), "_blank");
+    if (w) { w.opener = null; say("Street View ouvert."); }
+    else say("Street View bloqué par le navigateur : autorisez les fenêtres, puis recommencez.", true);
+  }
+  function setSv(on) {
+    svArmed = on;
+    $("sv").setAttribute("aria-pressed", on ? "true" : "false");
+    $("sv").setAttribute("aria-label", on ? "Annuler Street View" : "Street View : choisir un point");
+    $("map").classList.toggle("sv-armed", on);
+    if (on) say("Street View : touchez un point de la carte.");
+  }
+  $("sv").innerHTML = ICON("M9 6a3 3 0 1 0 6 0a3 3 0 1 0-6 0M12 9v6M7.5 12h9M10 21l2-6 2 6");
+  $("sv").onclick = function () { setSv(!svArmed); };
+  map.on("click", function (e) { if (svArmed) { setSv(false); openStreetView(e.latlng); } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && svArmed) setSv(false); });
+  function attachPopup(layer, htmlFor) {
+    layer.on("click", function (e) {
+      if (svArmed) { setSv(false); openStreetView(e.latlng); return; }
+      L.popup().setLatLng(e.latlng).setContent(htmlFor(e.latlng)).openOn(map);
+    });
+  }
+
+  // ---------- Recherche d'adresse ou de lieu ----------
+  var qEl = $("q"), qRes = $("qres"), qBar = $("searchbar"), qTimer = null, qAbort = null, qPin = null, qItems = [];
+  $("search").innerHTML = ICON("M4 11a7 7 0 1 0 14 0a7 7 0 1 0-14 0M16 16l5 5");
+  function qOpen(on) {
+    qBar.hidden = !on;
+    $("search").setAttribute("aria-pressed", on ? "true" : "false");
+    if (on) { qEl.focus(); qEl.select(); } else { qEl.blur(); if (qAbort) qAbort.abort(); }
+  }
+  function parseCoords(t) {
+    var m = /^\s*(-?\d{1,2}(?:[.,]\d+)?)\s*[;,\s]\s*(-?\d{1,3}(?:[.,]\d+)?)\s*$/.exec(t);
+    if (!m) return null;
+    var la = parseFloat(m[1].replace(",", ".")), lo = parseFloat(m[2].replace(",", "."));
+    return Math.abs(la) <= 90 && Math.abs(lo) <= 180 ? { lat: la, lon: lo } : null;
+  }
+  function guessZoom(label) {
+    return /\d|\b(rue|avenue|av\.|boulevard|bd|chemin|route|impasse|all[ée]e|place|quai|cours|rond-point|zone|za|lieu-dit|parking|gare|mairie|[ée]cole|coll[èe]ge|lyc[ée]e|h[ôo]pital)\b/i.test(label) ? 17 : 14;
+  }
+  function qShow(list, msg) {
+    qRes.innerHTML = ""; qItems = list;
+    if (msg) { var m = document.createElement("li"); m.className = "qmsg"; m.textContent = msg; qRes.appendChild(m); }
+    list.forEach(function (r) {
+      var li = document.createElement("li"), b = document.createElement("button");
+      b.type = "button"; b.textContent = r.label;
+      b.onclick = function () { qGo(r); };
+      li.appendChild(b); qRes.appendChild(li);
+    });
+  }
+  function qGo(r) {
+    destination = { lat: r.lat, lng: r.lon, label: r.label };
+    qOpen(false);
+    if (following) { following = false; syncLoc(); }
+    map.setView([r.lat, r.lon], r.zoom);
+    if (qPin) map.removeLayer(qPin);
+    var box = document.createElement("div"), t = document.createElement("b"), sv = document.createElement("a"), rm = document.createElement("a");
+    t.textContent = r.label; box.appendChild(t);
+    sv.href = svUrl(L.latLng(r.lat, r.lon)); sv.target = "_blank"; sv.rel = "noopener"; sv.textContent = "Ouvrir Street View ici"; sv.style.display = "block";
+    rm.href = "#"; rm.textContent = "Retirer le repère"; rm.style.display = "block";
+    rm.onclick = function (e) { e.preventDefault(); if (qPin) { map.removeLayer(qPin); qPin = null; } };
+    box.appendChild(sv);
+    var guide=document.createElement("button"); guide.type="button"; guide.textContent="Démarrer le guidage"; guide.style.display="block"; guide.style.margin="8px 0"; guide.onclick=function(){startGuidance(r);}; box.appendChild(guide);
+    var share=document.createElement("button"); share.type="button"; share.textContent="Partager l’itinéraire"; share.style.display="block"; share.onclick=shareRoute; box.appendChild(share);
+    box.appendChild(rm);
+    qPin = L.marker([r.lat, r.lon], { icon: L.divIcon({ className: "", html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [13, 31] }), keyboard: false })
+      .addTo(map).bindPopup(box);
+    say("Centré sur : " + r.label);
+  }
+  function qSearch(text) {
+    text = text.trim();
+    var c = parseCoords(text);
+    if (c) { qShow([{ label: "Coordonnées : " + c.lat.toFixed(5) + ", " + c.lon.toFixed(5), lat: c.lat, lon: c.lon, zoom: 17 }]); return; }
+    if (text.length < 3) { qShow([]); return; }
+    if (navigator.onLine === false) { qShow([], "Recherche impossible hors ligne (les coordonnées fonctionnent)."); return; }
+    if (qAbort) qAbort.abort();
+    qAbort = new AbortController();
+    var ctr = map.getCenter();
+    var url = "https://data.geopf.fr/geocodage/completion/?text=" + encodeURIComponent(text) + "&maximumResponses=6&lonlat=" + ctr.lng.toFixed(5) + "," + ctr.lat.toFixed(5);
+    qShow([], "Recherche…");
+    fetch(url, { signal: qAbort.signal })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (j) {
+        var list = (j.results || []).map(function (r) { return { label: String(r.fulltext || ""), lat: parseFloat(r.y), lon: parseFloat(r.x) }; })
+          .filter(function (r) { return r.label && !isNaN(r.lat) && !isNaN(r.lon); })
+          .map(function (r) { r.zoom = guessZoom(r.label); return r; });
+        qShow(list, list.length ? "" : "Aucun résultat.");
+      })
+      .catch(function (e) { if (e && e.name !== "AbortError") qShow([], "Recherche impossible : connexion requise ou service indisponible."); });
+  }
+  $("search").onclick = function () { qOpen(qBar.hidden); };
+  $("qclose").onclick = function () { qOpen(false); };
+  qEl.addEventListener("input", function () { clearTimeout(qTimer); qTimer = setTimeout(function () { qSearch(qEl.value); }, 300); });
+  qEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); clearTimeout(qTimer); if (qItems.length) qGo(qItems[0]); else qSearch(qEl.value); }
+    else if (e.key === "Escape") qOpen(false);
+  });
+  map.on("click", function () { if (!qBar.hidden) qOpen(false); });
+
+  // ---------- Mesures cartographiques éditables ----------
+  var measureMode=null, measureType=null, measurePoints=[], measureLayer=L.layerGroup().addTo(map),
+      measureShape=null, measureMarkers=[], measureSelected=-1;
+  function fmtDistance(m){return m>=1000?(m/1000).toFixed(2).replace(".",",")+" km":Math.round(m)+" m";}
+  function fmtArea(a){return a>=10000?(a/10000).toFixed(2).replace(".",",")+" ha":Math.round(a)+" m²";}
+  function areaMeters(points){var radius=6378137,sum=0;for(var i=0;i<points.length;i++){var a=points[i],b=points[(i+1)%points.length];sum+=(b.lng-a.lng)*Math.PI/180*(2+Math.sin(a.lat*Math.PI/180)+Math.sin(b.lat*Math.PI/180));}return Math.abs(sum*radius*radius/2);}
+  function measureLength(points){var d=0;for(var i=1;i<points.length;i++)d+=points[i-1].distanceTo(points[i]);return d;}
+  function updateMeasureValue(){
+    var v="Ajoutez au moins "+(measureType==="area"?3:2)+" points.";
+    if(measureType==="line"&&measurePoints.length>=2)v="Distance : "+fmtDistance(measureLength(measurePoints));
+    if(measureType==="area"&&measurePoints.length>=3)v="Surface : "+fmtArea(areaMeters(measurePoints));
+    if(measureSelected>=0&&measurePoints[measureSelected])v+=" · Sommet "+(measureSelected+1)+" sélectionné.";
+    $("measureValue").textContent=v;
+    $("measureDelete").disabled=measureSelected<0 || measurePoints.length<=(measureType==="area"?3:2);
+    $("measureUndo").disabled=measurePoints.length===0;
+  }
+  function measureVertexIcon(selected){return L.divIcon({className:"",html:'<div class="measure-vertex'+(selected?' selected':'')+'"></div>',iconSize:[22,22],iconAnchor:[11,11]});}
+
+  function insertMeasurePoint(e){
+    if(measurePoints.length<2)return false;
+    var click=map.latLngToLayerPoint(e.latlng),best=Infinity,bestIndex=-1,bestPoint=null;
+    var segments=measurePoints.length-1+(measureType==="area"&&measurePoints.length>=3?1:0);
+    for(var i=0;i<segments;i++){
+      var j=(i+1)%measurePoints.length;
+      var a=map.latLngToLayerPoint(measurePoints[i]),b=map.latLngToLayerPoint(measurePoints[j]);
+      var cp=L.LineUtil.closestPointOnSegment(click,a,b),d=click.distanceTo(cp);
+      if(d<best){best=d;bestIndex=i;bestPoint=map.layerPointToLatLng(cp);}
+    }
+    if(bestIndex<0||best>(L.Browser.touch?34:24))return false;
+    measurePoints.splice(bestIndex+1,0,bestPoint);measureSelected=bestIndex+1;drawMeasure();
+    return true;
+  }
+  function drawMeasure(){
+    measureLayer.clearLayers();measureShape=null;measureMarkers=[];
+    var validArea=measureType==="area"&&measurePoints.length>=3;
+    if(measurePoints.length>1){
+      measureShape=(validArea?L.polygon(measurePoints,{color:"#e07a28",weight:3,fillOpacity:.16}):L.polyline(measurePoints,{color:"#e07a28",weight:4,dashArray:"7 5"})).addTo(measureLayer);
+    }
+    measurePoints.forEach(function(p,i){
+      var marker=L.marker(p,{draggable:true,icon:measureVertexIcon(i===measureSelected),keyboard:true,title:"Déplacer le sommet "+(i+1)}).addTo(measureLayer);
+      marker.bindTooltip(String(i+1),{direction:"top",offset:[0,-8]});
+      marker.on("click",function(e){if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);measureSelected=i;drawMeasure();});
+      marker.on("drag",function(e){measurePoints[i]=e.target.getLatLng();if(measureShape)measureShape.setLatLngs(measurePoints);updateMeasureValue();});
+      marker.on("dragend",function(e){measurePoints[i]=e.target.getLatLng();drawMeasure();});
+      measureMarkers.push(marker);
+    });
+    updateMeasureValue();
+    $("measureHelp").textContent=measureMode?"Cliquez sur la carte pour ajouter un point. Déplacez une poignée ou touchez un segment pour insérer un sommet.":"Déplacez les poignées pour ajuster le tracé. Touchez un segment pour ajouter un sommet.";
+  }
+  function setMeasure(mode){
+    if(mode){
+      if(measureType!==mode){measurePoints=[];measureSelected=-1;measureType=mode;drawMeasure();}
+      measureMode=mode;
+    } else measureMode=null;
+    $("measurePanel").hidden=!mode&&!measurePoints.length;
+    $("measureTitle").textContent=measureType==="line"?"Mesure linéaire":"Mesure surfacique";
+    $("measureLine").classList.toggle("live",measureMode==="line");$("measureArea").classList.toggle("live",measureMode==="area");
+    if(mode){say("Mode mesure activé : cliquez pour ajouter des points, déplacez les poignées pour modifier le tracé.");}
+    drawMeasure();
+  }
+  map.on("click",function(e){
+    if(!measureMode)return;
+    if(insertMeasurePoint(e))return;
+    measurePoints.push(e.latlng);measureSelected=-1;drawMeasure();
+  });
+  $("measureLine").onclick=function(){setMeasure(measureMode==="line"?null:"line");};
+  $("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
+  $("measureUndo").onclick=function(){if(measurePoints.length){measurePoints.pop();measureSelected=-1;drawMeasure();}};
+  $("measureDelete").onclick=function(){if(measureSelected<0)return;var min=measureType==="area"?3:2;if(measurePoints.length<=min){say("Conservez au moins "+min+" sommets pour cette mesure.");return;}measurePoints.splice(measureSelected,1);measureSelected=-1;drawMeasure();};
+  
+  // Bouton Réinitialiser : efface le tracé sans fermer la fenêtre de mesure
+  $("measureReset").onclick=function(){
+    measurePoints=[];
+    measureSelected=-1;
+    drawMeasure();
+    say("Mesure réinitialisée. Cliquez sur la carte pour démarrer un nouveau tracé.");
+  };
+
+  // Bouton Terminer : efface le tracé, désactive la mesure et ferme le panneau
+  $("measureClose").onclick=function(){
+    measurePoints=[];
+    measureSelected=-1;
+    setMeasure(null);
+  };
+
+  // ---------- Parcelles cadastrales IGN ----------
+  var cadastreLayer=null,cadastreOn=false,cadastreOpacity=.85;
+  function syncCadastre(){
+    if(!cadastreOn){if(cadastreLayer){map.removeLayer(cadastreLayer);cadastreLayer=null;}return;}
+    if(!cadastreLayer){
+      cadastreLayer=L.tileLayer.wms("https://data.geopf.fr/wms-r/wms",{
+        layers:"CADASTRALPARCELS.PARCELLAIRE_EXPRESS",styles:"",format:"image/png",
+        transparent:true,version:"1.3.0",opacity:cadastreOpacity,
+        attribution:"Parcellaire Express (PCI) © IGN / DGFiP",maxZoom:22,
+        pane:"overlayPane",uppercase:false
+      });
+      cadastreLayer.on("tileerror",function(){say("La couche cadastrale IGN ne répond pas. Vérifiez la connexion Internet.",true);});
+      cadastreLayer.on("load",function(){say("Parcelles cadastrales affichées.");});
+      cadastreLayer.addTo(map);
+      cadastreLayer.bringToFront();
+    }else{cadastreLayer.setOpacity(cadastreOpacity);if(!map.hasLayer(cadastreLayer))cadastreLayer.addTo(map);cadastreLayer.bringToFront();}
+  }
+  $("ovCadastre").onchange=function(){cadastreOn=this.checked;syncCadastre();try{localStorage.setItem("vhmaps-cadastre",cadastreOn?"1":"0");}catch(e){}};
+  $("ovCadastreOp").oninput=function(){cadastreOpacity=Number(this.value)/100;if(cadastreLayer)cadastreLayer.setOpacity(cadastreOpacity);try{localStorage.setItem("vhmaps-cadastre-op",this.value);}catch(e){}};
+  try{cadastreOn=localStorage.getItem("vhmaps-cadastre")==="1";cadastreOpacity=(Number(localStorage.getItem("vhmaps-cadastre-op"))||85)/100;$("ovCadastre").checked=cadastreOn;$("ovCadastreOp").value=Math.round(cadastreOpacity*100);if(cadastreOn)syncCadastre();}catch(e){}
+
+  // ---------- Guidage et partage ----------
+  var destination=null,guidanceLine=null,guidanceMarker=null,guidanceOrigin=null,guidanceWatch=null;
+  function compassText(d){return["N","NE","E","SE","S","SO","O","NO"][Math.round(d/45)%8];}
+  var shareData=null;
+  function shareRoute(){
+    if(!destination){say("Sélectionnez d’abord une destination dans la recherche.",true);return;}
+    var url="https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(destination.lat+","+destination.lng)+"&travelmode=driving";
+    var title="Itinéraire vers "+destination.label;
+    var text=title+"\n"+url;
+    shareData={title:title,text:text,url:url};
+    $("shareTitle").textContent=title;
+    $("shareWhatsApp").href="https://wa.me/?text="+encodeURIComponent(text);
+    $("shareEmail").href="mailto:?subject="+encodeURIComponent(title)+"&body="+encodeURIComponent(text);
+    $("shareSms").href="sms:?&body="+encodeURIComponent(text);
+    var dlg=$("shareDlg");if(typeof dlg.showModal==="function")dlg.showModal();else if(navigator.share){navigator.share(shareData).catch(function(){});}else{window.location.href=$("shareEmail").href;}
+  }
+  $("shareNative").onclick=function(){
+    if(!shareData)return;
+    if(navigator.share){navigator.share(shareData).catch(function(err){if(err&&err.name!=="AbortError")say("Le partage système n’est pas disponible. Choisissez WhatsApp, E-mail ou SMS.",true);});}
+    else say("Le partage système n’est pas pris en charge par ce navigateur. Utilisez un des liens proposés.",true);
+  };
+  $("shareCopy").onclick=function(){
+    if(!shareData)return;
+    var value=shareData.text;
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(value).then(function(){say("Lien d’itinéraire copié.");}).catch(function(){window.prompt("Copiez ce lien d’itinéraire :",shareData.url);});}
+    else window.prompt("Copiez ce lien d’itinéraire :",shareData.url);
+  };
+  $("shareClose").onclick=function(){$("shareDlg").close();};
+  function startGuidance(r){destination={lat:r.lat,lng:r.lon,label:r.label};if(guidanceLine)map.removeLayer(guidanceLine);if(guidanceMarker)map.removeLayer(guidanceMarker);guidanceMarker=L.marker([r.lat,r.lon]).addTo(map).bindPopup("Destination : "+r.label).openPopup();
+    if(guidanceWatch!==null)navigator.geolocation.clearWatch(guidanceWatch);if(!navigator.geolocation){say("Géolocalisation indisponible sur cet appareil.",true);return;}say("Calcul de l’itinéraire…");
+    navigator.geolocation.getCurrentPosition(function(pos){var origin=L.latLng(pos.coords.latitude,pos.coords.longitude),dest=L.latLng(r.lat,r.lon);if(guidanceOrigin)map.removeLayer(guidanceOrigin);
+      guidanceOrigin=L.circleMarker(origin,{radius:8,color:"#fff",weight:3,fillColor:"#1976d2",fillOpacity:1}).addTo(map).bindTooltip("Votre position");var straight=origin.distanceTo(dest);
+      guidanceLine=L.polyline([origin,dest],{color:"#1976d2",weight:5,dashArray:"8 6"}).addTo(map);map.fitBounds(L.latLngBounds(origin,dest).pad(.18));
+      var api="https://router.project-osrm.org/route/v1/driving/"+origin.lng+","+origin.lat+";"+dest.lng+","+dest.lat+"?overview=full&geometries=geojson";
+      fetch(api).then(function(x){if(!x.ok)throw Error();return x.json();}).then(function(j){if(j.routes&&j.routes[0]){var rt=j.routes[0];guidanceLine.setLatLngs(rt.geometry.coordinates.map(function(c){return[c[1],c[0]];}));say("Itinéraire : "+fmtDistance(rt.distance)+" · durée estimée "+Math.round(rt.duration/60)+" min.");}else say("Distance à vol d’oiseau : "+fmtDistance(straight)+".");}).catch(function(){say("Guidage indicatif : "+fmtDistance(straight)+" à vol d’oiseau. Service de routage indisponible.");});
+      guidanceWatch=navigator.geolocation.watchPosition(function(p){var here=L.latLng(p.coords.latitude,p.coords.longitude),left=here.distanceTo(dest),dir=compassText(bearing(here,dest));if(guidanceOrigin)guidanceOrigin.setLatLng(here);say("Vers "+r.label+" · reste "+fmtDistance(left)+" · direction "+dir+".");},function(){},{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+    },function(){say("Autorisez la géolocalisation pour démarrer le guidage.",true);},{enableHighAccuracy:true,timeout:15000});}
+
+  // ---------- Cartes hors ligne ----------
+  var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
+  var offBusy = false, offAbort = null;
+  $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
+
+  function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
+  function lat2y(lat, z) {
+    var r = lat * Math.PI / 180;
+    return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z));
+  }
+  function clampT(v, z) { return Math.max(0, Math.min(Math.pow(2, z) - 1, v)); }
+  function tileMeters(lat, z) { return 40075016.686 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z); }
+
+  function viewTiles(z0, z1) {
+    var b = map.getBounds(), out = [], total = 0, z, x, y;
+    for (z = z0; z <= z1; z++) {
+      var x0 = clampT(lon2x(b.getWest(), z), z), x1 = clampT(lon2x(b.getEast(), z), z);
+      var y0 = clampT(lat2y(Math.min(b.getNorth(), 85), z), z), y1 = clampT(lat2y(Math.max(b.getSouth(), -85), z), z);
+      total += (x1 - x0 + 1) * (y1 - y0 + 1);
+      if (total > MAX_TILES) return { tiles: [], count: total, tooMany: true };
+      for (x = x0; x <= x1; x++) for (y = y0; y <= y1; y++) out.push({ z: z, x: x, y: y });
+    }
+    return { tiles: out, count: out.length, tooMany: false };
+  }
+  function routeTiles(segs, z0, z1) {
+    var seen = {}, out = [];
+    function add(lat, lon, z) {
+      var cx = lon2x(lon, z), cy = lat2y(lat, z);
+      for (var dx = -1; dx <= 1; dx++) for (var dy = -1; dy <= 1; dy++) {
+        var x = clampT(cx + dx, z), y = clampT(cy + dy, z), k = z + "/" + x + "/" + y;
+        if (!seen[k]) { seen[k] = 1; out.push({ z: z, x: x, y: y }); }
+      }
+    }
+    for (var z = z0; z <= z1; z++) {
+      segs.forEach(function (s) {
+        var prev = null;
+        s.pts.forEach(function (q) {
+          if (prev) {
+            var d = haversine({ lat: prev[0], lon: prev[1] }, { lat: q[0], lon: q[1] });
+            var n = Math.max(1, Math.ceil(d / (tileMeters(q[0], z) / 2)));
+            for (var i = 1; i <= n; i++) add(prev[0] + (q[0] - prev[0]) * i / n, prev[1] + (q[1] - prev[1]) * i / n, z);
+          } else add(q[0], q[1], z);
+          prev = q;
+        });
+      });
+      if (out.length > MAX_TILES) return { tiles: [], count: out.length, tooMany: true };
+    }
+    return { tiles: out, count: out.length, tooMany: false };
+  }
+  function plan() {
+    var base = BASES[$("offBase").value], z1 = parseInt($("offZoom").value, 10), p;
+    if ($("offArea").value === "route") {
+      var r = currentRoute();
+      if (!r || !segsOf(r).length) return { error: "Aucun itinéraire sélectionné : choisissez-en un, ou prenez « zone affichée »." };
+      p = routeTiles(segsOf(r), Math.min(10, z1), z1);
+    } else {
+      p = viewTiles(Math.max(6, Math.min(Math.floor(map.getZoom()) - 2, z1)), z1);
+    }
+    p.base = base;
+    return p;
+  }
+  function updateEst() {
+    if (offBusy) return;
+    var b = BASES[$("offBase").value], est = $("offEst"), go = $("offGo");
+    if (b.local) {
+      est.textContent = "La dalle (≈ 9 Mo) est enregistrée dans le téléphone dès son premier chargement : elle fonctionne ensuite hors ligne.";
+      go.disabled = true; return;
+    }
+    if (!b.offline) {
+      est.textContent = "Le téléchargement n'est pas autorisé sur les serveurs d'OpenStreetMap : choisissez Plan IGN ou Photographies aériennes IGN.";
+      go.disabled = true; return;
+    }
+    var p = plan();
+    if (p.error) { est.textContent = p.error; go.disabled = true; return; }
+    if (p.tooMany) { est.textContent = "Zone trop étendue (plus de " + MAX_TILES + " tuiles) : réduisez le niveau de détail ou la zone."; go.disabled = true; return; }
+    est.textContent = "≈ " + p.count + " tuiles, environ " + Math.max(1, Math.round(p.count * b.kb / 1024)) + " Mo.";
+    go.disabled = false;
+  }
+  function updateStorage() {
+    var info = $("offInfo");
+    if (!window.caches) { info.textContent = "Stockage hors ligne indisponible sur ce navigateur."; return; }
+    caches.open(OFFLINE).then(function (c) { return c.keys(); }).then(function (k) {
+      var txt = k.length + " tuile(s) enregistrée(s) hors ligne";
+      if (navigator.storage && navigator.storage.estimate) {
+        return navigator.storage.estimate().then(function (e) {
+          info.textContent = txt + " · espace utilisé par VHMaps : " + Math.round((e.usage || 0) / 1048576) + " Mo";
+        });
+      }
+      info.textContent = txt;
+    }).catch(function () { info.textContent = ""; });
+  }
+  function download() {
+    var p = plan();
+    if (offBusy || p.error || p.tooMany || !window.caches) return;
+    offBusy = true; offAbort = new AbortController();
+    var bar = $("offBar"), est = $("offEst");
+    bar.hidden = false; bar.max = p.count; bar.value = 0;
+    $("offGo").hidden = true; $("offStop").hidden = false;
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
+    var queue = p.tiles.slice(), done = 0, ok = 0, skipped = 0, fail = 0, streak = 0;
+    function urlOf(t) { return p.base.url.replace("{z}", t.z).replace("{x}", t.x).replace("{y}", t.y); }
+    function finish() {
+      var stopped = offAbort.signal.aborted, msg;
+      offBusy = false; bar.hidden = true; $("offGo").hidden = false; $("offStop").hidden = true;
+      if (stopped) msg = "Téléchargement interrompu : " + ok + " tuile(s) enregistrée(s).";
+      else if (streak >= 25 || (ok === 0 && skipped === 0 && fail > 0)) msg = "Échec : le serveur de cartes ne répond pas ou refuse le téléchargement (" + fail + " erreurs). Vérifiez la connexion.";
+      else msg = "Terminé : " + ok + " tuile(s) téléchargée(s)" + (skipped ? ", " + skipped + " déjà présente(s)" : "") + (fail ? ", " + fail + " en échec" : "") + ".";
+      est.textContent = msg; updateStorage();
+    }
+    caches.open(OFFLINE).then(function (cache) {
+      function worker() {
+        if (!queue.length || offAbort.signal.aborted || streak >= 25) return Promise.resolve();
+        var u = urlOf(queue.shift());
+        return cache.match(u).then(function (hit) {
+          if (hit) { skipped++; return; }
+          return fetch(u, { mode: "cors", credentials: "omit", signal: offAbort.signal })
+            .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return cache.put(u, res); })
+            .then(function () { ok++; streak = 0; })
+            .catch(function () { if (!offAbort.signal.aborted) { fail++; streak++; } });
+        }).then(function () {
+          done++; bar.value = done; est.textContent = done + " / " + p.count + " tuiles…";
+          return worker();
+        });
+      }
+      return Promise.all([worker(), worker(), worker(), worker()]);
+    }).then(finish, function () { streak = 25; finish(); });
+  }
+
+  // ---------- Superpositions (PCRS) ----------
+  var PCRS_LAYER = "PCRS.LAMB93", COVER_LAYER = "PCRS.GRAPHE-MOSAIQUAGE";
+  var OKEY = "vhmaps-overlays", ov = { pcrs: false, cover: false, op: 100, ref: false, pr: false }, ovLayers = {};
+  try {
+    var so = JSON.parse(localStorage.getItem(OKEY) || "null");
+    if (so) ov = { pcrs: !!so.pcrs, cover: !!so.cover, op: so.op >= 20 && so.op <= 100 ? so.op : 100, ref: !!so.ref, pr: !!so.pr };
+  } catch (e) {}
+  function mkWms(url, layer, attr, z, label) {
+    var l = L.tileLayer.wms(url, { layers: layer, styles: "", format: "image/png", transparent: true, version: "1.3.0",
+      minZoom: 16, maxZoom: 21, zIndex: z, attribution: attr });
+    var ok = 0, ko = 0;
+    l.on("tileload", function () { ok++; });
+    l.on("tileerror", function () {
+      ko++;
+      if (ko === 4 && ok === 0) say(label + " : aucune image reçue (service indisponible ou connexion coupée).", true);
+    });
+    return l;
+  }
+  var OVERLAYS = [
+    ["pcrs", "https://data.geopf.fr/wms-r", PCRS_LAYER, "PCRS &copy; IGN / G&eacute;oplateforme", 5, "PCRS"],
+    ["cover", "https://data.geopf.fr/wms-v", COVER_LAYER, "Emprise PCRS &copy; IGN", 6, "Emprise PCRS"]
+  ];
+  function syncOverlays() {
+    OVERLAYS.forEach(function (d) {
+      var l = ovLayers[d[0]];
+      if (ov[d[0]] && !l) { ovLayers[d[0]] = mkWms(d[1], d[2], d[3], d[4], d[5]); ovLayers[d[0]].addTo(map); }
+      else if (!ov[d[0]] && l) { map.removeLayer(l); delete ovLayers[d[0]]; }
+    });
+    if (ovLayers.pcrs) ovLayers.pcrs.setOpacity(ov.op / 100);
+    try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {}
+  }
+  function zoomHint() { if (map.getZoom() < 16) say("PCRS : zoomez à partir du niveau 16 pour l'afficher."); }
+
+  // ---------- Référentiel routier et PR ----------
+  var SITES = [
+    { key: "questembert", label: "Questembert", color: "#e03131" },
+    { key: "muzillac", label: "Muzillac", color: "#f76707" },
+    { key: "grand-champ", label: "Grand-Champ", color: "#2f9e44" },
+    { key: "gacilly", label: "La Gacilly", color: "#f5c400" },
+    { key: "vannes", label: "Vannes", color: "#1c7ed6" }
+  ];
+  var OTHER_SITE = { label: "Autre site", color: "#868e96" };
+  function siteOf(name) {
+    var n = String(name || "").toLowerCase();
+    for (var i = 0; i < SITES.length; i++) if (n.indexOf(SITES[i].key) >= 0) return SITES[i];
+    return OTHER_SITE;
+  }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function shortRoute(r) {
+    return String(r).replace(/^(Ex)?\d{2}\s+/, function (m, e) { return e ? "Ex " : ""; }).replace(/^(Ex\s)?([A-Za-z]+)0+(?=\d)/, "$1$2");
+  }
+  var dataCache = {};
+  function loadJson(url) {
+    if (!dataCache[url]) {
+      dataCache[url] = fetch(url).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+      dataCache[url].catch(function () { delete dataCache[url]; });
+    }
+    return dataCache[url];
+  }
+  map.createPane("ref"); map.getPane("ref").style.zIndex = 350;
+  map.createPane("prpts"); map.getPane("prpts").style.zIndex = 360;
+  var refRenderer = L.canvas({ pane: "ref", padding: 0.3, tolerance: 8 });
+  var prRenderer = L.canvas({ pane: "prpts", padding: 0.3, tolerance: 6 });
+  var refLayerGeo = null, prGroup = L.layerGroup().addTo(map), prData = null, refWanted = 0, prWanted = 0;
+
+  function drawRefLegend(sitesSeen) {
+    var leg = $("legendRef"); leg.innerHTML = "";
+    var h = document.createElement("h4"); h.textContent = "Référentiel par site"; leg.appendChild(h);
+    SITES.concat([OTHER_SITE]).forEach(function (s) {
+      if (!sitesSeen[s.label]) return;
+      var row = document.createElement("div"), sw = document.createElement("i");
+      sw.style.background = s.color;
+      row.appendChild(sw); row.appendChild(document.createTextNode(s.label)); leg.appendChild(row);
+    });
+    leg.hidden = false;
+  }
+  function syncRef() {
+    var token = ++refWanted;
+    if (!ov.ref) {
+      if (refLayerGeo) { map.removeLayer(refLayerGeo); refLayerGeo = null; }
+      $("legendRef").hidden = true; return;
+    }
+    if (refLayerGeo) return;
+    loadJson("donnees/lineaire.json").then(function (fc) {
+      if (token !== refWanted || !ov.ref) return;
+      var seen = {};
+      refLayerGeo = L.geoJSON(fc, {
+        renderer: refRenderer, bubblingMouseEvents: false,
+        style: function (f) { var s = siteOf(f.properties.site); seen[s.label] = true; return { color: s.color, weight: 4, opacity: .95, lineCap: "round", lineJoin: "round" }; },
+        onEachFeature: function (f, layer) {
+          var p = f.properties;
+          attachPopup(layer, function (ll) {
+            return "<b>" + esc(shortRoute(p.axe)) + "</b> (" + esc(p.axe) + ")<br>Site : " + esc(p.site) + "<br>PR " + esc(p.deb) + " &rarr; PR " + esc(p.fin) + svLink(ll);
+          });
+        }
+      }).addTo(map);
+      drawRefLegend(seen);
+    }).catch(function () { if (token === refWanted) say("Référentiel indisponible : connexion nécessaire au premier chargement.", true); });
+  }
+  function labelIcon(txt) { return L.divIcon({ className: "pr-label", html: "<span>" + esc(txt) + "</span>", iconSize: [0, 0], iconAnchor: [0, 0] }); }
+  function renderPr() {
+    prGroup.clearLayers();
+    var z = map.getZoom();
+    if (!ov.pr || !prData || z < 12) return;
+    var b = map.getBounds().pad(0.15), rad = z >= 14 ? 4 : 3, n = 0;
+    prData.forEach(function (q) {
+      if (!b.contains([q[1], q[0]])) return;
+      var m = L.circleMarker([q[1], q[0]], { renderer: prRenderer, radius: rad, color: "#fff", weight: 1.5, fillColor: q[4] ? "#1971c2" : "#212529", fillOpacity: 1, bubblingMouseEvents: false });
+      attachPopup(m, function () {
+        return "<b>" + esc(shortRoute(q[2])) + "</b> (" + esc(q[2]) + ")<br>PR " + esc(q[3]) + (q[4] ? " &ndash; d&eacute;but de route" : "") + svLink(L.latLng(q[1], q[0]));
+      });
+      m.addTo(prGroup);
+      if (z >= 14 && n < 500) {
+        L.marker([q[1], q[0]], { icon: labelIcon(z >= 16 ? shortRoute(q[2]) + " · " + q[3] : q[3]), interactive: false, keyboard: false, zIndexOffset: -1000 }).addTo(prGroup);
+        n++;
+      }
+    });
+  }
+  function syncPr() {
+    var token = ++prWanted;
+    if (!ov.pr) { renderPr(); return; }
+    loadJson("donnees/pr.json").then(function (d) { if (token !== prWanted) return; prData = d.pr; renderPr(); })
+      .catch(function () { if (token === prWanted) say("PR indisponibles : connexion nécessaire au premier chargement.", true); });
+    if (map.getZoom() < 12) say("PR : zoomez à partir du niveau 12 pour les voir (numéros à partir du niveau 14).");
+  }
+  map.on("moveend", renderPr);
+  $("ovRef").onchange = function () { ov.ref = this.checked; syncRef(); try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {} };
+  $("ovPr").onchange = function () { ov.pr = this.checked; syncPr(); try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {} };
+
+  $("ovPcrs").onchange = function () { ov.pcrs = this.checked; syncOverlays(); if (ov.pcrs) zoomHint(); };
+  $("ovCover").onchange = function () { ov.cover = this.checked; syncOverlays(); if (ov.cover) zoomHint(); };
+  $("ovOp").oninput = function () { ov.op = parseInt(this.value, 10) || 100; syncOverlays(); };
+  syncOverlays(); syncRef(); syncPr();
+
+  $("offline").onclick = function () {
+    $("offBase").value = baseKey; updateEst(); updateStorage();
+    $("ovPcrs").checked = ov.pcrs; $("ovCover").checked = ov.cover; $("ovOp").value = ov.op;
+    $("ovRef").checked = ov.ref; $("ovPr").checked = ov.pr;
+    $("off").showModal();
+  };
+  $("offBase").onchange = function () { setBase(this.value, true); updateEst(); };
+  $("offArea").onchange = updateEst;
+  $("offZoom").onchange = updateEst;
+  $("offGo").onclick = download;
+  $("offStop").onclick = function () { if (offAbort) offAbort.abort(); };
+  $("offDel").onclick = function () {
+    if (!window.caches || !confirm("Supprimer toutes les cartes hors ligne enregistrées ?")) return;
+    caches.delete(OFFLINE).then(function () { updateStorage(); $("offEst").textContent = "Cartes hors ligne supprimées."; });
+  };
+  $("offClose").onclick = function () { $("off").close(); };
+
+  function syncSheet() {
+    var sh = document.querySelector(".sheet");
+    if (sh) document.documentElement.style.setProperty("--sheet-h", sh.offsetHeight + "px");
+  }
+  syncSheet();
+  window.addEventListener("resize", syncSheet);
+  if (window.ResizeObserver) new ResizeObserver(syncSheet).observe(document.querySelector(".sheet"));
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+  }
+
+  load(); render(); initRoutes();
+  if (points.length) { drawAll(); $("toggle").textContent = "Reprendre"; say("Itinéraire précédent restauré."); }
+})();
+</script>
+</body>
+</html>
