@@ -99,6 +99,20 @@
   #map.sv-armed, #map.sv-armed.leaflet-grab, #map.sv-armed .leaflet-interactive { cursor: crosshair; }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--ink); }
   .leaflet-popup-content a { color: var(--go); font-weight: 600; }
+  .searchbar { position: absolute; z-index: 1100; left: 10px; right: 10px; top: calc(62px + env(safe-area-inset-top, 0px));
+    display: grid; gap: 6px; max-width: 520px; padding: 8px; background: var(--surface-a); border: 1px solid var(--line);
+    border-radius: 14px; box-shadow: 0 4px 16px rgba(20,52,47,.25); }
+  .searchbar .srow { display: flex; gap: 6px; }
+  .searchbar input { flex: 1; min-width: 0; font: inherit; font-size: 1rem; padding: 12px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+  .searchbar .srow button { padding: 0 14px; }
+  #qres { list-style: none; margin: 0; padding: 0; max-height: 42vh; overflow: auto; display: grid; gap: 4px; }
+  #qres button { width: 100%; text-align: left; font-weight: 500; padding: 11px 12px; background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+  #qres .qmsg { font-size: .85rem; opacity: .8; padding: 4px 6px; }
+  .pin { width: 26px; height: 26px; border-radius: 50% 50% 50% 0; background: var(--route); border: 3px solid #fff;
+    transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+  .pin::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #fff; }
+  @media (max-height: 720px) and (orientation: portrait) { .tools { grid-auto-flow: column; grid-template-rows: repeat(4, 46px); } }
   .tool.live { color: var(--go); border-color: var(--go); }
   @media (max-height: 520px) { .tools { grid-auto-flow: column; } }   /* paysage : boutons en ligne */
 </style>
@@ -127,7 +141,16 @@
   <div class="legend" id="legendRef" hidden></div>
 </div>
 
+<div class="searchbar" id="searchbar" role="search" hidden>
+  <div class="srow">
+    <input id="q" type="search" placeholder="Adresse, lieu ou coordonnées" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Rechercher une adresse ou un lieu">
+    <button id="qclose" class="ghost" aria-label="Fermer la recherche">&#10005;</button>
+  </div>
+  <ul id="qres" aria-live="polite"></ul>
+</div>
+
 <div class="tools">
+  <button id="search" class="tool" aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
   <button id="locate" class="tool" aria-pressed="false" aria-label="Activer ma position"></button>
   <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
   <button id="sv" class="tool" aria-pressed="false" aria-label="Street View : choisir un point"></button>
@@ -839,6 +862,78 @@
       L.popup().setLatLng(e.latlng).setContent(htmlFor(e.latlng)).openOn(map);
     });
   }
+
+  // ---------- Recherche d'adresse ou de lieu (autocomplétion Géoplateforme) ----------
+  var qEl = $("q"), qRes = $("qres"), qBar = $("searchbar"), qTimer = null, qAbort = null, qPin = null, qItems = [];
+  $("search").innerHTML = ICON("M4 11a7 7 0 1 0 14 0a7 7 0 1 0-14 0M16 16l5 5");
+  function qOpen(on) {
+    qBar.hidden = !on;
+    $("search").setAttribute("aria-pressed", on ? "true" : "false");
+    if (on) { qEl.focus(); qEl.select(); } else { qEl.blur(); if (qAbort) qAbort.abort(); }
+  }
+  function parseCoords(t) {              // « 47.658, -2.760 » ou « 47,658 -2,760 » (latitude, longitude)
+    var m = /^\s*(-?\d{1,2}(?:[.,]\d+)?)\s*[;,\s]\s*(-?\d{1,3}(?:[.,]\d+)?)\s*$/.exec(t);
+    if (!m) return null;
+    var la = parseFloat(m[1].replace(",", ".")), lo = parseFloat(m[2].replace(",", "."));
+    return Math.abs(la) <= 90 && Math.abs(lo) <= 180 ? { lat: la, lon: lo } : null;
+  }
+  function guessZoom(label) {            // adresse ou lieu précis : zoom 17 ; commune : zoom 14
+    return /\d|\b(rue|avenue|av\.|boulevard|bd|chemin|route|impasse|all[ée]e|place|quai|cours|rond-point|zone|za|lieu-dit|parking|gare|mairie|[ée]cole|coll[èe]ge|lyc[ée]e|h[ôo]pital)\b/i.test(label) ? 17 : 14;
+  }
+  function qShow(list, msg) {
+    qRes.innerHTML = ""; qItems = list;
+    if (msg) { var m = document.createElement("li"); m.className = "qmsg"; m.textContent = msg; qRes.appendChild(m); }
+    list.forEach(function (r) {
+      var li = document.createElement("li"), b = document.createElement("button");
+      b.type = "button"; b.textContent = r.label;
+      b.onclick = function () { qGo(r); };
+      li.appendChild(b); qRes.appendChild(li);
+    });
+  }
+  function qGo(r) {
+    qOpen(false);
+    if (following) { following = false; syncLoc(); }    // sinon le suivi de position recentrerait la carte
+    map.setView([r.lat, r.lon], r.zoom);
+    if (qPin) map.removeLayer(qPin);
+    var box = document.createElement("div"), t = document.createElement("b"), sv = document.createElement("a"), rm = document.createElement("a");
+    t.textContent = r.label; box.appendChild(t);
+    sv.href = svUrl(L.latLng(r.lat, r.lon)); sv.target = "_blank"; sv.rel = "noopener"; sv.textContent = "Ouvrir Street View ici"; sv.style.display = "block";
+    rm.href = "#"; rm.textContent = "Retirer le repère"; rm.style.display = "block";
+    rm.onclick = function (e) { e.preventDefault(); if (qPin) { map.removeLayer(qPin); qPin = null; } };
+    box.appendChild(sv); box.appendChild(rm);
+    qPin = L.marker([r.lat, r.lon], { icon: L.divIcon({ className: "", html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [13, 31] }), keyboard: false })
+      .addTo(map).bindPopup(box);
+    say("Centré sur : " + r.label);
+  }
+  function qSearch(text) {
+    text = text.trim();
+    var c = parseCoords(text);
+    if (c) { qShow([{ label: "Coordonnées : " + c.lat.toFixed(5) + ", " + c.lon.toFixed(5), lat: c.lat, lon: c.lon, zoom: 17 }]); return; }
+    if (text.length < 3) { qShow([]); return; }
+    if (navigator.onLine === false) { qShow([], "Recherche impossible hors ligne (les coordonnées fonctionnent)."); return; }
+    if (qAbort) qAbort.abort();
+    qAbort = new AbortController();
+    var ctr = map.getCenter();
+    var url = "https://data.geopf.fr/geocodage/completion/?text=" + encodeURIComponent(text) + "&maximumResponses=6&lonlat=" + ctr.lng.toFixed(5) + "," + ctr.lat.toFixed(5);
+    qShow([], "Recherche…");
+    fetch(url, { signal: qAbort.signal })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (j) {
+        var list = (j.results || []).map(function (r) { return { label: String(r.fulltext || ""), lat: parseFloat(r.y), lon: parseFloat(r.x) }; })
+          .filter(function (r) { return r.label && !isNaN(r.lat) && !isNaN(r.lon); })
+          .map(function (r) { r.zoom = guessZoom(r.label); return r; });
+        qShow(list, list.length ? "" : "Aucun résultat.");
+      })
+      .catch(function (e) { if (e && e.name !== "AbortError") qShow([], "Recherche impossible : connexion requise ou service indisponible."); });
+  }
+  $("search").onclick = function () { qOpen(qBar.hidden); };
+  $("qclose").onclick = function () { qOpen(false); };
+  qEl.addEventListener("input", function () { clearTimeout(qTimer); qTimer = setTimeout(function () { qSearch(qEl.value); }, 300); });
+  qEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); clearTimeout(qTimer); if (qItems.length) qGo(qItems[0]); else qSearch(qEl.value); }
+    else if (e.key === "Escape") qOpen(false);
+  });
+  map.on("click", function () { if (!qBar.hidden) qOpen(false); });
 
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
