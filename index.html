@@ -114,6 +114,12 @@
   .pin::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #fff; }
   @media (max-height: 720px) and (orientation: portrait) { .tools { grid-auto-flow: column; grid-template-rows: repeat(4, 46px); } }
   .tool.live { color: var(--go); border-color: var(--go); }
+  .measure-panel { position:absolute; z-index:1200; left:10px; right:10px; bottom:calc(var(--sheet-h, 0px) + 12px); max-width:460px;
+    padding:12px; display:grid; gap:8px; background:var(--surface-a); color:var(--ink); border:1px solid var(--line);
+    border-radius:14px; box-shadow:0 3px 14px rgba(0,0,0,.22); }
+  .measure-panel .row { display:flex; flex-wrap:wrap; gap:6px; }
+  .measure-panel button { padding:9px 11px; }
+  @media(max-width:520px){ .tools { top:calc(116px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
   @media (max-height: 520px) { .tools { grid-auto-flow: column; } }   /* paysage : boutons en ligne */
 </style>
 </head>
@@ -157,6 +163,12 @@
   <button id="theme" class="tool" aria-label="Mode sombre"></button>
   <button id="offline" class="tool" aria-label="Cartes et hors ligne"></button>
   <button id="install" class="tool" aria-label="Installer l'application"></button>
+  <button id="measureLine" class="tool" aria-label="Mesurer une distance">↔</button>
+  <button id="measureArea" class="tool" aria-label="Mesurer une surface">□</button>
+</div>
+<div id="measurePanel" class="measure-panel" hidden>
+  <b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span>
+  <div class="row"><button id="measureUndo" class="ghost">Annuler point</button><button id="measureReset" class="ghost">Réinitialiser</button><button id="measureClose" class="ghost">Terminer</button></div>
 </div>
 
 <section class="sheet">
@@ -195,6 +207,8 @@
   <h3>Superpositions</h3>
   <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
   <label class="chk"><input type="checkbox" id="ovPr"> PR (points et numéros)</label>
+  <label class="chk"><input type="checkbox" id="ovCadastre"> Parcelles cadastrales (IGN)</label>
+  <label>Opacité du cadastre <input type="range" id="ovCadastreOp" min="20" max="100" step="10" value="85"></label>
   <label class="chk"><input type="checkbox" id="ovPcrs"> PCRS (plan de corps de rue simplifié)</label>
   <label class="chk"><input type="checkbox" id="ovCover"> Emprise des données PCRS</label>
   <label>Opacité du PCRS <input type="range" id="ovOp" min="20" max="100" step="10" value="100"></label>
@@ -900,7 +914,10 @@
     sv.href = svUrl(L.latLng(r.lat, r.lon)); sv.target = "_blank"; sv.rel = "noopener"; sv.textContent = "Ouvrir Street View ici"; sv.style.display = "block";
     rm.href = "#"; rm.textContent = "Retirer le repère"; rm.style.display = "block";
     rm.onclick = function (e) { e.preventDefault(); if (qPin) { map.removeLayer(qPin); qPin = null; } };
-    box.appendChild(sv); box.appendChild(rm);
+    box.appendChild(sv);
+    var guide=document.createElement("button"); guide.type="button"; guide.textContent="Démarrer le guidage"; guide.style.display="block"; guide.style.margin="8px 0"; guide.onclick=function(){startGuidance(r);}; box.appendChild(guide);
+    var share=document.createElement("button"); share.type="button"; share.textContent="Partager l’itinéraire"; share.style.display="block"; share.onclick=shareRoute; box.appendChild(share);
+    box.appendChild(rm);
     qPin = L.marker([r.lat, r.lon], { icon: L.divIcon({ className: "", html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [13, 31] }), keyboard: false })
       .addTo(map).bindPopup(box);
     say("Centré sur : " + r.label);
@@ -934,6 +951,44 @@
     else if (e.key === "Escape") qOpen(false);
   });
   map.on("click", function () { if (!qBar.hidden) qOpen(false); });
+
+
+  // ---------- Mesures cartographiques ----------
+  var measureMode=null, measurePoints=[], measureLayer=L.layerGroup().addTo(map);
+  function fmtDistance(m){return m>=1000?(m/1000).toFixed(2).replace(".",",")+" km":Math.round(m)+" m";}
+  function fmtArea(a){return a>=10000?(a/10000).toFixed(2).replace(".",",")+" ha":Math.round(a)+" m²";}
+  function areaMeters(points){var radius=6378137,sum=0;for(var i=0;i<points.length;i++){var a=points[i],b=points[(i+1)%points.length];sum+=(b.lng-a.lng)*Math.PI/180*(2+Math.sin(a.lat*Math.PI/180)+Math.sin(b.lat*Math.PI/180));}return Math.abs(sum*radius*radius/2);}
+  function measureLength(points){var d=0;for(var i=1;i<points.length;i++)d+=points[i-1].distanceTo(points[i]);return d;}
+  function drawMeasure(){measureLayer.clearLayers();if(measurePoints.length>1){var sh=measureMode==="area"&&measurePoints.length>=3?L.polygon(measurePoints,{color:"#e07a28",weight:3,fillOpacity:.16}):L.polyline(measurePoints,{color:"#e07a28",weight:4,dashArray:"7 5"});sh.addTo(measureLayer);}
+    measurePoints.forEach(function(p,i){L.circleMarker(p,{radius:5,color:"#fff",weight:2,fillColor:"#e07a28",fillOpacity:1}).bindTooltip(String(i+1)).addTo(measureLayer);});
+    var v="Ajoutez au moins "+(measureMode==="area"?3:2)+" points.";if(measureMode==="line"&&measurePoints.length>=2)v="Distance : "+fmtDistance(measureLength(measurePoints));if(measureMode==="area"&&measurePoints.length>=3)v="Surface : "+fmtArea(areaMeters(measurePoints));$("measureValue").textContent=v;}
+  function setMeasure(mode){measureMode=mode;measurePoints=[];measureLayer.clearLayers();$("measurePanel").hidden=!mode;$("measureTitle").textContent=mode==="line"?"Mesure linéaire":"Mesure surfacique";$("measureLine").classList.toggle("live",mode==="line");$("measureArea").classList.toggle("live",mode==="area");if(mode){$("measureValue").textContent="Cliquez sur la carte pour ajouter des points.";say("Mode mesure activé : sélectionnez les points sur la carte.");}}
+  map.on("click",function(e){if(!measureMode)return;measurePoints.push(e.latlng);drawMeasure();});
+  $("measureLine").onclick=function(){setMeasure(measureMode==="line"?null:"line");};$("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
+  $("measureUndo").onclick=function(){measurePoints.pop();drawMeasure();};$("measureReset").onclick=function(){measurePoints=[];drawMeasure();};$("measureClose").onclick=function(){setMeasure(null);};
+
+  // ---------- Parcelles cadastrales IGN ----------
+  var cadastreLayer=null,cadastreOn=false,cadastreOpacity=.85;
+  function syncCadastre(){if(!cadastreOn){if(cadastreLayer){map.removeLayer(cadastreLayer);cadastreLayer=null;}return;}
+    if(!cadastreLayer){cadastreLayer=L.tileLayer.wms("https://data.geopf.fr/wms-r",{layers:"CADASTRALPARCELS.PARCELLAIRE_EXPRESS:parcelle",format:"image/png",transparent:true,version:"1.3.0",opacity:cadastreOpacity,attribution:"Cadastre © IGN / DGFiP",maxZoom:21}).addTo(map);}else cadastreLayer.setOpacity(cadastreOpacity);}
+  $("ovCadastre").onchange=function(){cadastreOn=this.checked;syncCadastre();try{localStorage.setItem("vhmaps-cadastre",cadastreOn?"1":"0");}catch(e){}};
+  $("ovCadastreOp").oninput=function(){cadastreOpacity=Number(this.value)/100;if(cadastreLayer)cadastreLayer.setOpacity(cadastreOpacity);try{localStorage.setItem("vhmaps-cadastre-op",this.value);}catch(e){}};
+  try{cadastreOn=localStorage.getItem("vhmaps-cadastre")==="1";cadastreOpacity=(Number(localStorage.getItem("vhmaps-cadastre-op"))||85)/100;$("ovCadastre").checked=cadastreOn;$("ovCadastreOp").value=Math.round(cadastreOpacity*100);if(cadastreOn)syncCadastre();}catch(e){}
+
+  // ---------- Guidage et partage ----------
+  var destination=null,guidanceLine=null,guidanceMarker=null,guidanceOrigin=null,guidanceWatch=null;
+  function bearing(a,b){var r=Math.PI/180,y=Math.sin((b.lng-a.lng)*r)*Math.cos(b.lat*r),x=Math.cos(a.lat*r)*Math.sin(b.lat*r)-Math.sin(a.lat*r)*Math.cos(b.lat*r)*Math.cos((b.lng-a.lng)*r);return(Math.atan2(y,x)*180/Math.PI+360)%360;}
+  function compassText(d){return["N","NE","E","SE","S","SO","O","NO"][Math.round(d/45)%8];}
+  function shareRoute(){if(!destination)return;var url="https://www.google.com/maps/dir/?api=1&destination="+destination.lat+","+destination.lng+"&travelmode=driving",title="Itinéraire vers "+destination.label,text="Itinéraire vers "+destination.label+" : "+url;if(navigator.share){navigator.share({title:title,text:text,url:url}).catch(function(){});}else{window.location.href="mailto:?subject="+encodeURIComponent(title)+"&body="+encodeURIComponent(text);}}
+  function startGuidance(r){destination={lat:r.lat,lng:r.lon,label:r.label};if(guidanceLine)map.removeLayer(guidanceLine);if(guidanceMarker)map.removeLayer(guidanceMarker);guidanceMarker=L.marker([r.lat,r.lon]).addTo(map).bindPopup("Destination : "+r.label).openPopup();
+    if(guidanceWatch!==null)navigator.geolocation.clearWatch(guidanceWatch);if(!navigator.geolocation){say("Géolocalisation indisponible sur cet appareil.",true);return;}say("Calcul de l’itinéraire…");
+    navigator.geolocation.getCurrentPosition(function(pos){var origin=L.latLng(pos.coords.latitude,pos.coords.longitude),dest=L.latLng(r.lat,r.lon);if(guidanceOrigin)map.removeLayer(guidanceOrigin);
+      guidanceOrigin=L.circleMarker(origin,{radius:8,color:"#fff",weight:3,fillColor:"#1976d2",fillOpacity:1}).addTo(map).bindTooltip("Votre position");var straight=origin.distanceTo(dest);
+      guidanceLine=L.polyline([origin,dest],{color:"#1976d2",weight:5,dashArray:"8 6"}).addTo(map);map.fitBounds(L.latLngBounds(origin,dest).pad(.18));
+      var api="https://router.project-osrm.org/route/v1/driving/"+origin.lng+","+origin.lat+";"+dest.lng+","+dest.lat+"?overview=full&geometries=geojson";
+      fetch(api).then(function(x){if(!x.ok)throw Error();return x.json();}).then(function(j){if(j.routes&&j.routes[0]){var rt=j.routes[0];guidanceLine.setLatLngs(rt.geometry.coordinates.map(function(c){return[c[1],c[0]];}));say("Itinéraire : "+fmtDistance(rt.distance)+" · durée estimée "+Math.round(rt.duration/60)+" min.");}else say("Distance à vol d’oiseau : "+fmtDistance(straight)+".");}).catch(function(){say("Guidage indicatif : "+fmtDistance(straight)+" à vol d’oiseau. Service de routage indisponible.");});
+      guidanceWatch=navigator.geolocation.watchPosition(function(p){var here=L.latLng(p.coords.latitude,p.coords.longitude),left=here.distanceTo(dest),dir=compassText(bearing(here,dest));if(guidanceOrigin)guidanceOrigin.setLatLng(here);say("Vers "+r.label+" · reste "+fmtDistance(left)+" · direction "+dir+".");},function(){},{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
+    },function(){say("Autorisez la géolocalisation pour démarrer le guidage.",true);},{enableHighAccuracy:true,timeout:15000});}
 
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
