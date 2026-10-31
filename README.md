@@ -94,3 +94,14 @@ python outils/preparer_donnees.py --tif ATDSE2019_georef.tif --lineaire lineaire
 
 Le GeoTIFF fourni n'a pas de système de coordonnées enregistré : il est supposé en Lambert-93 (EPSG:2154),
 hypothèse vérifiée en superposant les lignes et les PR sur la dalle. Les couleurs des sites se règlent dans `index.html` (liste `SITES`).
+
+## Recherche (loupe)
+
+En plus des adresses, lieux-dits et coordonnées, la recherche accepte :
+
+- une **route** : `D20`, `D 20`, `RD20`, `N165`, `D1C`, `DB198`… (affiche les routes correspondantes ; en choisir une
+  recadre la carte dessus et la surligne 20 s) ;
+- un **PR** : `D20 12`, `D20 PR12`, `D20-12` (centre la carte sur le PR avec un repère).
+
+Cette recherche utilise `donnees/pr.json` et `donnees/lineaire.json` : elle fonctionne hors ligne et même si les
+couches « Référentiel » et « PR » ne sont pas affichées.

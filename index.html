@@ -166,7 +166,7 @@
 
 <div class="searchbar" id="searchbar" role="search" hidden>
   <div class="srow">
-    <input id="q" type="search" placeholder="Adresse, lieu ou coordonnées" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Rechercher une adresse ou un lieu">
+    <input id="q" type="search" placeholder="Adresse, lieu, route (D20) ou PR (D20 12)" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Rechercher une adresse, un lieu, une route ou un PR">
     <button id="qclose" class="ghost" data-tip="Fermer la recherche" aria-label="Fermer la recherche">&#10005;</button>
   </div>
   <ul id="qres" aria-live="polite"></ul>
@@ -937,12 +937,12 @@
   }
 
   // ---------- Recherche d'adresse ou de lieu ----------
-  var qEl = $("q"), qRes = $("qres"), qBar = $("searchbar"), qTimer = null, qAbort = null, qPin = null, qItems = [];
+  var qEl = $("q"), qRes = $("qres"), qBar = $("searchbar"), qTimer = null, qAbort = null, qPin = null, qItems = [], qHi = null, qHiT = null, qSeq = 0;
   $("search").innerHTML = ICON("M4 11a7 7 0 1 0 14 0a7 7 0 1 0-14 0M16 16l5 5");
   function qOpen(on) {
     qBar.hidden = !on;
     $("search").setAttribute("aria-pressed", on ? "true" : "false");
-    if (on) { qEl.focus(); qEl.select(); } else { qEl.blur(); if (qAbort) qAbort.abort(); }
+    if (on) { qEl.focus(); qEl.select(); qIndex().catch(function () {}); } else { qEl.blur(); if (qAbort) qAbort.abort(); }
   }
   function parseCoords(t) {
     var m = /^\s*(-?\d{1,2}(?:[.,]\d+)?)\s*[;,\s]\s*(-?\d{1,3}(?:[.,]\d+)?)\s*$/.exec(t);
@@ -959,11 +959,30 @@
     list.forEach(function (r) {
       var li = document.createElement("li"), b = document.createElement("button");
       b.type = "button"; b.textContent = r.label;
-      b.onclick = function () { qGo(r); };
+      b.onclick = function () { qPick(r); };
       li.appendChild(b); qRes.appendChild(li);
     });
   }
+  function qClearHi() { clearTimeout(qHiT); if (qHi) { map.removeLayer(qHi); qHi = null; } }
+  function qPick(r) { if (r.bounds) qGoRoute(r); else qGo(r); }
+  function qGoRoute(r) {
+    qOpen(false); qClearHi();
+    if (qPin) { map.removeLayer(qPin); qPin = null; }
+    if (following) { following = false; syncLoc(); }
+    var sh = $("sheet"), bottom = 30 + (sh && !sh.hidden ? sh.offsetHeight : 0);
+    map.fitBounds(r.bounds, { paddingTopLeft: [30, 70], paddingBottomRight: [30, bottom], maxZoom: 17 });
+    if (r.feats && r.feats.length) {
+      var gj = { type: "FeatureCollection", features: r.feats };
+      qHi = L.featureGroup([
+        L.geoJSON(gj, { interactive: false, style: { color: "#fff", weight: 12, opacity: .75, lineCap: "round", lineJoin: "round" } }),
+        L.geoJSON(gj, { interactive: false, style: { color: "#f08c00", weight: 7, opacity: .95, lineCap: "round", lineJoin: "round" } })
+      ]).addTo(map);
+      qHiT = setTimeout(qClearHi, 20000);
+    }
+    say("Route : " + r.label);
+  }
   function qGo(r) {
+    qClearHi();
     destination = { lat: r.lat, lng: r.lon, label: r.label };
     qOpen(false);
     if (following) { following = false; syncLoc(); }
@@ -982,10 +1001,82 @@
       .addTo(map).bindPopup(box);
     say("Centré sur : " + r.label);
   }
+  // --- Recherche locale par route et PR (données du dossier donnees/, utilisable hors ligne) ---
+  var AX_RE = /^(Ex)?\s*(\d{2})?\s*([A-Za-z]+)\s*0*(\d+)\s*([A-Za-z]*)$/;
+  var Q_RE = /^([a-z]{1,2})\s*0*(\d{1,4})([a-z])?(?:\s*[-\/,;:]?\s*(?:pr\.?\s*)?(\d{1,3}[a-z]?))?$/;
+  var qIdxP = null;
+  function extendGeom(b, g) {
+    (function walk(a) { if (typeof a[0] === "number") b.extend([a[1], a[0]]); else a.forEach(walk); })(g.coordinates);
+  }
+  function qIndex() {
+    if (!qIdxP) {
+      qIdxP = Promise.all([loadJson("donnees/pr.json").catch(function () { return null; }), loadJson("donnees/lineaire.json").catch(function () { return null; })])
+        .then(function (r) {
+          if (!r[0] && !r[1]) throw new Error("données indisponibles");
+          var ax = {};
+          function get(a) {
+            if (ax[a]) return ax[a];
+            var m = AX_RE.exec(String(a)); if (!m) return null;
+            return (ax[a] = { axe: a, ex: !!m[1], L: m[3].toUpperCase(), N: String(parseInt(m[4], 10)), S: m[5].toUpperCase(), sites: {}, prs: [], feats: [], b: L.latLngBounds([]) });
+          }
+          ((r[0] && r[0].pr) || []).forEach(function (q) { var e = get(q[2]); if (e) { e.prs.push(q); e.b.extend([q[1], q[0]]); } });
+          ((r[1] && r[1].features) || []).forEach(function (f) { var e = get(f.properties.axe); if (e && f.geometry) { e.feats.push(f); e.sites[f.properties.site] = 1; extendGeom(e.b, f.geometry); } });
+          return Object.keys(ax).map(function (k) { return ax[k]; }).filter(function (e) { return e.b.isValid(); });
+        });
+      qIdxP.catch(function () { qIdxP = null; });
+    }
+    return qIdxP;
+  }
+  function parseRouteQuery(text) {
+    var t = text.toLowerCase().trim()
+      .replace(/^(?:route\s+)?d[ée]partementale\s*/, "d").replace(/^(?:route\s+)?nationale\s*/, "n")
+      .replace(/^route\s+(?=[dn]\s*\d)/, "").replace(/^r([dn])(?=\s*\d)/, "$1");
+    var m = Q_RE.exec(t);
+    return m ? { L: m[1].toUpperCase(), N: String(parseInt(m[2], 10)), S: (m[3] || "").toUpperCase(), P: (m[4] || "").toUpperCase() } : null;
+  }
+  function routeLabel(e) { return shortRoute(e.axe); }
+  function qLocal(query, idx) {
+    var res = [], routes = idx.filter(function (e) {
+      return e.L === query.L && (!query.S || e.S.indexOf(query.S) === 0);
+    });
+    var exact = routes.filter(function (e) { return e.N === query.N; });
+    function order(a, b) { return (parseInt(a.N, 10) - parseInt(b.N, 10)) || (a.S < b.S ? -1 : a.S > b.S ? 1 : 0) || (a.ex - b.ex); }
+    if (query.P) {
+      var full = [], part = [];
+      exact.sort(order).forEach(function (e) {
+        e.prs.forEach(function (q) {
+          var n = String(q[3]).toUpperCase();
+          var r = { label: routeLabel(e) + " · PR " + q[3] + (q[4] ? " (début de route)" : ""), lat: q[1], lon: q[0], zoom: 17 };
+          if (n === query.P) full.push(r); else if (n.indexOf(query.P) === 0) part.push(r);
+        });
+      });
+      return full.concat(part).slice(0, 8);
+    }
+    var prefix = routes.filter(function (e) { return e.N !== query.N && e.N.indexOf(query.N) === 0; });
+    exact.sort(order).concat(prefix.sort(order)).slice(0, 8).forEach(function (e) {
+      var nums = e.prs.map(function (q) { return parseInt(q[3], 10); }).filter(function (n) { return !isNaN(n); });
+      var sites = Object.keys(e.sites).join(", ");
+      res.push({
+        label: routeLabel(e) + (sites ? " · " + sites : "") + (nums.length ? " · PR " + Math.min.apply(null, nums) + " → " + Math.max.apply(null, nums) : ""),
+        bounds: e.b, feats: e.feats
+      });
+    });
+    return res;
+  }
   function qSearch(text) {
     text = text.trim();
+    var seq = ++qSeq;
     var c = parseCoords(text);
     if (c) { qShow([{ label: "Coordonnées : " + c.lat.toFixed(5) + ", " + c.lon.toFixed(5), lat: c.lat, lon: c.lon, zoom: 17 }]); return; }
+    var rq = parseRouteQuery(text);
+    if (!rq) { qGeocode(text); return; }
+    qIndex().then(function (idx) { return qLocal(rq, idx); }, function () { return []; })
+      .then(function (list) {
+        if (seq !== qSeq) return;
+        if (list.length) { if (qAbort) qAbort.abort(); qShow(list); } else qGeocode(text);
+      });
+  }
+  function qGeocode(text) {
     if (text.length < 3) { qShow([]); return; }
     if (navigator.onLine === false) { qShow([], "Recherche impossible hors ligne (les coordonnées fonctionnent)."); return; }
     if (qAbort) qAbort.abort();
@@ -1007,7 +1098,7 @@
   $("qclose").onclick = function () { qOpen(false); };
   qEl.addEventListener("input", function () { clearTimeout(qTimer); qTimer = setTimeout(function () { qSearch(qEl.value); }, 300); });
   qEl.addEventListener("keydown", function (e) {
-    if (e.key === "Enter") { e.preventDefault(); clearTimeout(qTimer); if (qItems.length) qGo(qItems[0]); else qSearch(qEl.value); }
+    if (e.key === "Enter") { e.preventDefault(); clearTimeout(qTimer); if (qItems.length) qPick(qItems[0]); else qSearch(qEl.value); }
     else if (e.key === "Escape") qOpen(false);
   });
   map.on("click", function () { if (!qBar.hidden) qOpen(false); });
