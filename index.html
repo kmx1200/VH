@@ -22,6 +22,10 @@
   :root[data-theme="dark"] .vh-invert { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
   :root[data-theme="dark"] .vh-dim { filter: brightness(.72) contrast(1.05); }
   .leaflet-container { background: var(--map-bg); }
+  .leaflet-tooltip-pane .old-lbl { background: transparent; border: 0; box-shadow: none; padding: 0; color: #3d2f00; font-weight: 700; font-size: 12px;
+    text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 3px #fff; }
+  .old-lbl:before { display: none; }
+  .old-nolabels .old-lbl { display: none; }
   .leaflet-tooltip { background: var(--surface); color: var(--ink); border-color: var(--line); }
   .leaflet-tooltip-top:before { border-top-color: var(--surface); }
   .leaflet-tooltip-bottom:before { border-bottom-color: var(--surface); }
@@ -1748,6 +1752,9 @@
       + (p.just ? "<br>Justification : " + esc(p.just) : "")
       + svLink(ll);
   }
+  // Numéros affichés seulement à partir du zoom 15 (sinon illisible)
+  function oldLabelsZoom() { map.getContainer().classList.toggle("old-nolabels", map.getZoom() < 15); }
+  map.on("zoomend", oldLabelsZoom);
   function syncOld() {
     var token = ++oldWanted;
     if (!oldOn) { if (oldLayer) { map.removeLayer(oldLayer); oldLayer = null; } return; }
@@ -1756,8 +1763,12 @@
       if (token !== oldWanted || !oldOn || oldLayer) return;
       oldLayer = L.geoJSON(fc, {
         style: oldStyle,
-        onEachFeature: function (f, layer) { attachPopup(layer, function (ll) { return oldPopup(f.properties, ll); }); }
+        onEachFeature: function (f, layer) {
+          attachPopup(layer, function (ll) { return oldPopup(f.properties, ll); });
+          if (f.properties && f.properties.id) layer.bindTooltip(String(f.properties.id), { permanent: true, direction: "center", className: "old-lbl", interactive: false });
+        }
       }).addTo(map);
+      oldLabelsZoom();
       say("OLD affichées (" + fc.features.length + " zones).");
     }).catch(function () { if (token === oldWanted) say("OLD indisponibles : connexion nécessaire au premier chargement.", true); });
   }
