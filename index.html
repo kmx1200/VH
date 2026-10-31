@@ -96,6 +96,9 @@
   #offEst, #offInfo { font-size: .85rem; margin: 0 0 8px; }
   #offGo { flex: 1; color: #fff; background: var(--go); }
   #offGo:disabled { opacity: .45; cursor: not-allowed; }
+  #map.sv-armed, #map.sv-armed.leaflet-grab, #map.sv-armed .leaflet-interactive { cursor: crosshair; }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--ink); }
+  .leaflet-popup-content a { color: var(--go); font-weight: 600; }
   .tool.live { color: var(--go); border-color: var(--go); }
   @media (max-height: 520px) { .tools { grid-auto-flow: column; } }   /* paysage : boutons en ligne */
 </style>
@@ -127,6 +130,7 @@
 <div class="tools">
   <button id="locate" class="tool" aria-pressed="false" aria-label="Activer ma position"></button>
   <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
+  <button id="sv" class="tool" aria-pressed="false" aria-label="Street View : choisir un point"></button>
   <button id="theme" class="tool" aria-label="Mode sombre"></button>
   <button id="offline" class="tool" aria-label="Cartes et hors ligne"></button>
   <button id="install" class="tool" aria-label="Installer l'application"></button>
@@ -805,6 +809,37 @@
   };
   if (mq && mq.addEventListener) mq.addEventListener("change", function () { if (!storedTheme()) applyTheme(systemTheme()); });
 
+  // ---------- Street View ----------
+  var svArmed = false, svPin = null;
+  function svUrl(ll) { return "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + ll.lat.toFixed(6) + "," + ll.lng.toFixed(6); }
+  function svLink(ll) { return '<br><a href="' + svUrl(ll) + '" target="_blank" rel="noopener">Ouvrir Street View ici</a>'; }
+  function openStreetView(ll) {
+    if (navigator.onLine === false) { say("Street View nécessite une connexion.", true); return; }
+    if (svPin) map.removeLayer(svPin);
+    svPin = L.circleMarker(ll, { radius: 9, color: "#fff", weight: 3, fillColor: "#f76707", fillOpacity: 1, interactive: false }).addTo(map);
+    setTimeout(function () { if (svPin) { map.removeLayer(svPin); svPin = null; } }, 6000);
+    var w = window.open(svUrl(ll), "_blank");
+    if (w) { w.opener = null; say("Street View ouvert."); }
+    else say("Street View bloqué par le navigateur : autorisez les fenêtres, puis recommencez.", true);
+  }
+  function setSv(on) {
+    svArmed = on;
+    $("sv").setAttribute("aria-pressed", on ? "true" : "false");
+    $("sv").setAttribute("aria-label", on ? "Annuler Street View" : "Street View : choisir un point");
+    $("map").classList.toggle("sv-armed", on);
+    if (on) say("Street View : touchez un point de la carte.");
+  }
+  $("sv").innerHTML = ICON("M9 6a3 3 0 1 0 6 0a3 3 0 1 0-6 0M12 9v6M7.5 12h9M10 21l2-6 2 6");
+  $("sv").onclick = function () { setSv(!svArmed); };
+  map.on("click", function (e) { if (svArmed) { setSv(false); openStreetView(e.latlng); } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && svArmed) setSv(false); });
+  function attachPopup(layer, htmlFor) {   // fenêtre d'information, sauf en mode Street View où le toucher ouvre Street View
+    layer.on("click", function (e) {
+      if (svArmed) { setSv(false); openStreetView(e.latlng); return; }
+      L.popup().setLatLng(e.latlng).setContent(htmlFor(e.latlng)).openOn(map);
+    });
+  }
+
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
@@ -1022,7 +1057,9 @@
         style: function (f) { var s = siteOf(f.properties.site); seen[s.label] = true; return { color: s.color, weight: 4, opacity: .95, lineCap: "round", lineJoin: "round" }; },
         onEachFeature: function (f, layer) {
           var p = f.properties;
-          layer.bindPopup("<b>" + esc(shortRoute(p.axe)) + "</b> (" + esc(p.axe) + ")<br>Site : " + esc(p.site) + "<br>PR " + esc(p.deb) + " &rarr; PR " + esc(p.fin));
+          attachPopup(layer, function (ll) {
+            return "<b>" + esc(shortRoute(p.axe)) + "</b> (" + esc(p.axe) + ")<br>Site : " + esc(p.site) + "<br>PR " + esc(p.deb) + " &rarr; PR " + esc(p.fin) + svLink(ll);
+          });
         }
       }).addTo(map);
       drawRefLegend(seen);
@@ -1037,7 +1074,9 @@
     prData.forEach(function (q) {
       if (!b.contains([q[1], q[0]])) return;
       var m = L.circleMarker([q[1], q[0]], { renderer: prRenderer, radius: rad, color: "#fff", weight: 1.5, fillColor: q[4] ? "#1971c2" : "#212529", fillOpacity: 1, bubblingMouseEvents: false });
-      m.bindPopup("<b>" + esc(shortRoute(q[2])) + "</b> (" + esc(q[2]) + ")<br>PR " + esc(q[3]) + (q[4] ? " &ndash; d&eacute;but de route" : ""));
+      attachPopup(m, function () {
+        return "<b>" + esc(shortRoute(q[2])) + "</b> (" + esc(q[2]) + ")<br>PR " + esc(q[3]) + (q[4] ? " &ndash; d&eacute;but de route" : "") + svLink(L.latLng(q[1], q[0]));
+      });
       m.addTo(prGroup);
       if (z >= 14 && n < 500) {
         L.marker([q[1], q[0]], { icon: labelIcon(z >= 16 ? shortRoute(q[2]) + " · " + q[3] : q[3]), interactive: false, keyboard: false, zIndexOffset: -1000 }).addTo(prGroup);
