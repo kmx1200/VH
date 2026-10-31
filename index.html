@@ -999,7 +999,7 @@
     updateMeasureValue();
   }
   function insertMeasurePoint(e){
-    if(measurePoints.length<2)return;
+    if(measurePoints.length<2)return false;
     var click=map.latLngToLayerPoint(e.latlng),best=Infinity,bestIndex=-1,bestPoint=null;
     var segments=measurePoints.length-1+(measureType==="area"&&measurePoints.length>=3?1:0);
     for(var i=0;i<segments;i++){
@@ -1019,7 +1019,6 @@
     var validArea=measureType==="area"&&measurePoints.length>=3;
     if(measurePoints.length>1){
       measureShape=(validArea?L.polygon(measurePoints,{color:"#e07a28",weight:3,fillOpacity:.16}):L.polyline(measurePoints,{color:"#e07a28",weight:4,dashArray:"7 5"})).addTo(measureLayer);
-      measureShape.on("click",function(e){if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);insertMeasurePoint(e);});
     }
     measurePoints.forEach(function(p,i){
       var marker=L.marker(p,{draggable:true,icon:measureVertexIcon(i===measureSelected),keyboard:true,title:"Déplacer le sommet "+(i+1)}).addTo(measureLayer);
