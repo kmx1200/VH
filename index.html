@@ -504,7 +504,7 @@
     var trkpts = points.map(function (p) {
       return '<trkpt lat="' + p.lat + '" lon="' + p.lon + '"><time>' + new Date(p.t).toISOString() + "</time></trkpt>";
     }).join("");
-    var gpx = '<?xml version="1.1" encoding="UTF-8"?><gpx version="1.1" creator="VHMaps" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Itinéraire</name><trkseg>' + trkpts + "</trkseg></trk></gpx>";
+    var gpx = '<?xml version="1.0" encoding="UTF-8"?><gpx version="1.1" creator="VHMaps" xmlns="http://www.topografix.com/GPX/1/1"><trk><name>Itinéraire</name><trkseg>' + trkpts + "</trkseg></trk></gpx>";
     var a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([gpx], { type: "application/gpx+xml" }));
     a.download = "vhmaps-" + new Date().toISOString().slice(0, 10) + ".gpx";
@@ -1054,13 +1054,16 @@
   $("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
   $("measureUndo").onclick=function(){if(measurePoints.length){measurePoints.pop();measureSelected=-1;drawMeasure();}};
   $("measureDelete").onclick=function(){if(measureSelected<0)return;var min=measureType==="area"?3:2;if(measurePoints.length<=min){say("Conservez au moins "+min+" sommets pour cette mesure.");return;}measurePoints.splice(measureSelected,1);measureSelected=-1;drawMeasure();};
-  $("measureReset").onclick=function(){measurePoints=[];measureSelected=-1;drawMeasure();if(!measureMode)$("measurePanel").hidden=true;};
-  $("measureClose").onclick=function(){
-    setMeasure(null);
+  $("measureReset").onclick=function(){
     measurePoints=[];
     measureSelected=-1;
     drawMeasure();
-    $("measurePanel").hidden=true;
+    say("Mesure réinitialisée. Cliquez sur la carte pour démarrer un nouveau tracé.");
+  };
+  $("measureClose").onclick=function(){
+    measurePoints=[];
+    measureSelected=-1;
+    setMeasure(null);
   };
 
   // ---------- Parcelles cadastrales IGN ----------
