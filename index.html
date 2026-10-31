@@ -350,6 +350,7 @@
   var marker = null;
 
   var points = [];
+  var wasRecording = false;
   var elapsed = 0;
   var startedAt = null;
   var watchId = null, wakeLock = null, timer = null;
@@ -359,12 +360,12 @@
   function say(text, err) { $("msg").textContent = text; $("msg").className = err ? "err" : ""; }
 
   function save() {
-    try { localStorage.setItem(KEY, JSON.stringify({ points: points, elapsed: currentElapsed() })); } catch (e) {}
+    try { localStorage.setItem(KEY, JSON.stringify({ points: points, elapsed: currentElapsed(), recording: startedAt !== null })); } catch (e) {}
   }
   function load() {
     try {
       var d = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (d && d.points) { points = d.points; elapsed = d.elapsed || 0; }
+      if (d && d.points) { points = d.points; elapsed = d.elapsed || 0; wasRecording = !!d.recording; }
     } catch (e) {}
   }
 
@@ -419,9 +420,9 @@
     $("speed").textContent = (ms > 0 ? km / (ms / 3600000) : 0).toFixed(1).replace(".", ",");
   }
 
-  function drawAll() {
+  function drawAll(noFit) {
     line.setLatLngs(points.map(function (p) { return [p.lat, p.lon]; }));
-    if (points.length) map.fitBounds(line.getBounds(), { paddingTopLeft: [20, 70], paddingBottomRight: [20, 200], maxZoom: 17 });
+    if (points.length && !noFit) map.fitBounds(line.getBounds(), { paddingTopLeft: [20, 70], paddingBottomRight: [20, 200], maxZoom: 17 });
   }
 
   function onPosition(pos) {
@@ -485,6 +486,7 @@
   function start() {
     if (!watchStart()) return;
     startedAt = Date.now(); following = true;
+    save();
     lockScreen();
     timer = setInterval(render, 1000);
     $("toggle").textContent = "Arrêter"; $("toggle").className = "on";
@@ -525,12 +527,35 @@
   };
 
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible" && startedAt !== null) lockScreen();
+    if (document.visibilityState === "hidden") { save(); return; }
+    if (document.visibilityState === "visible" && (startedAt !== null || locating)) {
+      // Au retour (ex. après Street View) le navigateur a pu suspendre le GPS : on le relance
+      if (watchId !== null) { try { navigator.geolocation.clearWatch(watchId); } catch (e) {} watchId = null; }
+      watchStart();
+      if (startedAt !== null) lockScreen();
+    }
   });
+  window.addEventListener("pagehide", save);
 
   // ---------- Itinéraires à suivre ----------
   var RKEY = "itineraires-v1", SKEY = "itineraire-choisi-v1", OFF_ROUTE = 50;
   var routes = [], routeId = "";
+  // Vue de la carte mémorisée : restaurée si l'application a été fermée par le système (ex. après Street View)
+  var VKEY = "vhmaps-view-v1", keepView = false;
+  (function () {
+    var v = null;
+    try { v = JSON.parse(localStorage.getItem(VKEY) || "null"); } catch (e) {}
+    if (v && isFinite(v.lat) && isFinite(v.lng) && isFinite(v.z)) { map.setView([v.lat, v.lng], v.z, { animate: false }); keepView = true; }
+    var t = null;
+    function saveView() {
+      clearTimeout(t);
+      t = setTimeout(function () {
+        var c = map.getCenter();
+        try { localStorage.setItem(VKEY, JSON.stringify({ lat: c.lat, lng: c.lng, z: map.getZoom() })); } catch (e) {}
+      }, 400);
+    }
+    map.on("moveend zoomend", saveView);
+  })();
 
   function currentRoute() { return routes.find(function (r) { return r.id === routeId; }); }
   function saveRoutes() {
@@ -779,7 +804,7 @@
     } catch (e) { routes = []; }
     function has(id) { return routes.some(function (r) { return r.id === id; }); }
     routeId = has(saved) ? saved : "";
-    fillSelect(); applyRoute(true);
+    fillSelect(); applyRoute(!keepView);
   }
 
   // ---------- Bouton position (réticule) ----------
@@ -1446,7 +1471,9 @@
   }
 
   load(); render(); initRoutes();
-  if (points.length) { drawAll(); $("toggle").textContent = "Reprendre"; say("Itinéraire précédent restauré."); }
+  if (points.length) { drawAll(keepView); $("toggle").textContent = "Reprendre"; say("Itinéraire précédent restauré."); }
+  // L'application avait été fermée par le système pendant un enregistrement : on le reprend
+  if (wasRecording) { wasRecording = false; start(); say("Enregistrement repris après interruption."); }
 })();
 </script>
 </body>
