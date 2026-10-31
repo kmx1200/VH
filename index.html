@@ -113,6 +113,18 @@
     transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
   .pin::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #fff; }
   @media (max-height: 720px) and (orientation: portrait) { .tools { grid-auto-flow: column; grid-template-rows: repeat(4, 46px); } }
+  /* Info-bulles : titre = aria-label (suit l'état du bouton) + explication = data-help ; boutons texte : data-tip */
+  .tool, [data-tip] { position: relative; -webkit-touch-callout: none; }
+  .tool::after, [data-tip]::after { position: absolute; z-index: 1300; opacity: 0; pointer-events: none; transition: opacity .12s;
+    padding: 7px 10px; border-radius: 8px; background: var(--ink); color: var(--paper); box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    font: 600 .78rem/1.35 system-ui, sans-serif; text-align: left; white-space: pre-line; width: max-content; max-width: 230px; }
+  .tool::after { content: attr(aria-label) "\A" attr(data-help); right: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
+  [data-tip]::after { content: attr(data-tip); }
+  .sheet [data-tip]::after, .measure-panel [data-tip]::after { bottom: calc(100% + 8px); left: 0; }
+  .sheet .row [data-tip]:last-child::after, .measure-panel .row [data-tip]:last-child::after { left: auto; right: 0; }
+  .routebar [data-tip]::after, .searchbar [data-tip]::after { top: calc(100% + 8px); right: 0; }
+  .tool:focus-visible::after, [data-tip]:focus-visible::after, .tool.tip-on::after, [data-tip].tip-on::after { opacity: 1; }
+  @media (hover: hover) { .tool:hover::after, [data-tip]:hover::after { opacity: 1; transition-delay: .3s; } }
   .tool.live { color: var(--go); border-color: var(--go); }
   .measure-panel { position:absolute; z-index:1200; left:10px; right:10px; bottom:calc(var(--sheet-h, 0px) + 12px); max-width:460px;
     padding:12px; display:grid; gap:8px; background:var(--surface-a); color:var(--ink); border:1px solid var(--line);
@@ -120,8 +132,9 @@
   .measure-panel .row { display:flex; flex-wrap:wrap; gap:6px; }
   .measure-panel button { padding:9px 11px; }
   .measure-panel button:disabled { opacity:.45; cursor:not-allowed; }
+  :root { --measure: #d90429; }   /* rouge des mesures (doit rester identique à MEASURE_COLOR dans le script) */
   .measure-vertex { width:22px; height:22px; box-sizing:border-box; border:3px solid #fff; border-radius:50%;
-    background:#e07a28; box-shadow:0 1px 5px rgba(0,0,0,.55); cursor:move; touch-action:none; }
+    background:var(--measure); box-shadow:0 1px 5px rgba(0,0,0,.55); cursor:move; touch-action:none; }
   .measure-vertex.selected { width:27px; height:27px; margin:-2.5px; border-width:3px; background:#1976d2; }
   @media(max-width:520px){ .tools { top:calc(116px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
   @media (max-height: 520px) { .tools { grid-auto-flow: column; } }
@@ -132,8 +145,8 @@
 
 <div class="routebar">
   <select id="route" aria-label="Itinéraire à suivre"></select>
-  <button id="import" class="ghost">Importer GPX</button>
-  <button id="del" class="ghost" aria-label="Supprimer cet itinéraire" hidden>✕</button>
+  <button id="import" class="ghost" data-tip="Importer un itinéraire (serveur ou appareil)">Importer GPX</button>
+  <button id="del" class="ghost" data-tip="Supprimer cet itinéraire" aria-label="Supprimer cet itinéraire" hidden>✕</button>
   <input type="file" id="file" accept=".gpx,application/gpx+xml,text/xml" multiple hidden>
 </div>
 
@@ -154,25 +167,25 @@
 <div class="searchbar" id="searchbar" role="search" hidden>
   <div class="srow">
     <input id="q" type="search" placeholder="Adresse, lieu ou coordonnées" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Rechercher une adresse ou un lieu">
-    <button id="qclose" class="ghost" aria-label="Fermer la recherche">&#10005;</button>
+    <button id="qclose" class="ghost" data-tip="Fermer la recherche" aria-label="Fermer la recherche">&#10005;</button>
   </div>
   <ul id="qres" aria-live="polite"></ul>
 </div>
 
 <div class="tools">
-  <button id="search" class="tool" aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
-  <button id="locate" class="tool" aria-pressed="false" aria-label="Activer ma position"></button>
-  <button id="fs" class="tool" aria-pressed="false" aria-label="Plein écran"></button>
-  <button id="sv" class="tool" aria-pressed="false" aria-label="Street View : choisir un point"></button>
-  <button id="theme" class="tool" aria-label="Mode sombre"></button>
-  <button id="offline" class="tool" aria-label="Cartes et hors ligne"></button>
-  <button id="install" class="tool" aria-label="Installer l'application"></button>
-  <button id="measureLine" class="tool" aria-label="Mesurer une distance">↔</button>
-  <button id="measureArea" class="tool" aria-label="Mesurer une surface">□</button>
+  <button id="search" class="tool" data-help="Cherchez une adresse, un lieu ou des coordonnées, puis centrez la carte dessus." aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
+  <button id="locate" class="tool" data-help="Affiche votre position et votre direction sans enregistrer de tracé. Touchez de nouveau pour désactiver." aria-pressed="false" aria-label="Activer ma position"></button>
+  <button id="fs" class="tool" data-help="Masque la barre du navigateur pour agrandir la carte." aria-pressed="false" aria-label="Plein écran"></button>
+  <button id="sv" class="tool" data-help="Touchez ensuite un point de la carte pour ouvrir Google Street View à cet endroit." aria-pressed="false" aria-label="Street View : choisir un point"></button>
+  <button id="theme" class="tool" data-help="Bascule entre le thème clair et le thème sombre." aria-label="Mode sombre"></button>
+  <button id="offline" class="tool" data-help="Fond de carte, couches (référentiel, PR, PCRS, parcelles) et cartes hors ligne." aria-label="Cartes et hors ligne"></button>
+  <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
+  <button id="measureLine" class="tool" data-help="Posez des points pour mesurer une distance. Les poignées permettent d’ajuster le tracé." aria-label="Mesurer une distance">↔</button>
+  <button id="measureArea" class="tool" data-help="Posez au moins 3 points pour mesurer une surface." aria-label="Mesurer une surface">□</button>
 </div>
 <div id="measurePanel" class="measure-panel" hidden>
   <b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span>
-  <div class="row"><button id="measureUndo" class="ghost">Annuler point</button><button id="measureDelete" class="ghost" disabled>Supprimer sommet</button><button id="measureReset" class="ghost">Réinitialiser</button><button id="measureClose" class="ghost">Terminer</button></div>
+  <div class="row"><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé et recommencer">Réinitialiser</button><button id="measureClose" class="ghost" data-tip="Terminer : efface la mesure et ferme le panneau">Terminer</button></div>
   <small id="measureHelp">Déplacez les poignées pour ajuster le tracé. Touchez un segment pour ajouter un sommet.</small>
 </div>
 
@@ -184,9 +197,9 @@
     <div class="stat"><b id="speed">0,0</b><span>km/h moyenne</span></div>
   </div>
   <div class="row">
-    <button id="toggle">Démarrer</button>
-    <button id="gpx" class="ghost">Exporter GPX</button>
-    <button id="clear" class="ghost">Effacer</button>
+    <button id="toggle" data-tip="Démarrer ou arrêter l’enregistrement du tracé">Démarrer</button>
+    <button id="gpx" class="ghost" data-tip="Exporter le tracé enregistré (GPX)">Exporter GPX</button>
+    <button id="clear" class="ghost" data-tip="Effacer le tracé enregistré">Effacer</button>
   </div>
 </section>
 
@@ -972,6 +985,7 @@
   map.on("click", function () { if (!qBar.hidden) qOpen(false); });
 
   // ---------- Mesures cartographiques éditables ----------
+  var MEASURE_COLOR = "#d90429";   // rouge : distinct de l'orange des parcelles cadastrales
   var measureMode=null, measureType=null, measurePoints=[], measureLayer=L.layerGroup().addTo(map),
       measureShape=null, measureMarkers=[], measureSelected=-1;
   function fmtDistance(m){return m>=1000?(m/1000).toFixed(2).replace(".",",")+" km":Math.round(m)+" m";}
@@ -1007,7 +1021,7 @@
     measureLayer.clearLayers();measureShape=null;measureMarkers=[];
     var validArea=measureType==="area"&&measurePoints.length>=3;
     if(measurePoints.length>1){
-      measureShape=(validArea?L.polygon(measurePoints,{color:"#e07a28",weight:3,fillOpacity:.16}):L.polyline(measurePoints,{color:"#e07a28",weight:4,dashArray:"7 5"})).addTo(measureLayer);
+      measureShape=(validArea?L.polygon(measurePoints,{color:MEASURE_COLOR,weight:3,fillColor:MEASURE_COLOR,fillOpacity:.16}):L.polyline(measurePoints,{color:MEASURE_COLOR,weight:4,dashArray:"7 5"})).addTo(measureLayer);
     }
     measurePoints.forEach(function(p,i){
       var marker=L.marker(p,{draggable:true,icon:measureVertexIcon(i===measureSelected),keyboard:true,title:"Déplacer le sommet "+(i+1)}).addTo(measureLayer);
@@ -1401,6 +1415,28 @@
   syncSheet();
   window.addEventListener("resize", syncSheet);
   if (window.ResizeObserver) new ResizeObserver(syncSheet).observe(document.querySelector(".sheet"));
+
+  // Info-bulles sur écran tactile : appui long (≈ 0,5 s) sur un bouton ; le toucher qui suit n'active pas le bouton
+  (function () {
+    var timer = null, hideT = null, shown = null, suppress = null, SEL = ".tool, [data-tip]";
+    function hide() { clearTimeout(hideT); if (shown) { shown.classList.remove("tip-on"); shown = null; } }
+    document.addEventListener("pointerdown", function (e) {
+      if (e.pointerType !== "touch") return;
+      var b = e.target.closest ? e.target.closest(SEL) : null;
+      clearTimeout(timer); hide();
+      if (!b) return;
+      timer = setTimeout(function () { b.classList.add("tip-on"); shown = b; suppress = b; hideT = setTimeout(hide, 3500); }, 500);
+    }, true);
+    function release() { clearTimeout(timer); setTimeout(function () { suppress = null; }, 400); }
+    document.addEventListener("pointerup", release, true);
+    document.addEventListener("pointercancel", release, true);
+    document.addEventListener("click", function (e) {
+      if (!suppress) return;
+      var s = suppress; suppress = null;
+      if (e.target.closest && e.target.closest(SEL) === s) { e.preventDefault(); e.stopPropagation(); }
+    }, true);
+    document.addEventListener("contextmenu", function (e) { if (e.target.closest && e.target.closest(SEL)) e.preventDefault(); });
+  })();
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
