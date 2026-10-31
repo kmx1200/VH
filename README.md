@@ -102,6 +102,21 @@ En plus des adresses, lieux-dits et coordonnées, la recherche accepte :
 - une **route** : `D20`, `D 20`, `RD20`, `N165`, `D1C`, `DB198`… (affiche les routes correspondantes ; en choisir une
   recadre la carte dessus et la surligne 20 s) ;
 - un **PR** : `D20 12`, `D20 PR12`, `D20-12` (centre la carte sur le PR avec un repère).
+- une **abscisse** (PR + mètres) : `D20 33+669`, `D20 PR33+669`, `D20 33 + 669 m`. La position est calculée en partant du
+  PR et en suivant le linéaire de référence (`lineaire.json`) dans le sens des PR croissants. Pour une route absente du
+  linéaire, ou si le PR est trop éloigné du tracé, la position est estimée en comptant 1000 m entre deux PR
+  successifs ; elle est alors signalée « position approximative ».
 
 Cette recherche utilise `donnees/pr.json` et `donnees/lineaire.json` : elle fonctionne hors ligne et même si les
 couches « Référentiel » et « PR » ne sont pas affichées.
+
+## Localiser un PR (bouton repère)
+
+Bouton « repère » de la colonne de droite : touchez-le, puis touchez un point proche d'une route du référentiel.
+L'application affiche la route, le site, le **PR et l'abscisse** (ex. `PR 33+669`), la distance entre le point touché
+et le tracé, et place un repère sur le tracé (avec lien Street View).
+
+- Tolérance : environ 35 pixels autour du point touché (entre 30 et 300 m selon le zoom).
+- Si plusieurs routes se superposent (ex. N165 et N165 G), elles sont toutes listées.
+- Fonctionne avec `lineaire.json` et `pr.json`, hors ligne, sans afficher les couches « Référentiel » et « PR ».
+- Les routes absentes de `lineaire.json` ne sont pas détectées.

@@ -96,7 +96,8 @@
   #offEst, #offInfo { font-size: .85rem; margin: 0 0 8px; }
   #offGo { flex: 1; color: #fff; background: var(--go); }
   #offGo:disabled { opacity: .45; cursor: not-allowed; }
-  #map.sv-armed, #map.sv-armed.leaflet-grab, #map.sv-armed .leaflet-interactive { cursor: crosshair; }
+  #map.sv-armed, #map.sv-armed.leaflet-grab, #map.sv-armed .leaflet-interactive,
+  #map.pk-armed, #map.pk-armed.leaflet-grab, #map.pk-armed .leaflet-interactive { cursor: crosshair; }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--ink); }
   .leaflet-popup-content a { color: var(--go); font-weight: 600; }
   .searchbar { position: absolute; z-index: 1100; left: 10px; right: 10px; top: calc(62px + env(safe-area-inset-top, 0px));
@@ -166,7 +167,7 @@
 
 <div class="searchbar" id="searchbar" role="search" hidden>
   <div class="srow">
-    <input id="q" type="search" placeholder="Adresse, lieu, route (D20) ou PR (D20 12)" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Rechercher une adresse, un lieu, une route ou un PR">
+    <input id="q" type="search" placeholder="Adresse, lieu, D20, D20 12, D20 12+300" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" aria-label="Rechercher une adresse, un lieu, une route ou un PR">
     <button id="qclose" class="ghost" data-tip="Fermer la recherche" aria-label="Fermer la recherche">&#10005;</button>
   </div>
   <ul id="qres" aria-live="polite"></ul>
@@ -177,6 +178,7 @@
   <button id="locate" class="tool" data-help="Affiche votre position et votre direction sans enregistrer de tracé. Touchez de nouveau pour désactiver." aria-pressed="false" aria-label="Activer ma position"></button>
   <button id="fs" class="tool" data-help="Masque la barre du navigateur pour agrandir la carte." aria-pressed="false" aria-label="Plein écran"></button>
   <button id="sv" class="tool" data-help="Touchez ensuite un point de la carte pour ouvrir Google Street View à cet endroit." aria-pressed="false" aria-label="Street View : choisir un point"></button>
+  <button id="pk" class="tool" data-help="Touchez ensuite un point proche d’une route du référentiel pour obtenir la route, le PR et l’abscisse." aria-pressed="false" aria-label="Localiser un PR : choisir un point"></button>
   <button id="theme" class="tool" data-help="Bascule entre le thème clair et le thème sombre." aria-label="Mode sombre"></button>
   <button id="offline" class="tool" data-help="Fond de carte, couches (référentiel, PR, PCRS, parcelles) et cartes hors ligne." aria-label="Cartes et hors ligne"></button>
   <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
@@ -920,6 +922,7 @@
   }
   function setSv(on) {
     svArmed = on;
+    if (on && pkArmed) setPk(false);
     $("sv").setAttribute("aria-pressed", on ? "true" : "false");
     $("sv").setAttribute("aria-label", on ? "Annuler Street View" : "Street View : choisir un point");
     $("map").classList.toggle("sv-armed", on);
@@ -929,9 +932,100 @@
   $("sv").onclick = function () { setSv(!svArmed); };
   map.on("click", function (e) { if (svArmed) { setSv(false); openStreetView(e.latlng); } });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && svArmed) setSv(false); });
+
+  // ---------- Localiser un PR : d'un point de la carte vers route + PR + abscisse ----------
+  var pkArmed = false, pkPin = null;
+  $("pk").innerHTML = ICON("M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10zM10 11a2 2 0 1 0 4 0a2 2 0 1 0-4 0");
+  function setPk(on) {
+    pkArmed = on;
+    if (on && svArmed) setSv(false);
+    $("pk").setAttribute("aria-pressed", on ? "true" : "false");
+    $("pk").setAttribute("aria-label", on ? "Annuler la localisation de PR" : "Localiser un PR : choisir un point");
+    $("map").classList.toggle("pk-armed", on);
+    if (on) say("Localiser un PR : touchez un point proche d'une route du référentiel.");
+  }
+  $("pk").onclick = function () { setPk(!pkArmed); };
+  map.on("click", function (e) { if (pkArmed) { setPk(false); locatePk(e.latlng); } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pkArmed) setPk(false); });
+
+  // Cherche les routes du référentiel proches de ll (tolérance tol en mètres) et calcule PR + abscisse
+  function pkFind(ll, idx, tol) {
+    var o = { lon0: ll.lng, lat0: ll.lat, kx: 111320 * Math.cos(ll.lat * Math.PI / 180), ky: 110574 }, cands = [];
+    idx.forEach(function (e) {
+      var best = Infinity, bestF = null;
+      e.feats.forEach(function (f) {
+        var g = f.geometry;
+        (g.type === "LineString" ? [g.coordinates] : g.coordinates).forEach(function (l) {
+          for (var i = 0; i < l.length - 1; i++) {
+            var ax = (l[i][0] - o.lon0) * o.kx, ay = (l[i][1] - o.lat0) * o.ky, bx = (l[i + 1][0] - o.lon0) * o.kx, by = (l[i + 1][1] - o.lat0) * o.ky;
+            var dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
+            var px = ax + t * dx, py = ay + t * dy, d = Math.sqrt(px * px + py * py);
+            if (d < best) { best = d; bestF = f; }
+          }
+        });
+      });
+      if (bestF && best <= tol) cands.push({ e: e, d: best, f: bestF });
+    });
+    cands.sort(function (a, b) { return a.d - b.d; });
+    if (!cands.length) return [];
+    var d0 = cands[0].d, out = [], C = { x: 0, y: 0 };
+    cands.filter(function (c) { return c.d <= d0 + 10; }).slice(0, 3).forEach(function (c) {
+      var chains = buildChains(c.e, o), best = null;
+      chains.forEach(function (ch) { var pj = projectOn(ch, C); if (!best || pj.d < best.pj.d) best = { ch: ch, pj: pj }; });
+      if (!best) return;
+      var sc = best.pj.s, list = [];
+      c.e.prs.forEach(function (q) {
+        if (!/^\d+$/.test(String(q[3]))) return;
+        var pj = projectOn(best.ch, { x: (q[0] - o.lon0) * o.kx, y: (q[1] - o.lat0) * o.ky });
+        if (pj.d < 200) list.push({ n: parseInt(q[3], 10), s: pj.s, q: q });
+      });
+      var snap = pointAt(best.ch, sc), res = { e: c.e, d: c.d, site: c.f.properties.site, lat: o.lat0 + snap.y / o.ky, lon: o.lon0 + snap.x / o.kx, pr: null };
+      if (list.length) {
+        list.sort(function (a, b) { return a.n - b.n; });
+        var sum = 0; for (var i = 1; i < list.length; i++) sum += Math.sign(list[i].s - list[i - 1].s);
+        var dir = sum < 0 ? -1 : 1; res.approx = list.length < 2;
+        var before = list.filter(function (r) { return dir > 0 ? r.s <= sc + 5 : r.s >= sc - 5; });
+        var ref = before.length ? before.reduce(function (a, b) { return dir > 0 ? (b.s > a.s ? b : a) : (b.s < a.s ? b : a); })
+                                : list.reduce(function (a, b) { return Math.abs(b.s - sc) < Math.abs(a.s - sc) ? b : a; });
+        res.pr = ref.q[3]; res.m = Math.round(dir > 0 ? sc - ref.s : ref.s - sc); if (before.length && res.m < 0) res.m = 0;
+      }
+      out.push(res);
+    });
+    return out;
+  }
+  function locatePk(ll) {
+    say("Recherche du PR…");
+    qIndex().then(function (idx) {
+      var mpp = 156543.03 * Math.cos(ll.lat * Math.PI / 180) / Math.pow(2, map.getZoom());
+      var tol = Math.max(30, Math.min(300, 35 * mpp));
+      var res = pkFind(ll, idx, tol);
+      if (pkPin) { map.removeLayer(pkPin); pkPin = null; }
+      if (!res.length) {
+        L.popup().setLatLng(ll).setContent("Aucune route du référentiel à moins de " + Math.round(tol) + " m de ce point.").openOn(map);
+        say("Aucune route du référentiel à proximité.", true); return;
+      }
+      var box = document.createElement("div"), html = "";
+      res.forEach(function (r) {
+        html += "<b>" + esc(shortRoute(r.e.axe)) + "</b> (" + esc(r.e.axe) + ")" + (r.site ? "<br>Site : " + esc(r.site) : "") + "<br>";
+        if (r.pr === null) html += "PR indisponible";
+        else if (r.m >= 0) html += "<b>PR " + esc(r.pr) + "+" + r.m + "</b>" + (r.approx ? " (estimé)" : "");
+        else html += "environ " + (-r.m) + " m avant le PR " + esc(r.pr);
+        html += "<br><small>à " + Math.round(r.d) + " m du point touché</small><br>";
+      });
+      box.innerHTML = html + svLink(L.latLng(res[0].lat, res[0].lon)).replace(/^<br>/, "");
+      var rm = document.createElement("a"); rm.href = "#"; rm.textContent = "Retirer le repère"; rm.style.display = "block";
+      rm.onclick = function (ev) { ev.preventDefault(); if (pkPin) { map.removeLayer(pkPin); pkPin = null; } };
+      box.appendChild(rm);
+      pkPin = L.marker([res[0].lat, res[0].lon], { icon: L.divIcon({ className: "", html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [13, 31] }), keyboard: false })
+        .addTo(map).bindPopup(box).openPopup();
+      var r0 = res[0];
+      say(shortRoute(r0.e.axe) + (r0.pr !== null && r0.m >= 0 ? " · PR " + r0.pr + "+" + r0.m : ""));
+    }, function () { say("Référentiel indisponible : connexion nécessaire au premier chargement.", true); });
+  }
   function attachPopup(layer, htmlFor) {
     layer.on("click", function (e) {
       if (svArmed) { setSv(false); openStreetView(e.latlng); return; }
+      if (pkArmed) { setPk(false); locatePk(e.latlng); return; }
       L.popup().setLatLng(e.latlng).setContent(htmlFor(e.latlng)).openOn(map);
     });
   }
@@ -1003,7 +1097,7 @@
   }
   // --- Recherche locale par route et PR (données du dossier donnees/, utilisable hors ligne) ---
   var AX_RE = /^(Ex)?\s*(\d{2})?\s*([A-Za-z]+)\s*0*(\d+)\s*([A-Za-z]*)$/;
-  var Q_RE = /^([a-z]{1,2})\s*0*(\d{1,4})([a-z])?(?:\s*[-\/,;:]?\s*(?:pr\.?\s*)?(\d{1,3}[a-z]?))?$/;
+  var Q_RE = /^([a-z]{1,2})\s*0*(\d{1,4})([a-z])?(?:\s*[-\/,;:]?\s*(?:pr\.?\s*)?(\d{1,3}[a-z]?)(?:\s*\+\s*(\d{0,5})\s*m?)?)?$/;
   var qIdxP = null;
   function extendGeom(b, g) {
     (function walk(a) { if (typeof a[0] === "number") b.extend([a[1], a[0]]); else a.forEach(walk); })(g.coordinates);
@@ -1032,15 +1126,119 @@
       .replace(/^(?:route\s+)?d[ée]partementale\s*/, "d").replace(/^(?:route\s+)?nationale\s*/, "n")
       .replace(/^route\s+(?=[dn]\s*\d)/, "").replace(/^r([dn])(?=\s*\d)/, "$1");
     var m = Q_RE.exec(t);
-    return m ? { L: m[1].toUpperCase(), N: String(parseInt(m[2], 10)), S: (m[3] || "").toUpperCase(), P: (m[4] || "").toUpperCase() } : null;
+    return m ? { L: m[1].toUpperCase(), N: String(parseInt(m[2], 10)), S: (m[3] || "").toUpperCase(), P: (m[4] || "").toUpperCase(), M: m[5] ? parseInt(m[5], 10) : null, plus: m[5] !== undefined } : null;
   }
   function routeLabel(e) { return shortRoute(e.axe); }
+
+  // --- Abscisse « PR + mètres » : on part du PR et on parcourt le linéaire dans le sens des PR croissants ---
+  function d2(p, q) { var dx = p.x - q.x, dy = p.y - q.y; return Math.sqrt(dx * dx + dy * dy); }
+  function joinLines(a, b) {
+    var T = 15, as = a[0], ae = a[a.length - 1], bs = b[0], be = b[b.length - 1];
+    if (d2(ae, bs) < T) return a.concat(b.slice(1));
+    if (d2(ae, be) < T) return a.concat(b.slice().reverse().slice(1));
+    if (d2(as, be) < T) return b.concat(a.slice(1));
+    if (d2(as, bs) < T) return b.slice().reverse().concat(a.slice(1));
+    return null;
+  }
+  function buildChains(e, o) {
+    var lines = [];
+    e.feats.forEach(function (f) {
+      var g = f.geometry;
+      (g.type === "LineString" ? [g.coordinates] : g.coordinates).forEach(function (l) {
+        if (l.length > 1) lines.push(l.map(function (c) { return { x: (c[0] - o.lon0) * o.kx, y: (c[1] - o.lat0) * o.ky }; }));
+      });
+    });
+    // Tronçons en double (même route déclarée deux fois) : on retire ceux entièrement couverts par un autre
+    function covered(b, a) { return b.every(function (pt) { return projectOn(a, pt).d < 8; }); }
+    for (var i0 = 0; i0 < lines.length; i0++) for (var j0 = i0 + 1; j0 < lines.length; j0++) {
+      if (covered(lines[j0], lines[i0])) { lines.splice(j0, 1); j0--; }
+      else if (covered(lines[i0], lines[j0])) { lines.splice(i0, 1); i0--; break; }
+    }
+    var changed = true;
+    while (changed) {
+      changed = false;
+      outer: for (var i = 0; i < lines.length; i++) for (var j = i + 1; j < lines.length; j++) {
+        var r = joinLines(lines[i], lines[j]);
+        if (r) { lines[i] = r; lines.splice(j, 1); changed = true; break outer; }
+      }
+    }
+    return lines;
+  }
+  function projectOn(chain, p) {
+    var best = { d: Infinity, s: 0 }, acc = 0;
+    for (var i = 0; i < chain.length - 1; i++) {
+      var a = chain[i], b = chain[i + 1], dx = b.x - a.x, dy = b.y - a.y, len = Math.sqrt(dx * dx + dy * dy);
+      var t = len ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (len * len))) : 0;
+      var d = d2(p, { x: a.x + t * dx, y: a.y + t * dy });
+      if (d < best.d) best = { d: d, s: acc + t * len };
+      acc += len;
+    }
+    best.L = acc;
+    return best;
+  }
+  function pointAt(chain, s) {
+    var acc = 0;
+    for (var i = 0; i < chain.length - 1; i++) {
+      var a = chain[i], b = chain[i + 1], len = d2(a, b);
+      if (s <= acc + len || i === chain.length - 2) { var t = len ? Math.max(0, Math.min(1, (s - acc) / len)) : 0; return { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y) }; }
+      acc += len;
+    }
+    return chain[0];
+  }
+  function locateOnLine(e, pr, m) {
+    var n = parseInt(pr, 10);
+    function find(k) { return e.prs.filter(function (q) { return String(q[3]) === String(k); })[0]; }
+    var a = isNaN(n) || String(n) !== pr ? null : find(n);
+    if (!a) return null;
+    var o = { lon0: a[0], lat0: a[1], kx: 111320 * Math.cos(a[1] * Math.PI / 180), ky: 110574 };
+    function xy(q) { return { x: (q[0] - o.lon0) * o.kx, y: (q[1] - o.lat0) * o.ky }; }
+    var chains = buildChains(e, o), A = xy(a), best = null;
+    chains.forEach(function (c) { var pj = projectOn(c, A); if (!best || pj.d < best.pj.d) best = { c: c, pj: pj }; });
+    if (!best || best.pj.d > 300) return null;
+    var dir = 0, approx = false, nx = find(n + 1), pv = find(n - 1);
+    if (nx) { var pn = projectOn(best.c, xy(nx)); if (pn.d < 200 && Math.abs(pn.s - best.pj.s) > 20) dir = pn.s > best.pj.s ? 1 : -1; }
+    if (!dir && pv) { var pp = projectOn(best.c, xy(pv)); if (pp.d < 200 && Math.abs(pp.s - best.pj.s) > 20) dir = pp.s < best.pj.s ? 1 : -1; }
+    if (!dir) { dir = 1; approx = true; }
+    var s = best.pj.s + dir * m;
+    if (s < 0 || s > best.pj.L) { s = Math.max(0, Math.min(best.pj.L, s)); approx = true; }
+    var pt = pointAt(best.c, s);
+    return { lat: o.lat0 + pt.y / o.ky, lon: o.lon0 + pt.x / o.kx, approx: approx };
+  }
+  // Sans linéaire exploitable (route hors référentiel) : on suit les PR successifs en comptant 1000 m entre deux PR (approximatif)
+  function locateOnPr(e, pr, m) {
+    var n = parseInt(pr, 10);
+    function find(k) { return e.prs.filter(function (q) { return String(q[3]) === String(k); })[0]; }
+    if (isNaN(n) || String(n) !== pr) return null;
+    var cur = find(n), rem = m, k = n;
+    if (!cur) return null;
+    while (rem > 0) {
+      var nx = find(k + 1);
+      if (!nx) return { lat: cur[1], lon: cur[0], approx: true };
+      if (rem <= 1000) { var t = rem / 1000; return { lat: cur[1] + (nx[1] - cur[1]) * t, lon: cur[0] + (nx[0] - cur[0]) * t, approx: true }; }
+      rem -= 1000; cur = nx; k++;
+    }
+    return { lat: cur[1], lon: cur[0], approx: false };
+  }
+  function locateAbscisse(e, pr, m) { return locateOnLine(e, pr, m) || locateOnPr(e, pr, m); }
   function qLocal(query, idx) {
     var res = [], routes = idx.filter(function (e) {
       return e.L === query.L && (!query.S || e.S.indexOf(query.S) === 0);
     });
     var exact = routes.filter(function (e) { return e.N === query.N; });
     function order(a, b) { return (parseInt(a.N, 10) - parseInt(b.N, 10)) || (a.S < b.S ? -1 : a.S > b.S ? 1 : 0) || (a.ex - b.ex); }
+    if (query.P && query.M !== null) {
+      var out = [];
+      exact.sort(order).forEach(function (e) {
+        var loc = locateAbscisse(e, query.P, query.M);
+        if (!loc) return;
+        var sites = Object.keys(e.sites).join(", ");
+        out.push({
+          label: routeLabel(e) + " · PR " + query.P + "+" + query.M + (sites ? " · " + sites : "") + (loc.approx ? " (position approximative)" : ""),
+          lat: loc.lat, lon: loc.lon, zoom: 17
+        });
+      });
+      return out;
+    }
     if (query.P) {
       var full = [], part = [];
       exact.sort(order).forEach(function (e) {
@@ -1073,7 +1271,9 @@
     qIndex().then(function (idx) { return qLocal(rq, idx); }, function () { return []; })
       .then(function (list) {
         if (seq !== qSeq) return;
-        if (list.length) { if (qAbort) qAbort.abort(); qShow(list); } else qGeocode(text);
+        if (list.length) { if (qAbort) qAbort.abort(); qShow(list); }
+        else if (rq.M !== null) qShow([], "Abscisse introuvable : PR " + rq.P + " absent ou hors du linéaire de cette route.");
+        else qGeocode(text);
       });
   }
   function qGeocode(text) {
