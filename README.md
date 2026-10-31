@@ -67,7 +67,7 @@ Dans le dialogue « Cartes » : cocher « PCRS » pour superposer le plan de cor
 ## Superposition : OLD (obligations légales de débroussaillement)
 
 Dans le dialogue « Cartes » : cocher « OLD » (avec un curseur d'opacité, comme pour les parcelles cadastrales).
-Les 277 zones (polygones verts) viennent de `donnees/old.json` ; toucher une zone affiche son numéro, la route,
+Les 277 zones (polygones jaunes) viennent de `donnees/old.json` ; toucher une zone affiche son numéro, la route,
 le site, la surface, le traitement prévu (super-épareuse, bras long, manuel, évacuation, zone non OLD en %),
 la contrainte, les observations et la justification, avec un lien Street View.
 

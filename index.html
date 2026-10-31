@@ -428,11 +428,29 @@
     if (points.length && !noFit) map.fitBounds(line.getBounds(), { paddingTopLeft: [20, 70], paddingBottomRight: [20, 200], maxZoom: 17 });
   }
 
+  function mePopup() {
+    var box = document.createElement("div"), t = document.createElement("b"), btn = document.createElement("button");
+    t.textContent = "Ma position"; box.appendChild(t);
+    if (lastFix) {
+      var c = document.createElement("div"); c.textContent = lastFix.lat.toFixed(5) + ", " + lastFix.lon.toFixed(5); box.appendChild(c);
+    }
+    btn.type = "button"; btn.textContent = "Partager l’itinéraire vers ma position"; btn.style.display = "block"; btn.style.margin = "8px 0 0";
+    btn.onclick = function () {
+      if (!lastFix) { say("Position GPS non disponible pour le moment.", true); return; }
+      shareRoute({ lat: lastFix.lat, lng: lastFix.lon, label: "ma position" });
+    };
+    box.appendChild(btn);
+    return box;
+  }
+
   function onPosition(pos) {
     var c = pos.coords;
     var p = { lat: c.latitude, lon: c.longitude, t: pos.timestamp };
-    if (!marker) marker = L.marker([p.lat, p.lon], { interactive: false, keyboard: false, zIndexOffset: 1000, icon: L.divIcon({
-      className: "", iconSize: [26, 26], iconAnchor: [13, 13], html: '<div class="me"><span class="dir"></span><i></i></div>' }) }).addTo(map);
+    if (!marker) {
+      marker = L.marker([p.lat, p.lon], { interactive: true, keyboard: false, zIndexOffset: 1000, icon: L.divIcon({
+        className: "", iconSize: [26, 26], iconAnchor: [13, 13], html: '<div class="me"><span class="dir"></span><i></i></div>' }) }).addTo(map);
+      marker.bindPopup(mePopup);
+    }
     marker.setLatLng([p.lat, p.lon]);
     lastFix = p;
     if (following && (c.accuracy <= MAX_ACCURACY || firstCenter)) { centerOn(p, firstCenter); firstCenter = false; }
@@ -1090,7 +1108,7 @@
     rm.onclick = function (e) { e.preventDefault(); if (qPin) { map.removeLayer(qPin); qPin = null; } };
     box.appendChild(sv);
     var guide=document.createElement("button"); guide.type="button"; guide.textContent="Démarrer le guidage"; guide.style.display="block"; guide.style.margin="8px 0"; guide.onclick=function(){startGuidance(r);}; box.appendChild(guide);
-    var share=document.createElement("button"); share.type="button"; share.textContent="Partager l’itinéraire"; share.style.display="block"; share.onclick=shareRoute; box.appendChild(share);
+    var share=document.createElement("button"); share.type="button"; share.textContent="Partager l’itinéraire"; share.style.display="block"; share.onclick=function(){shareRoute();}; box.appendChild(share);
     box.appendChild(rm);
     qPin = L.marker([r.lat, r.lon], { icon: L.divIcon({ className: "", html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [13, 31] }), keyboard: false })
       .addTo(map).bindPopup(box);
@@ -1415,10 +1433,11 @@
   var destination=null,guidanceLine=null,guidanceMarker=null,guidanceOrigin=null,guidanceWatch=null;
   function compassText(d){return["N","NE","E","SE","S","SO","O","NO"][Math.round(d/45)%8];}
   var shareData=null;
-  function shareRoute(){
-    if(!destination){say("Sélectionnez d’abord une destination dans la recherche.",true);return;}
-    var url="https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(destination.lat+","+destination.lng)+"&travelmode=driving";
-    var title="Itinéraire vers "+destination.label;
+  function shareRoute(d){
+    if(!d||typeof d.lat!=="number")d=destination;
+    if(!d){say("Sélectionnez d’abord une destination dans la recherche.",true);return;}
+    var url="https://www.google.com/maps/dir/?api=1&destination="+encodeURIComponent(d.lat+","+d.lng)+"&travelmode=driving";
+    var title="Itinéraire vers "+d.label;
     var text=title+"\n"+url;
     shareData={title:title,text:text,url:url};
     $("shareTitle").textContent=title;
@@ -1712,8 +1731,8 @@
   map.createPane("old"); map.getPane("old").style.zIndex = 340;
   var oldRenderer = L.canvas({ pane: "old", padding: 0.3, tolerance: 6 });
   var oldLayer = null, oldOn = false, oldOpacity = .7, oldWanted = 0;
-  var OLD_COLOR = "#2b8a3e";
-  function oldStyle() { return { renderer: oldRenderer, color: "#1b5e2a", weight: 1.5, opacity: Math.min(1, oldOpacity + .2), fillColor: OLD_COLOR, fillOpacity: oldOpacity * .55, bubblingMouseEvents: false }; }
+  var OLD_COLOR = "#ffd43b";
+  function oldStyle() { return { renderer: oldRenderer, color: "#c99700", weight: 1.5, opacity: Math.min(1, oldOpacity + .2), fillColor: OLD_COLOR, fillOpacity: oldOpacity * .55, bubblingMouseEvents: false }; }
   function oldPopup(p, ll) {
     var t = [];
     [["se", "Super-épareuse"], ["sebl", "Super-épareuse bras long"], ["man", "Manuel"], ["mane", "Manuel avec évacuation"], ["nold", "Zone non OLD"]].forEach(function (k) {
