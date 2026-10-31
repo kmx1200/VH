@@ -119,6 +119,10 @@
     border-radius:14px; box-shadow:0 3px 14px rgba(0,0,0,.22); }
   .measure-panel .row { display:flex; flex-wrap:wrap; gap:6px; }
   .measure-panel button { padding:9px 11px; }
+  .measure-panel button:disabled { opacity:.45; cursor:not-allowed; }
+  .measure-vertex { width:22px; height:22px; box-sizing:border-box; border:3px solid #fff; border-radius:50%;
+    background:#e07a28; box-shadow:0 1px 5px rgba(0,0,0,.55); cursor:move; touch-action:none; }
+  .measure-vertex.selected { width:27px; height:27px; margin:-2.5px; border-width:3px; background:#1976d2; }
   @media(max-width:520px){ .tools { top:calc(116px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
   @media (max-height: 520px) { .tools { grid-auto-flow: column; } }   /* paysage : boutons en ligne */
 </style>
@@ -168,7 +172,8 @@
 </div>
 <div id="measurePanel" class="measure-panel" hidden>
   <b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span>
-  <div class="row"><button id="measureUndo" class="ghost">Annuler point</button><button id="measureReset" class="ghost">Réinitialiser</button><button id="measureClose" class="ghost">Terminer</button></div>
+  <div class="row"><button id="measureUndo" class="ghost">Annuler point</button><button id="measureDelete" class="ghost" disabled>Supprimer sommet</button><button id="measureReset" class="ghost">Réinitialiser</button><button id="measureClose" class="ghost">Terminer</button></div>
+  <small id="measureHelp">Déplacez les poignées pour ajuster le tracé. Touchez un segment pour ajouter un sommet.</small>
 </div>
 
 <section class="sheet">
@@ -969,19 +974,79 @@
   map.on("click", function () { if (!qBar.hidden) qOpen(false); });
 
 
-  // ---------- Mesures cartographiques ----------
-  var measureMode=null, measurePoints=[], measureLayer=L.layerGroup().addTo(map);
+  // ---------- Mesures cartographiques éditables ----------
+  var measureMode=null, measureType=null, measurePoints=[], measureLayer=L.layerGroup().addTo(map),
+      measureShape=null, measureMarkers=[], measureSelected=-1;
   function fmtDistance(m){return m>=1000?(m/1000).toFixed(2).replace(".",",")+" km":Math.round(m)+" m";}
   function fmtArea(a){return a>=10000?(a/10000).toFixed(2).replace(".",",")+" ha":Math.round(a)+" m²";}
   function areaMeters(points){var radius=6378137,sum=0;for(var i=0;i<points.length;i++){var a=points[i],b=points[(i+1)%points.length];sum+=(b.lng-a.lng)*Math.PI/180*(2+Math.sin(a.lat*Math.PI/180)+Math.sin(b.lat*Math.PI/180));}return Math.abs(sum*radius*radius/2);}
   function measureLength(points){var d=0;for(var i=1;i<points.length;i++)d+=points[i-1].distanceTo(points[i]);return d;}
-  function drawMeasure(){measureLayer.clearLayers();if(measurePoints.length>1){var sh=measureMode==="area"&&measurePoints.length>=3?L.polygon(measurePoints,{color:"#e07a28",weight:3,fillOpacity:.16}):L.polyline(measurePoints,{color:"#e07a28",weight:4,dashArray:"7 5"});sh.addTo(measureLayer);}
-    measurePoints.forEach(function(p,i){L.circleMarker(p,{radius:5,color:"#fff",weight:2,fillColor:"#e07a28",fillOpacity:1}).bindTooltip(String(i+1)).addTo(measureLayer);});
-    var v="Ajoutez au moins "+(measureMode==="area"?3:2)+" points.";if(measureMode==="line"&&measurePoints.length>=2)v="Distance : "+fmtDistance(measureLength(measurePoints));if(measureMode==="area"&&measurePoints.length>=3)v="Surface : "+fmtArea(areaMeters(measurePoints));$("measureValue").textContent=v;}
-  function setMeasure(mode){measureMode=mode;measurePoints=[];measureLayer.clearLayers();$("measurePanel").hidden=!mode;$("measureTitle").textContent=mode==="line"?"Mesure linéaire":"Mesure surfacique";$("measureLine").classList.toggle("live",mode==="line");$("measureArea").classList.toggle("live",mode==="area");if(mode){$("measureValue").textContent="Cliquez sur la carte pour ajouter des points.";say("Mode mesure activé : sélectionnez les points sur la carte.");}}
-  map.on("click",function(e){if(!measureMode)return;measurePoints.push(e.latlng);drawMeasure();});
-  $("measureLine").onclick=function(){setMeasure(measureMode==="line"?null:"line");};$("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
-  $("measureUndo").onclick=function(){measurePoints.pop();drawMeasure();};$("measureReset").onclick=function(){measurePoints=[];drawMeasure();};$("measureClose").onclick=function(){setMeasure(null);};
+  function updateMeasureValue(){
+    var v="Ajoutez au moins "+(measureType==="area"?3:2)+" points.";
+    if(measureType==="line"&&measurePoints.length>=2)v="Distance : "+fmtDistance(measureLength(measurePoints));
+    if(measureType==="area"&&measurePoints.length>=3)v="Surface : "+fmtArea(areaMeters(measurePoints));
+    if(measureSelected>=0&&measurePoints[measureSelected])v+=" · Sommet "+(measureSelected+1)+" sélectionné.";
+    $("measureValue").textContent=v;
+    $("measureDelete").disabled=measureSelected<0 || measurePoints.length<=(measureType==="area"?3:2);
+    $("measureUndo").disabled=measurePoints.length===0;
+  }
+  function measureVertexIcon(selected){return L.divIcon({className:"",html:'<div class="measure-vertex'+(selected?' selected':'')+'"></div>',iconSize:[22,22],iconAnchor:[11,11]});}
+  function refreshMeasureShape(){
+    var validArea=measureType==="area"&&measurePoints.length>=3;
+    if(measureShape){measureShape.setLatLngs(measurePoints);}
+    else if(measurePoints.length>1){measureShape=(validArea?L.polygon(measurePoints,{color:"#e07a28",weight:3,fillOpacity:.16}):L.polyline(measurePoints,{color:"#e07a28",weight:4,dashArray:"7 5"})).addTo(measureLayer);}
+    if(measureShape&&measureShape.setStyle)measureShape.setStyle({fillOpacity:validArea ? .16 : 0});
+    updateMeasureValue();
+  }
+  function insertMeasurePoint(e){
+    if(measurePoints.length<2)return;
+    var click=map.latLngToLayerPoint(e.latlng),best=Infinity,bestIndex=-1,bestPoint=null;
+    var segments=measurePoints.length-1+(measureType==="area"&&measurePoints.length>=3?1:0);
+    for(var i=0;i<segments;i++){
+      var j=(i+1)%measurePoints.length;
+      var a=map.latLngToLayerPoint(measurePoints[i]),b=map.latLngToLayerPoint(measurePoints[j]);
+      var cp=L.LineUtil.closestPointOnSegment(click,a,b),d=click.distanceTo(cp);
+      if(d<best){best=d;bestIndex=i;bestPoint=map.layerPointToLatLng(cp);}
+    }
+    if(bestIndex<0||best>(L.Browser.touch?30:22))return;
+    measurePoints.splice(bestIndex+1,0,bestPoint);measureSelected=bestIndex+1;drawMeasure();
+  }
+  function drawMeasure(){
+    measureLayer.clearLayers();measureShape=null;measureMarkers=[];
+    var validArea=measureType==="area"&&measurePoints.length>=3;
+    if(measurePoints.length>1){
+      measureShape=(validArea?L.polygon(measurePoints,{color:"#e07a28",weight:3,fillOpacity:.16}):L.polyline(measurePoints,{color:"#e07a28",weight:4,dashArray:"7 5"})).addTo(measureLayer);
+      measureShape.on("click",function(e){if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);insertMeasurePoint(e);});
+    }
+    measurePoints.forEach(function(p,i){
+      var marker=L.marker(p,{draggable:true,icon:measureVertexIcon(i===measureSelected),keyboard:true,title:"Déplacer le sommet "+(i+1)}).addTo(measureLayer);
+      marker.bindTooltip(String(i+1),{direction:"top",offset:[0,-8]});
+      marker.on("click",function(e){if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);measureSelected=i;drawMeasure();});
+      marker.on("drag",function(e){measurePoints[i]=e.target.getLatLng();if(measureShape)measureShape.setLatLngs(measurePoints);updateMeasureValue();});
+      marker.on("dragend",function(e){measurePoints[i]=e.target.getLatLng();drawMeasure();});
+      measureMarkers.push(marker);
+    });
+    updateMeasureValue();
+    $("measureHelp").textContent=measureMode?"Cliquez sur la carte pour ajouter un point. Déplacez une poignée ou touchez un segment pour insérer un sommet.":"Déplacez les poignées pour ajuster le tracé. Touchez un segment pour ajouter un sommet.";
+  }
+  function setMeasure(mode){
+    if(mode){
+      if(measureType!==mode){measurePoints=[];measureSelected=-1;measureType=mode;drawMeasure();}
+      measureMode=mode;
+    } else measureMode=null;
+    $("measurePanel").hidden=!mode&&!measurePoints.length;
+    $("measureTitle").textContent=measureType==="line"?"Mesure linéaire":"Mesure surfacique";
+    $("measureLine").classList.toggle("live",measureMode==="line");$("measureArea").classList.toggle("live",measureMode==="area");
+    if(mode){say("Mode mesure activé : cliquez pour ajouter des points, déplacez les poignées pour modifier le tracé.");}
+    drawMeasure();
+  }
+  map.on("click",function(e){if(!measureMode)return;measurePoints.push(e.latlng);measureSelected=-1;drawMeasure();});
+  $("measureLine").onclick=function(){setMeasure(measureMode==="line"?null:"line");};
+  $("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
+  $("measureUndo").onclick=function(){if(measurePoints.length){measurePoints.pop();measureSelected=-1;drawMeasure();}};
+  $("measureDelete").onclick=function(){if(measureSelected<0)return;var min=measureType==="area"?3:2;if(measurePoints.length<=min){say("Conservez au moins "+min+" sommets pour cette mesure.");return;}measurePoints.splice(measureSelected,1);measureSelected=-1;drawMeasure();};
+  $("measureReset").onclick=function(){measurePoints=[];measureSelected=-1;drawMeasure();if(!measureMode)$("measurePanel").hidden=true;};
+  $("measureClose").onclick=function(){setMeasure(null);};
 
   // ---------- Parcelles cadastrales IGN ----------
   // Service WMS-Raster officiel Géoplateforme ; la couche raster porte le nom du produit
