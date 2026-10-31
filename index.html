@@ -189,7 +189,7 @@
   <small id="measureHelp">Déplacez les poignées pour ajuster le tracé. Touchez un segment pour ajouter un sommet.</small>
 </div>
 
-<section class="sheet">
+<section class="sheet" id="sheet" hidden>
   <p id="msg" role="status">Appuyez sur « Démarrer » et gardez l'écran allumé.</p>
   <div class="stats">
     <div class="stat"><b id="dist">0,00</b><span>km</span></div>
@@ -651,6 +651,9 @@
   }
   function applyRoute(fit) {
     var r = currentRoute();
+    // Panneau du bas : visible seulement avec un circuit sélectionné (ou si un enregistrement est en cours)
+    $("sheet").hidden = !r && startedAt === null;
+    if (typeof syncSheet === "function") syncSheet();
     $("del").hidden = !r || !!r.file;
     if (r && r.file && !r.segs && !r.pts) {
       drawRoute(null);
