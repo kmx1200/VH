@@ -1,9 +1,10 @@
 /* VHMaps — service worker : fonctionnement hors ligne */
-const VERSION = "vhmaps-v2";
+const VERSION = "vhmaps-v3";
 const SHELL = VERSION + "-shell";
 const TILES = VERSION + "-tiles";      // tuiles vues en navigation (limité)
 const DATA = VERSION + "-data";
 const OFFLINE = "vhmaps-offline-tiles"; // cartes téléchargées volontairement : jamais effacées par une mise à jour
+const DONNEES = "vhmaps-donnees";       // dalle, référentiel et PR (dossier donnees/) : conservés entre les versions
 const MAX_TILES = 800;
 const LEAFLET = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/";
 const PRECACHE = [
@@ -21,7 +22,7 @@ self.addEventListener("install", (e) => {
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION) && k !== OFFLINE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION) && k !== OFFLINE && k !== DONNEES).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -52,6 +53,18 @@ async function cacheFirst(req, cacheName) {
   const res = await fetch(req);
   if (res && (res.ok || res.type === "opaque")) c.put(req, res.clone());
   return res;
+}
+
+// Données volumineuses et peu changeantes : on sert la copie locale tout de suite, on la met à jour en arrière-plan
+async function staleWhileRevalidate(req, cacheName) {
+  const c = await caches.open(cacheName);
+  const hit = await c.match(req);
+  const net = fetch(new Request(req, { cache: "no-cache" })).then((res) => {
+    if (res && res.ok) c.put(req, res.clone());
+    return res;
+  });
+  if (hit) { net.catch(() => {}); return hit; }
+  return net;
 }
 
 // Tuiles : 1) cartes téléchargées, 2) tuiles déjà vues, 3) réseau
@@ -89,6 +102,10 @@ self.addEventListener("fetch", (e) => {
   }
   if (url.hostname === "cdnjs.cloudflare.com") {            // Leaflet
     e.respondWith(cacheFirst(req, SHELL));
+    return;
+  }
+  if (url.origin === location.origin && url.pathname.includes("/donnees/")) {   // dalle, référentiel, PR
+    e.respondWith(staleWhileRevalidate(req, DONNEES).catch(() => Response.error()));
     return;
   }
   if (url.origin === location.origin) {                     // appli, GPX, icônes : version en ligne d'abord
