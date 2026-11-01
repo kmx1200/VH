@@ -93,13 +93,13 @@
   dialog select { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
   dialog { max-height: 90vh; overflow: auto; }
   dialog h3 { margin: 12px 0 6px; font-size: .95rem; }
-  #offSec { margin: 12px 0 0; border-top: 1px solid var(--line); padding-top: 8px; }
-  #offSec summary { cursor: pointer; font-weight: 700; font-size: .95rem; padding: 6px 0; list-style: none;
+  #offSec, #ovSec { margin: 12px 0 0; border-top: 1px solid var(--line); padding-top: 8px; }
+  #offSec summary, #ovSec summary { cursor: pointer; font-weight: 700; font-size: .95rem; padding: 6px 0; list-style: none;
     display: flex; align-items: center; justify-content: space-between; }
-  #offSec summary::-webkit-details-marker { display: none; }
-  #offSec summary::after { content: "\25BE"; transition: transform .2s; }
-  #offSec[open] summary::after { transform: rotate(180deg); }
-  #offSec[open] summary { margin-bottom: 6px; }
+  #offSec summary::-webkit-details-marker, #ovSec summary::-webkit-details-marker { display: none; }
+  #offSec summary::after, #ovSec summary::after { content: "\25BE"; transition: transform .2s; }
+  #offSec[open] summary::after, #ovSec[open] summary::after { transform: rotate(180deg); }
+  #offSec[open] summary, #ovSec[open] summary { margin-bottom: 6px; }
   dialog label.chk { display: flex; align-items: center; gap: 8px; }
   dialog input[type="range"] { width: 100%; }
   dialog .hint { font-size: .8rem; opacity: .75; margin: 0 0 8px; }
@@ -263,7 +263,8 @@
   </label>
   <label>Opacité du fond de carte <input type="range" id="baseOp" min="10" max="100" step="5" value="100"></label>
   <label>Niveaux de gris du fond <input type="range" id="baseGray" min="0" max="100" step="5" value="0"></label>
-  <h3>Superpositions</h3>
+  <details id="ovSec" open>
+  <summary>Superpositions</summary>
   <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
   <label class="chk"><input type="checkbox" id="ovPr"> PR (points et numéros)</label>
   <label class="chk"><input type="checkbox" id="ovCadastre"> Parcelles cadastrales (IGN)</label>
@@ -273,6 +274,7 @@
   <label class="chk"><input type="checkbox" id="ovPcrs"> PCRS (plan de corps de rue simplifié)</label>
   <label>Opacité du PCRS <input type="range" id="ovOp" min="20" max="100" step="10" value="100"></label>
   <p class="hint">Le PCRS s'affiche à partir du zoom 16, seulement là où il est diffusé en open data, et en ligne uniquement.</p>
+  </details>
   <details id="offSec">
   <summary>Hors ligne</summary>
   <label>Zone à télécharger
@@ -410,6 +412,9 @@
     document.documentElement.style.setProperty("--base-gray", baseGray);
     try { localStorage.setItem(BGKEY, this.value); } catch (e) {}
   };
+  var ovSecEl = document.getElementById("ovSec");
+  try { if (localStorage.getItem("vhmaps-ovsec") === "0") ovSecEl.open = false; } catch (e) {}
+  ovSecEl.addEventListener("toggle", function () { try { localStorage.setItem("vhmaps-ovsec", ovSecEl.open ? "1" : "0"); } catch (e) {} });
   var refLayer = L.featureGroup().addTo(map);
   var line = L.polyline([], { color: "#d6336c", weight: 5 }).addTo(map);
   var marker = null;
