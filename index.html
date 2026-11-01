@@ -110,6 +110,9 @@
   #offGo:disabled { opacity: .45; cursor: not-allowed; }
   #map.sv-armed, #map.sv-armed.leaflet-grab, #map.sv-armed .leaflet-interactive,
   #map.pk-armed, #map.pk-armed.leaflet-grab, #map.pk-armed .leaflet-interactive { cursor: crosshair; }
+  /* Mode mesure : croix partout (y compris sur OLD, référentiel, PR), sauf sur les poignées déplaçables */
+  #map.measuring, #map.measuring.leaflet-grab, #map.measuring .leaflet-interactive { cursor: crosshair; }
+  #map.measuring .leaflet-marker-draggable { cursor: move; }
   .pk-tip { position: absolute; z-index: 1150; pointer-events: none; padding: 5px 9px; border-radius: 9px; background: var(--surface-a);
     color: var(--ink); border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: .82rem; line-height: 1.35; white-space: nowrap; }
   .pk-tip small { opacity: .7; }
@@ -1525,6 +1528,7 @@
       if(measureType!==mode){commitMeasure();measurePoints=[];measureSelected=-1;measureType=mode;drawMeasure();}
       measureMode=mode;
     } else measureMode=null;
+    map.getContainer().classList.toggle("measuring",!!measureMode);
     $("measurePanel").hidden=!mode&&!measurePoints.length&&!measureDone.length;
     $("measureTitle").textContent=measureType==="line"?"Mesure linéaire":"Mesure surfacique";
     $("measureLine").classList.toggle("live",measureMode==="line");$("measureArea").classList.toggle("live",measureMode==="area");
