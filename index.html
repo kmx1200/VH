@@ -1451,7 +1451,7 @@
     if(measureType==="area"&&measurePoints.length>=3)v="Surface : "+fmtArea(areaMeters(measurePoints));
     if(measureSelected>=0&&measurePoints[measureSelected])v+=" · Sommet "+(measureSelected+1)+" sélectionné.";
     $("measureValue").textContent=v;
-    $("measureDelete").disabled=measureSelected<0 || measurePoints.length<=(measureType==="area"?3:2);
+    $("measureDelete").disabled=!(measureSelected>=0&&measurePoints[measureSelected]);
     $("measureUndo").disabled=measurePoints.length===0;
     $("measureAdd").disabled=!measureValid(measureType,measurePoints);
     updateMeasureTotals();
@@ -1562,7 +1562,19 @@
   $("measureLine").onclick=function(){setMeasure(measureMode==="line"?null:"line");};
   $("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
   $("measureUndo").onclick=function(){if(measurePoints.length){measurePoints.pop();measureSelected=-1;drawMeasure();}};
-  $("measureDelete").onclick=function(){if(measureSelected<0)return;var min=measureType==="area"?3:2;if(measurePoints.length<=min){say("Conservez au moins "+min+" sommets pour cette mesure.");return;}measurePoints.splice(measureSelected,1);measureSelected=-1;drawMeasure();};
+  function deleteMeasureVertex(){
+    if(measureSelected<0||!measurePoints[measureSelected])return;
+    measurePoints.splice(measureSelected,1);measureSelected=-1;drawMeasure();
+  }
+  $("measureDelete").onclick=deleteMeasureVertex;
+  // Touche Suppr / Retour arrière : supprime le sommet sélectionné (bleu)
+  document.addEventListener("keydown",function(e){
+    if(e.key!=="Delete"&&e.key!=="Backspace")return;
+    var t=e.target,tag=t&&t.tagName;
+    if(tag==="INPUT"||tag==="TEXTAREA"||tag==="SELECT"||(t&&t.isContentEditable))return;
+    if(measureSelected<0||$("measurePanel").hidden)return;
+    e.preventDefault();deleteMeasureVertex();
+  });
   
   // Bouton Nouveau tracé : valide le tracé en cours (il rejoint le total) et en démarre un autre
   $("measureAdd").onclick=function(){
