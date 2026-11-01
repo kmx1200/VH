@@ -108,10 +108,10 @@
   #offGo { flex: 1; color: #fff; background: var(--go); }
   #offGo:disabled { opacity: .45; cursor: not-allowed; }
   #map.sv-armed, #map.sv-armed.leaflet-grab, #map.sv-armed .leaflet-interactive,
+  #map.pk-armed, #map.pk-armed.leaflet-grab, #map.pk-armed .leaflet-interactive { cursor: crosshair; }
   .pk-tip { position: absolute; z-index: 1150; pointer-events: none; padding: 5px 9px; border-radius: 9px; background: var(--surface-a);
     color: var(--ink); border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: .82rem; line-height: 1.35; white-space: nowrap; }
   .pk-tip small { opacity: .7; }
-  #map.pk-armed, #map.pk-armed.leaflet-grab, #map.pk-armed .leaflet-interactive { cursor: crosshair; }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--ink); }
   .leaflet-popup-content a { color: var(--go); font-weight: 600; }
   .searchbar { position: absolute; z-index: 1100; left: 10px; right: 10px; top: calc(62px + env(safe-area-inset-top, 0px));
@@ -152,6 +152,7 @@
   #measureHead #measureValue { flex:1 1 auto; min-width:0; }
   #measureHead #measureFold { padding:4px 12px; margin-left:auto; font-size:1.1rem; line-height:1.2; }
   .measure-panel.folded { right:auto; }
+  .measure-panel.folded #measureTotals { font-size:.78rem; padding:4px 8px; }
   .measure-panel.folded > :not(#measureHead):not(#measureTotals) { display:none; }
   .measure-panel ul { list-style:none; margin:0; padding:0; max-height:8.5em; overflow:auto; display:grid; gap:4px; }
   .measure-panel li { display:flex; gap:6px; }
@@ -1033,7 +1034,7 @@
   }
   map.getContainer().addEventListener("mousemove", function (ev) {
     if (!pkArmed) return;
-    if ((ev.buttons & 1) || !ev.target.closest || !ev.target.closest(".leaflet-map-pane")) { pkTipHide(); return; }
+    if ((ev.buttons & 1) || !(ev.target === map.getContainer() || (ev.target.closest && ev.target.closest(".leaflet-map-pane")))) { pkTipHide(); return; }
     pkTipCp = map.mouseEventToContainerPoint(ev);
     pkTipPlace();
     var ll = map.mouseEventToLatLng(ev), now = Date.now();
