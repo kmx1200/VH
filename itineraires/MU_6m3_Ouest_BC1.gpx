@@ -2,20 +2,6 @@
 <gpx version="1.1" creator="QGIS export VHMaps" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:gpx_style="http://www.topografix.com/GPX/gpx_style/0/2">
   <metadata><name>MU_6m3_Ouest_BC1</name></metadata>
   <trk>
-    <name>Traitement</name>
-    <extensions><gpx_style:line><gpx_style:color>1D6FD8</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>DarkCyan</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
-    <trkseg>
-      <trkpt lat="47.560802" lon="-2.514111"/>
-      <trkpt lat="47.560134" lon="-2.514241"/>
-      <trkpt lat="47.559860" lon="-2.514120"/>
-      <trkpt lat="47.558926" lon="-2.513439"/>
-      <trkpt lat="47.558692" lon="-2.513279"/>
-      <trkpt lat="47.558086" lon="-2.513038"/>
-      <trkpt lat="47.557943" lon="-2.512995"/>
-      <trkpt lat="47.557948" lon="-2.512995"/>
-    </trkseg>
-  </trk>
-  <trk>
     <name>Salage</name>
     <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
     <trkseg>
