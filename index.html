@@ -108,6 +108,9 @@
   #offGo { flex: 1; color: #fff; background: var(--go); }
   #offGo:disabled { opacity: .45; cursor: not-allowed; }
   #map.sv-armed, #map.sv-armed.leaflet-grab, #map.sv-armed .leaflet-interactive,
+  .pk-tip { position: absolute; z-index: 1150; pointer-events: none; padding: 5px 9px; border-radius: 9px; background: var(--surface-a);
+    color: var(--ink); border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: .82rem; line-height: 1.35; white-space: nowrap; }
+  .pk-tip small { opacity: .7; }
   #map.pk-armed, #map.pk-armed.leaflet-grab, #map.pk-armed .leaflet-interactive { cursor: crosshair; }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--ink); }
   .leaflet-popup-content a { color: var(--go); font-weight: 600; }
@@ -983,7 +986,7 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && svArmed) setSv(false); });
 
   // ---------- Localiser un PR : d'un point de la carte vers route + PR + abscisse ----------
-  var pkArmed = false, pkPin = null;
+  var pkArmed = false, pkPin = null, pkTipEl = null, pkTipSeq = 0, pkTipT = 0, pkTipLast = 0, pkTipCp = null;
   $("pk").innerHTML = ICON("M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10zM10 11a2 2 0 1 0 4 0a2 2 0 1 0-4 0");
   function setPk(on) {
     pkArmed = on;
@@ -991,16 +994,63 @@
     $("pk").setAttribute("aria-pressed", on ? "true" : "false");
     $("pk").setAttribute("aria-label", on ? "Annuler la localisation de PR" : "Localiser un PR : choisir un point");
     $("map").classList.toggle("pk-armed", on);
-    if (on) say("Localiser un PR : touchez un point proche d'une route du référentiel.");
+    if (on) { say("Localiser un PR : touchez un point proche d'une route du référentiel."); qIndex().catch(function () {}); }
+    else pkTipHide();
   }
   $("pk").onclick = function () { setPk(!pkArmed); };
   map.on("click", function (e) { if (pkArmed) { setPk(false); locatePk(e.latlng); } });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pkArmed) setPk(false); });
 
+  // Info-bulle qui suit le curseur : route + PR+abscisse avant de cliquer (souris uniquement)
+  function pkLine(r) {
+    var t = "<b>" + esc(shortRoute(r.e.axe)) + "</b>";
+    if (r.pr === null) return t + " · PR indisponible";
+    if (r.m >= 0) return t + " · PR " + esc(r.pr) + "+" + r.m + (r.approx ? " <small>(estimé)</small>" : "");
+    return t + " · ~" + (-r.m) + " m avant PR " + esc(r.pr);
+  }
+  function pkTipHide() {
+    pkTipSeq++; clearTimeout(pkTipT);
+    if (pkTipEl) pkTipEl.style.display = "none";
+  }
+  function pkTipPlace() {
+    if (!pkTipEl || !pkTipCp || pkTipEl.style.display === "none") return;
+    var sz = map.getSize(), w = pkTipEl.offsetWidth, h = pkTipEl.offsetHeight, x = pkTipCp.x + 16, y = pkTipCp.y + 18;
+    if (x + w > sz.x - 4) x = Math.max(4, pkTipCp.x - w - 12);
+    if (y + h > sz.y - 4) y = Math.max(4, pkTipCp.y - h - 12);
+    pkTipEl.style.left = x + "px"; pkTipEl.style.top = y + "px";
+  }
+  function pkTipUpdate(ll) {
+    var seq = ++pkTipSeq;
+    qIndex().then(function (idx) {
+      if (seq !== pkTipSeq || !pkArmed) return;
+      var mpp = 156543.03 * Math.cos(ll.lat * Math.PI / 180) / Math.pow(2, map.getZoom());
+      var res = pkFind(ll, idx, Math.max(30, Math.min(300, 35 * mpp)));
+      if (!pkTipEl) { pkTipEl = document.createElement("div"); pkTipEl.className = "pk-tip"; map.getContainer().appendChild(pkTipEl); }
+      pkTipEl.innerHTML = res.length ? res.map(pkLine).join("<br>") : "<small>Aucune route du référentiel à proximité</small>";
+      pkTipEl.style.display = "block";
+      pkTipPlace();
+    }, function () {});
+  }
+  map.getContainer().addEventListener("mousemove", function (ev) {
+    if (!pkArmed) return;
+    if ((ev.buttons & 1) || !ev.target.closest || !ev.target.closest(".leaflet-map-pane")) { pkTipHide(); return; }
+    pkTipCp = map.mouseEventToContainerPoint(ev);
+    pkTipPlace();
+    var ll = map.mouseEventToLatLng(ev), now = Date.now();
+    clearTimeout(pkTipT);
+    if (now - pkTipLast >= 70) { pkTipLast = now; pkTipUpdate(ll); }
+    else pkTipT = setTimeout(function () { pkTipLast = Date.now(); pkTipUpdate(ll); }, 70);
+  });
+  map.getContainer().addEventListener("mouseleave", pkTipHide);
+  map.on("movestart zoomstart", function () { if (pkArmed) pkTipHide(); });
+
   // Cherche les routes du référentiel proches de ll (tolérance tol en mètres) et calcule PR + abscisse
   function pkFind(ll, idx, tol) {
     var o = { lon0: ll.lng, lat0: ll.lat, kx: 111320 * Math.cos(ll.lat * Math.PI / 180), ky: 110574 }, cands = [];
-    idx.forEach(function (e) {
+    var padLat = tol / 100000, padLng = tol / (100000 * Math.max(0.2, Math.cos(ll.lat * Math.PI / 180)));
+    idx.filter(function (e) {
+      var b = e.b; return ll.lat >= b.getSouth() - padLat && ll.lat <= b.getNorth() + padLat && ll.lng >= b.getWest() - padLng && ll.lng <= b.getEast() + padLng;
+    }).forEach(function (e) {
       var best = Infinity, bestF = null;
       e.feats.forEach(function (f) {
         var g = f.geometry;
