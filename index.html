@@ -92,6 +92,13 @@
   dialog select { width: 100%; font: inherit; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
   dialog { max-height: 90vh; overflow: auto; }
   dialog h3 { margin: 12px 0 6px; font-size: .95rem; }
+  #offSec { margin: 12px 0 0; border-top: 1px solid var(--line); padding-top: 8px; }
+  #offSec summary { cursor: pointer; font-weight: 700; font-size: .95rem; padding: 6px 0; list-style: none;
+    display: flex; align-items: center; justify-content: space-between; }
+  #offSec summary::-webkit-details-marker { display: none; }
+  #offSec summary::after { content: "\25BE"; transition: transform .2s; }
+  #offSec[open] summary::after { transform: rotate(180deg); }
+  #offSec[open] summary { margin-bottom: 6px; }
   dialog label.chk { display: flex; align-items: center; gap: 8px; }
   dialog input[type="range"] { width: 100%; }
   dialog .hint { font-size: .8rem; opacity: .75; margin: 0 0 8px; }
@@ -238,7 +245,8 @@
   <label class="chk"><input type="checkbox" id="ovPcrs"> PCRS (plan de corps de rue simplifié)</label>
   <label>Opacité du PCRS <input type="range" id="ovOp" min="20" max="100" step="10" value="100"></label>
   <p class="hint">Le PCRS s'affiche à partir du zoom 16, seulement là où il est diffusé en open data, et en ligne uniquement.</p>
-  <h3>Hors ligne</h3>
+  <details id="offSec">
+  <summary>Hors ligne</summary>
   <label>Zone à télécharger
     <select id="offArea">
       <option value="route">Autour de l'itinéraire sélectionné</option>
@@ -260,7 +268,10 @@
     <button id="offGo">Télécharger</button>
     <button id="offStop" class="ghost" hidden>Arrêter</button>
     <button id="offDel" class="ghost">Tout supprimer</button>
-    <button id="offClose" class="ghost">Fermer</button>
+  </div>
+  </details>
+  <div class="row" style="margin-top:10px">
+    <button id="offClose" class="ghost" style="flex:1">Fermer</button>
   </div>
 </dialog>
 
@@ -1787,6 +1798,7 @@
     $("ovPcrs").checked = ov.pcrs; $("ovOp").value = ov.op;
     $("ovOld").checked = oldOn; $("ovOldOp").value = Math.round(oldOpacity * 100);
     $("ovRef").checked = ov.ref; $("ovPr").checked = ov.pr;
+    $("offSec").open = false;
     $("off").showModal();
   };
   $("offBase").onchange = function () { setBase(this.value, true); updateEst(); };
