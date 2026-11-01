@@ -1440,7 +1440,7 @@
   var MEASURE_COLOR = "#d90429";   // rouge : distinct de l'orange des parcelles cadastrales
   var measureMode=null, measureType=null, measurePoints=[], measureLayer=L.layerGroup().addTo(map),
       measureShape=null, measureMarkers=[], measureSelected=-1,
-      measureDone=[], measureDoneLayer=L.layerGroup().addTo(map);   // tracés validés (indépendants, cumulés au total)
+      measureDone=[], measureEditIdx=-1, measureDoneLayer=L.layerGroup().addTo(map);   // tracés validés (indépendants, cumulés au total)
   function fmtDistance(m){return m>=1000?(m/1000).toFixed(2).replace(".",",")+" km":Math.round(m)+" m";}
   function fmtArea(a){return a>=10000?(a/10000).toFixed(2).replace(".",",")+" ha":Math.round(a)+" m²";}
   function areaMeters(points){var radius=6378137,sum=0;for(var i=0;i<points.length;i++){var a=points[i],b=points[(i+1)%points.length];sum+=(b.lng-a.lng)*Math.PI/180*(2+Math.sin(a.lat*Math.PI/180)+Math.sin(b.lat*Math.PI/180));}return Math.abs(sum*radius*radius/2);}
@@ -1454,6 +1454,7 @@
     $("measureDelete").disabled=!(measureSelected>=0&&measurePoints[measureSelected]);
     $("measureUndo").disabled=measurePoints.length===0;
     $("measureAdd").disabled=!measureValid(measureType,measurePoints);
+    $("measureAdd").textContent=measureEditIdx>=0?"✓ Valider la modification":"+ Nouveau tracé";
     updateMeasureTotals();
   }
   function measureValid(t,pts){return !!t&&pts.length>=(t==="area"?3:2);}
@@ -1474,7 +1475,10 @@
   }
   function commitMeasure(){
     if(!measureValid(measureType,measurePoints))return false;
-    measureDone.push({type:measureType,points:measurePoints.slice()});
+    var item={type:measureType,points:measurePoints.slice()};
+    if(measureEditIdx>=0)measureDone.splice(Math.min(measureEditIdx,measureDone.length),0,item);
+    else measureDone.push(item);
+    measureEditIdx=-1;
     measurePoints=[];measureSelected=-1;
     renderMeasureDone();
     return true;
@@ -1492,7 +1496,8 @@
       var li=document.createElement("li");
       var go=document.createElement("button");go.className="ghost ml-go";go.textContent=(isArea?"□ ":"↔ ")+name+" · "+txt;go.setAttribute("data-i",i);go.title="Zoomer sur ce tracé";
       var x=document.createElement("button");x.className="ghost ml-x";x.textContent="✕";x.setAttribute("data-del",i);x.setAttribute("aria-label","Supprimer "+name);
-      li.appendChild(go);li.appendChild(x);list.appendChild(li);
+      var ed=document.createElement("button");ed.className="ghost ml-x";ed.textContent="✎";ed.setAttribute("data-edit",i);ed.title="Modifier ce tracé";ed.setAttribute("aria-label","Modifier "+name);
+      li.appendChild(go);li.appendChild(ed);li.appendChild(x);list.appendChild(li);
     });
     list.hidden=!measureDone.length;
     $("measurePanel").hidden=!measureMode&&!measurePoints.length&&!measureDone.length;
@@ -1533,7 +1538,7 @@
   }
   function setMeasure(mode){
     if(mode){
-      if(measureType!==mode){commitMeasure();measurePoints=[];measureSelected=-1;measureType=mode;drawMeasure();}
+      if(measureType!==mode){commitMeasure();measureEditIdx=-1;measurePoints=[];measureSelected=-1;measureType=mode;drawMeasure();}
       measureMode=mode;
     } else measureMode=null;
     map.getContainer().classList.toggle("measuring",!!measureMode);
@@ -1578,19 +1583,38 @@
   
   // Bouton Nouveau tracé : valide le tracé en cours (il rejoint le total) et en démarre un autre
   $("measureAdd").onclick=function(){
-    if(commitMeasure()){drawMeasure();say("Tracé validé et ajouté au total. Cliquez sur la carte pour en démarrer un autre.");}
+    var wasEdit=measureEditIdx>=0;
+    if(commitMeasure()){drawMeasure();say(wasEdit?"Modification enregistrée. Cliquez sur la carte pour démarrer un nouveau tracé.":"Tracé validé et ajouté au total. Cliquez sur la carte pour en démarrer un autre.");}
   };
+
+  // Rouvre un tracé validé pour le modifier (poignées, ajout/suppression de sommets), puis « Valider la modification »
+  function editMeasure(i){
+    var m=measureDone[i];if(!m)return;
+    if(measurePoints.length){
+      if(!measureValid(measureType,measurePoints)){say("Terminez ou réinitialisez d’abord le tracé en cours.");return;}
+      commitMeasure();
+    }
+    var idx=measureDone.indexOf(m);if(idx<0)return;
+    measureDone.splice(idx,1);
+    measureEditIdx=idx;measurePoints=m.points.slice();measureType=m.type;measureSelected=-1;
+    renderMeasureDone();
+    setMeasure(m.type);
+    map.fitBounds(L.latLngBounds(m.points),{padding:[50,50],maxZoom:19});
+    say("Modification du tracé : déplacez les poignées, touchez un segment pour ajouter un sommet, puis « Valider la modification ».");
+  }
 
   // Liste des tracés validés : zoom sur un tracé ou suppression individuelle
   $("measureList").onclick=function(e){
     var t=e.target.closest("button");if(!t)return;
-    if(t.hasAttribute("data-del")){measureDone.splice(+t.getAttribute("data-del"),1);renderMeasureDone();return;}
+    if(t.hasAttribute("data-del")){var di=+t.getAttribute("data-del");measureDone.splice(di,1);if(measureEditIdx>di)measureEditIdx--;renderMeasureDone();return;}
+    if(t.hasAttribute("data-edit")){editMeasure(+t.getAttribute("data-edit"));return;}
     var m=measureDone[+t.getAttribute("data-i")];
     if(m)map.fitBounds(L.latLngBounds(m.points),{padding:[50,50],maxZoom:19});
   };
 
   // Bouton Réinitialiser : efface uniquement le tracé en cours (les tracés validés sont conservés)
   $("measureReset").onclick=function(){
+    measureEditIdx=-1;
     measurePoints=[];
     measureSelected=-1;
     drawMeasure();
@@ -1600,6 +1624,7 @@
   // Bouton Terminer : efface toutes les mesures, désactive la mesure et ferme le panneau
   $("measureClose").onclick=function(){
     if(measureDone.length&&!confirm("Terminer et effacer les "+measureDone.length+" tracé(s) validé(s) ?"))return;
+    measureEditIdx=-1;
     measurePoints=[];
     measureSelected=-1;
     measureDone=[];
