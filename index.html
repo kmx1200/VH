@@ -19,8 +19,9 @@
     --surface:#ffffff; --surface-a:rgba(255,255,255,.94); --err:#b3261e; --me:#14342f; --map-bg:#dddddd; }
   :root[data-theme="dark"] { color-scheme: dark; --ink:#e4ede8; --paper:#17211f; --line:#36463f; --route:#ff6b9d; --go:#2b8a67; --stop:#d6453d;
     --surface:#212e2b; --surface-a:rgba(33,46,43,.94); --err:#ff8a80; --me:#4dabf7; --map-bg:#1b2523; }
-  :root[data-theme="dark"] .vh-invert { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
-  :root[data-theme="dark"] .vh-dim { filter: brightness(.72) contrast(1.05); }
+  .vh-base { filter: grayscale(var(--base-gray, 0)); }
+  :root[data-theme="dark"] .vh-invert { filter: grayscale(var(--base-gray, 0)) invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+  :root[data-theme="dark"] .vh-dim { filter: grayscale(var(--base-gray, 0)) brightness(.72) contrast(1.05); }
   .leaflet-container { background: var(--map-bg); }
   .leaflet-tooltip-pane .old-lbl { background: transparent; border: 0; box-shadow: none; padding: 0; color: #3d2f00; font-weight: 700; font-size: 12px;
     text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 3px #fff; }
@@ -255,6 +256,7 @@
     </select>
   </label>
   <label>Opacité du fond de carte <input type="range" id="baseOp" min="10" max="100" step="5" value="100"></label>
+  <label>Niveaux de gris du fond <input type="range" id="baseGray" min="0" max="100" step="5" value="0"></label>
   <h3>Superpositions</h3>
   <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
   <label class="chk"><input type="checkbox" id="ovPr"> PR (points et numéros)</label>
@@ -360,16 +362,18 @@
   });
   var BKEY = "vhmaps-base", baseKey = "ign", baseLayer = null;
   try { var sb = localStorage.getItem(BKEY); if (BASES[sb]) baseKey = sb; } catch (e) {}
-  var BOKEY = "vhmaps-base-op", baseOpacity = 1;
+  var BOKEY = "vhmaps-base-op", baseOpacity = 1, BGKEY = "vhmaps-base-gray", baseGray = 0;
   try { var bo = Number(localStorage.getItem(BOKEY)); if (bo >= 10 && bo <= 100) baseOpacity = bo / 100; } catch (e) {}
+  try { var bg = Number(localStorage.getItem(BGKEY)); if (bg >= 0 && bg <= 100) baseGray = bg / 100; } catch (e) {}
+  document.documentElement.style.setProperty("--base-gray", baseGray);   // lu par .vh-base (filtre grayscale du fond)
   function setBase(k, fit) {
     if (!BASES[k]) return;
     var b = BASES[k];
     baseKey = k;
     if (baseLayer) map.removeLayer(baseLayer);
     baseLayer = (b.pack
-      ? new PackLayer({ pack: b.pack, maxZoom: 21, maxNativeZoom: b.native, minZoom: 0, className: b.cls, attribution: b.attr })
-      : L.tileLayer(b.url, { maxZoom: 21, maxNativeZoom: b.native, className: b.cls, attribution: b.attr })).addTo(map);
+      ? new PackLayer({ pack: b.pack, maxZoom: 21, maxNativeZoom: b.native, minZoom: 0, className: (b.cls ? b.cls + " " : "") + "vh-base", attribution: b.attr })
+      : L.tileLayer(b.url, { maxZoom: 21, maxNativeZoom: b.native, className: (b.cls ? b.cls + " " : "") + "vh-base", attribution: b.attr })).addTo(map);
     baseLayer.setOpacity(baseOpacity);
     baseLayer.bringToBack();
     if (b.pack) setTimeout(function () {
@@ -392,6 +396,13 @@
     baseOpacity = Number(this.value) / 100;
     if (baseLayer) baseLayer.setOpacity(baseOpacity);
     try { localStorage.setItem(BOKEY, this.value); } catch (e) {}
+  };
+  var baseGrayEl = document.getElementById("baseGray");
+  baseGrayEl.value = Math.round(baseGray * 100);
+  baseGrayEl.oninput = function () {
+    baseGray = Number(this.value) / 100;
+    document.documentElement.style.setProperty("--base-gray", baseGray);
+    try { localStorage.setItem(BGKEY, this.value); } catch (e) {}
   };
   var refLayer = L.featureGroup().addTo(map);
   var line = L.polyline([], { color: "#d6336c", weight: 5 }).addTo(map);
