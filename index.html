@@ -1680,6 +1680,17 @@
     return a;
   }
   function r2(v){return Math.round(v*100)/100;}
+  // WGS84 → Lambert 93 (RGF93 / EPSG:2154) : conique conforme de Lambert à 2 parallèles, ellipsoïde GRS80
+  function toLambert93(lat,lng){
+    var a=6378137,f=1/298.257222101,e=Math.sqrt(2*f-f*f),d=Math.PI/180;
+    var phi0=46.5*d,phi1=44*d,phi2=49*d,lam0=3*d,X0=700000,Y0=6600000;
+    function m(p){var s=Math.sin(p);return Math.cos(p)/Math.sqrt(1-e*e*s*s);}
+    function t(p){var s=e*Math.sin(p);return Math.tan(Math.PI/4-p/2)/Math.pow((1-s)/(1+s),e/2);}
+    var n=(Math.log(m(phi1))-Math.log(m(phi2)))/(Math.log(t(phi1))-Math.log(t(phi2)));
+    var F=m(phi1)/(n*Math.pow(t(phi1),n)),r0=a*F*Math.pow(t(phi0),n);
+    var r=a*F*Math.pow(t(lat*d),n),th=n*(lng*d-lam0);
+    return {x:X0+r*Math.sin(th),y:Y0+r0-r*Math.cos(th)};
+  }
   // Le bouton affiche « Export en cours… » avec une roue ; on laisse d'abord le navigateur l'afficher, puis on génère le fichier
   var xlsBusy=false;
   function exportMeasuresXlsx(){
@@ -1700,7 +1711,7 @@
     var H=function(t){return {v:t,s:1};};
     var areas=all.filter(function(m){return m.type==="area";}),lines=all.filter(function(m){return m.type!=="area";});
     var sheets=[];
-    if(areas.length){
+    {
       var rows=[[H("N°"),H("Nom"),H("Surface (m²)"),H("Surface (ha)"),H("Périmètre (m)"),H("Nb sommets")]],tm=0,tp=0;
       areas.forEach(function(m,i){
         var a=r2(areaMeters(m.points)),per=r2(measureLength(m.points)+m.points[m.points.length-1].distanceTo(m.points[0])),n=i+2;
@@ -1708,25 +1719,27 @@
         rows.push([i+1,"Surface "+(i+1),{v:a,s:2},{f:"C"+n+"/10000",v:a/10000,s:2},{v:per,s:2},m.points.length]);
       });
       var last=areas.length+1;
-      rows.push([null,{v:"Total",s:1},{f:"SUM(C2:C"+last+")",v:r2(tm),s:4},{f:"SUM(D2:D"+last+")",v:tm/10000,s:4},{f:"SUM(E2:E"+last+")",v:r2(tp),s:4},null]);
-      sheets.push({name:"Surfaces",xml:xlSheet(rows,[6,16,16,16,16,13])});
+      if(areas.length)rows.push([null,{v:"Total",s:1},{f:"SUM(C2:C"+last+")",v:r2(tm),s:4},{f:"SUM(D2:D"+last+")",v:tm/10000,s:4},{f:"SUM(E2:E"+last+")",v:r2(tp),s:4},null]);
+      else rows.push([null,"Aucune mesure surfacique"]);
+      sheets.push({name:"Surfacique",xml:xlSheet(rows,[6,16,16,16,16,13])});
     }
-    if(lines.length){
+    {
       var rl=[[H("N°"),H("Nom"),H("Distance (m)"),H("Distance (km)"),H("Nb points")]],td=0;
       lines.forEach(function(m,i){
         var d=r2(measureLength(m.points)),n=i+2;td+=d;
         rl.push([i+1,"Distance "+(i+1),{v:d,s:2},{f:"C"+n+"/1000",v:d/1000,s:2},m.points.length]);
       });
       var ll=lines.length+1;
-      rl.push([null,{v:"Total",s:1},{f:"SUM(C2:C"+ll+")",v:r2(td),s:4},{f:"SUM(D2:D"+ll+")",v:td/1000,s:4},null]);
-      sheets.push({name:"Distances",xml:xlSheet(rl,[6,16,16,16,13])});
+      if(lines.length)rl.push([null,{v:"Total",s:1},{f:"SUM(C2:C"+ll+")",v:r2(td),s:4},{f:"SUM(D2:D"+ll+")",v:td/1000,s:4},null]);
+      else rl.push([null,"Aucune mesure linéaire"]);
+      sheets.push({name:"Linéaire",xml:xlSheet(rl,[6,16,16,16,13])});
     }
-    var rs=[[H("Mesure"),H("Type"),H("N° sommet"),H("Latitude (WGS84)"),H("Longitude (WGS84)")]],na=0,nl=0;
+    var rs=[[H("Mesure"),H("Type"),H("N° sommet"),H("Latitude (WGS84)"),H("Longitude (WGS84)"),H("X (Lambert 93)"),H("Y (Lambert 93)")]],na=0,nl=0;
     all.forEach(function(m){
       var isA=m.type==="area",name=(isA?"Surface ":"Distance ")+(isA?++na:++nl);
-      m.points.forEach(function(pt,i){rs.push([name,isA?"Surface":"Distance",i+1,{v:pt.lat,s:3},{v:pt.lng,s:3}]);});
+      m.points.forEach(function(pt,i){var L93=toLambert93(pt.lat,pt.lng);rs.push([name,isA?"Surface":"Distance",i+1,{v:pt.lat,s:3},{v:pt.lng,s:3},{v:r2(L93.x),s:2},{v:r2(L93.y),s:2}]);});
     });
-    sheets.push({name:"Sommets",xml:xlSheet(rs,[16,12,12,18,18])});
+    sheets.push({name:"Sommets",xml:xlSheet(rs,[16,12,12,18,18,18,18])});
 
     var NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',R='http://schemas.openxmlformats.org/officeDocument/2006/relationships',X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
     var files=[
