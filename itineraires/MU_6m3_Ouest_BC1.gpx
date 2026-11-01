@@ -1,0 +1,674 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="QGIS export VHMaps" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxx="http://www.garmin.com/xmlschemas/GpxExtensions/v3" xmlns:gpx_style="http://www.topografix.com/GPX/gpx_style/0/2">
+  <metadata><name>MU_6m3_Ouest_BC1</name></metadata>
+  <trk>
+    <name>Traitement</name>
+    <extensions><gpx_style:line><gpx_style:color>0EC87E</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>DarkCyan</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.560802" lon="-2.514111"/>
+      <trkpt lat="47.560134" lon="-2.514241"/>
+      <trkpt lat="47.559860" lon="-2.514120"/>
+      <trkpt lat="47.558926" lon="-2.513439"/>
+      <trkpt lat="47.558692" lon="-2.513279"/>
+      <trkpt lat="47.558086" lon="-2.513038"/>
+      <trkpt lat="47.557943" lon="-2.512995"/>
+      <trkpt lat="47.557948" lon="-2.512995"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.557947" lon="-2.513009"/>
+      <trkpt lat="47.557080" lon="-2.518776"/>
+      <trkpt lat="47.555723" lon="-2.527845"/>
+      <trkpt lat="47.554864" lon="-2.533519"/>
+      <trkpt lat="47.554629" lon="-2.535221"/>
+      <trkpt lat="47.554441" lon="-2.540394"/>
+      <trkpt lat="47.554289" lon="-2.545400"/>
+      <trkpt lat="47.554104" lon="-2.551516"/>
+      <trkpt lat="47.554061" lon="-2.552824"/>
+      <trkpt lat="47.554026" lon="-2.554222"/>
+      <trkpt lat="47.553996" lon="-2.555039"/>
+      <trkpt lat="47.554083" lon="-2.555954"/>
+      <trkpt lat="47.554161" lon="-2.556440"/>
+      <trkpt lat="47.554214" lon="-2.556752"/>
+      <trkpt lat="47.554509" lon="-2.557960"/>
+      <trkpt lat="47.554754" lon="-2.558492"/>
+      <trkpt lat="47.554891" lon="-2.558763"/>
+      <trkpt lat="47.555034" lon="-2.559199"/>
+      <trkpt lat="47.555373" lon="-2.559491"/>
+      <trkpt lat="47.555529" lon="-2.559657"/>
+      <trkpt lat="47.555714" lon="-2.560040"/>
+      <trkpt lat="47.556587" lon="-2.562585"/>
+      <trkpt lat="47.556761" lon="-2.562881"/>
+      <trkpt lat="47.556878" lon="-2.563057"/>
+      <trkpt lat="47.556914" lon="-2.563418"/>
+      <trkpt lat="47.557100" lon="-2.564079"/>
+      <trkpt lat="47.557426" lon="-2.564826"/>
+      <trkpt lat="47.558544" lon="-2.566384"/>
+      <trkpt lat="47.558975" lon="-2.567071"/>
+      <trkpt lat="47.560903" lon="-2.571396"/>
+      <trkpt lat="47.561821" lon="-2.573589"/>
+      <trkpt lat="47.564032" lon="-2.576845"/>
+      <trkpt lat="47.564661" lon="-2.577824"/>
+      <trkpt lat="47.564862" lon="-2.578259"/>
+      <trkpt lat="47.564971" lon="-2.578613"/>
+      <trkpt lat="47.565270" lon="-2.581041"/>
+      <trkpt lat="47.565728" lon="-2.582959"/>
+      <trkpt lat="47.566056" lon="-2.583578"/>
+      <trkpt lat="47.566301" lon="-2.584117"/>
+      <trkpt lat="47.566995" lon="-2.586559"/>
+      <trkpt lat="47.569433" lon="-2.595519"/>
+      <trkpt lat="47.571214" lon="-2.602071"/>
+      <trkpt lat="47.574813" lon="-2.615180"/>
+      <trkpt lat="47.576500" lon="-2.621252"/>
+      <trkpt lat="47.576701" lon="-2.622301"/>
+      <trkpt lat="47.576743" lon="-2.623419"/>
+      <trkpt lat="47.576312" lon="-2.625957"/>
+      <trkpt lat="47.576014" lon="-2.627524"/>
+      <trkpt lat="47.575758" lon="-2.628624"/>
+      <trkpt lat="47.574870" lon="-2.633412"/>
+      <trkpt lat="47.574414" lon="-2.636047"/>
+      <trkpt lat="47.574110" lon="-2.637128"/>
+      <trkpt lat="47.573002" lon="-2.639266"/>
+      <trkpt lat="47.570999" lon="-2.643136"/>
+      <trkpt lat="47.570260" lon="-2.645627"/>
+      <trkpt lat="47.568768" lon="-2.656087"/>
+      <trkpt lat="47.567460" lon="-2.665110"/>
+      <trkpt lat="47.565965" lon="-2.675969"/>
+      <trkpt lat="47.565358" lon="-2.680499"/>
+      <trkpt lat="47.564803" lon="-2.682381"/>
+      <trkpt lat="47.563600" lon="-2.684079"/>
+      <trkpt lat="47.561151" lon="-2.687928"/>
+      <trkpt lat="47.559445" lon="-2.690429"/>
+      <trkpt lat="47.558920" lon="-2.691686"/>
+      <trkpt lat="47.558175" lon="-2.694688"/>
+      <trkpt lat="47.557497" lon="-2.697869"/>
+      <trkpt lat="47.555976" lon="-2.701331"/>
+      <trkpt lat="47.552413" lon="-2.708997"/>
+      <trkpt lat="47.551768" lon="-2.710726"/>
+      <trkpt lat="47.551732" lon="-2.713804"/>
+      <trkpt lat="47.551391" lon="-2.716821"/>
+      <trkpt lat="47.551391" lon="-2.716821"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.551391" lon="-2.716821"/>
+      <trkpt lat="47.551536" lon="-2.717022"/>
+      <trkpt lat="47.553550" lon="-2.715925"/>
+      <trkpt lat="47.557012" lon="-2.713884"/>
+      <trkpt lat="47.562938" lon="-2.710038"/>
+      <trkpt lat="47.566039" lon="-2.708258"/>
+      <trkpt lat="47.567232" lon="-2.706787"/>
+      <trkpt lat="47.567556" lon="-2.706479"/>
+      <trkpt lat="47.569134" lon="-2.706591"/>
+      <trkpt lat="47.572458" lon="-2.704206"/>
+      <trkpt lat="47.578373" lon="-2.697016"/>
+      <trkpt lat="47.581560" lon="-2.693474"/>
+      <trkpt lat="47.582239" lon="-2.692233"/>
+      <trkpt lat="47.582418" lon="-2.691738"/>
+      <trkpt lat="47.583406" lon="-2.691273"/>
+      <trkpt lat="47.587721" lon="-2.687564"/>
+      <trkpt lat="47.591333" lon="-2.684409"/>
+      <trkpt lat="47.593416" lon="-2.682889"/>
+      <trkpt lat="47.595086" lon="-2.681924"/>
+      <trkpt lat="47.598799" lon="-2.681035"/>
+      <trkpt lat="47.600727" lon="-2.680726"/>
+      <trkpt lat="47.602742" lon="-2.680598"/>
+      <trkpt lat="47.604734" lon="-2.681353"/>
+      <trkpt lat="47.606467" lon="-2.683052"/>
+      <trkpt lat="47.607410" lon="-2.684295"/>
+      <trkpt lat="47.608865" lon="-2.685364"/>
+      <trkpt lat="47.609848" lon="-2.685812"/>
+      <trkpt lat="47.611488" lon="-2.685844"/>
+      <trkpt lat="47.615156" lon="-2.685492"/>
+      <trkpt lat="47.618145" lon="-2.685211"/>
+      <trkpt lat="47.619637" lon="-2.685513"/>
+      <trkpt lat="47.622536" lon="-2.686280"/>
+      <trkpt lat="47.624877" lon="-2.686587"/>
+      <trkpt lat="47.626652" lon="-2.686233"/>
+      <trkpt lat="47.631455" lon="-2.683602"/>
+      <trkpt lat="47.633361" lon="-2.682548"/>
+      <trkpt lat="47.635384" lon="-2.682649"/>
+      <trkpt lat="47.636925" lon="-2.682757"/>
+      <trkpt lat="47.637221" lon="-2.682617"/>
+      <trkpt lat="47.637393" lon="-2.683064"/>
+      <trkpt lat="47.637068" lon="-2.683372"/>
+      <trkpt lat="47.636806" lon="-2.683201"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Pas de salage</name>
+    <extensions><gpx_style:line><gpx_style:color>FCF406</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Yellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.636806" lon="-2.683201"/>
+      <trkpt lat="47.634467" lon="-2.682852"/>
+      <trkpt lat="47.633537" lon="-2.682895"/>
+      <trkpt lat="47.630095" lon="-2.684557"/>
+      <trkpt lat="47.627452" lon="-2.686075"/>
+      <trkpt lat="47.626027" lon="-2.686781"/>
+      <trkpt lat="47.622830" lon="-2.686582"/>
+      <trkpt lat="47.620785" lon="-2.686136"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.620785" lon="-2.686136"/>
+      <trkpt lat="47.620770" lon="-2.685648"/>
+      <trkpt lat="47.620063" lon="-2.684687"/>
+      <trkpt lat="47.618712" lon="-2.683886"/>
+      <trkpt lat="47.617964" lon="-2.683778"/>
+      <trkpt lat="47.616981" lon="-2.683730"/>
+      <trkpt lat="47.615849" lon="-2.684352"/>
+      <trkpt lat="47.615125" lon="-2.684160"/>
+      <trkpt lat="47.614183" lon="-2.683660"/>
+      <trkpt lat="47.611968" lon="-2.683138"/>
+      <trkpt lat="47.610870" lon="-2.682678"/>
+      <trkpt lat="47.610600" lon="-2.681878"/>
+      <trkpt lat="47.610190" lon="-2.680778"/>
+      <trkpt lat="47.609995" lon="-2.680414"/>
+      <trkpt lat="47.608776" lon="-2.680056"/>
+      <trkpt lat="47.606569" lon="-2.678964"/>
+      <trkpt lat="47.605287" lon="-2.678713"/>
+      <trkpt lat="47.604329" lon="-2.678954"/>
+      <trkpt lat="47.602559" lon="-2.679193"/>
+      <trkpt lat="47.601356" lon="-2.679322"/>
+      <trkpt lat="47.600429" lon="-2.680109"/>
+      <trkpt lat="47.599949" lon="-2.680829"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Pas de salage</name>
+    <extensions><gpx_style:line><gpx_style:color>FCF406</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Yellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.599949" lon="-2.680829"/>
+      <trkpt lat="47.597289" lon="-2.681502"/>
+      <trkpt lat="47.595029" lon="-2.682104"/>
+      <trkpt lat="47.593039" lon="-2.683291"/>
+      <trkpt lat="47.591039" lon="-2.684891"/>
+      <trkpt lat="47.586541" lon="-2.688795"/>
+      <trkpt lat="47.583969" lon="-2.691218"/>
+      <trkpt lat="47.582631" lon="-2.692118"/>
+      <trkpt lat="47.582246" lon="-2.692491"/>
+      <trkpt lat="47.581673" lon="-2.693543"/>
+      <trkpt lat="47.579032" lon="-2.696387"/>
+      <trkpt lat="47.577205" lon="-2.698776"/>
+      <trkpt lat="47.575356" lon="-2.701233"/>
+      <trkpt lat="47.573053" lon="-2.704191"/>
+      <trkpt lat="47.570257" lon="-2.706062"/>
+      <trkpt lat="47.567656" lon="-2.707096"/>
+      <trkpt lat="47.566271" lon="-2.708547"/>
+      <trkpt lat="47.560179" lon="-2.712233"/>
+      <trkpt lat="47.553788" lon="-2.715915"/>
+      <trkpt lat="47.551441" lon="-2.717276"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.551441" lon="-2.717276"/>
+      <trkpt lat="47.550345" lon="-2.717872"/>
+      <trkpt lat="47.548491" lon="-2.718836"/>
+      <trkpt lat="47.546753" lon="-2.720012"/>
+      <trkpt lat="47.545498" lon="-2.721361"/>
+      <trkpt lat="47.544327" lon="-2.723176"/>
+      <trkpt lat="47.543199" lon="-2.726079"/>
+      <trkpt lat="47.541882" lon="-2.730460"/>
+      <trkpt lat="47.541021" lon="-2.733434"/>
+      <trkpt lat="47.540331" lon="-2.735685"/>
+      <trkpt lat="47.539346" lon="-2.737434"/>
+      <trkpt lat="47.536727" lon="-2.741189"/>
+      <trkpt lat="47.533175" lon="-2.746213"/>
+      <trkpt lat="47.530370" lon="-2.750204"/>
+      <trkpt lat="47.527700" lon="-2.753995"/>
+      <trkpt lat="47.525428" lon="-2.757173"/>
+      <trkpt lat="47.524658" lon="-2.758673"/>
+      <trkpt lat="47.523749" lon="-2.760735"/>
+      <trkpt lat="47.523186" lon="-2.762450"/>
+      <trkpt lat="47.522670" lon="-2.764491"/>
+      <trkpt lat="47.522379" lon="-2.766170"/>
+      <trkpt lat="47.522349" lon="-2.767272"/>
+      <trkpt lat="47.522326" lon="-2.767726"/>
+      <trkpt lat="47.522155" lon="-2.768050"/>
+      <trkpt lat="47.521714" lon="-2.776958"/>
+      <trkpt lat="47.521814" lon="-2.777653"/>
+      <trkpt lat="47.521682" lon="-2.777981"/>
+      <trkpt lat="47.521797" lon="-2.779163"/>
+      <trkpt lat="47.521999" lon="-2.781324"/>
+      <trkpt lat="47.522652" lon="-2.783733"/>
+      <trkpt lat="47.525367" lon="-2.790902"/>
+      <trkpt lat="47.526484" lon="-2.793704"/>
+      <trkpt lat="47.526791" lon="-2.794137"/>
+      <trkpt lat="47.526920" lon="-2.794636"/>
+      <trkpt lat="47.528455" lon="-2.798739"/>
+      <trkpt lat="47.528618" lon="-2.799726"/>
+      <trkpt lat="47.529378" lon="-2.805400"/>
+      <trkpt lat="47.529416" lon="-2.806973"/>
+      <trkpt lat="47.529139" lon="-2.808255"/>
+      <trkpt lat="47.528462" lon="-2.810606"/>
+      <trkpt lat="47.527845" lon="-2.813676"/>
+      <trkpt lat="47.527716" lon="-2.815488"/>
+      <trkpt lat="47.527841" lon="-2.818782"/>
+      <trkpt lat="47.528513" lon="-2.820795"/>
+      <trkpt lat="47.529135" lon="-2.822261"/>
+      <trkpt lat="47.529787" lon="-2.825070"/>
+      <trkpt lat="47.531248" lon="-2.833303"/>
+      <trkpt lat="47.532021" lon="-2.841775"/>
+      <trkpt lat="47.532083" lon="-2.844007"/>
+      <trkpt lat="47.532242" lon="-2.844680"/>
+      <trkpt lat="47.532085" lon="-2.845119"/>
+      <trkpt lat="47.532459" lon="-2.848070"/>
+      <trkpt lat="47.533344" lon="-2.852361"/>
+      <trkpt lat="47.535963" lon="-2.860979"/>
+      <trkpt lat="47.537585" lon="-2.866378"/>
+      <trkpt lat="47.538146" lon="-2.868266"/>
+      <trkpt lat="47.539221" lon="-2.873007"/>
+      <trkpt lat="47.540039" lon="-2.876321"/>
+      <trkpt lat="47.540751" lon="-2.877912"/>
+      <trkpt lat="47.541163" lon="-2.878556"/>
+      <trkpt lat="47.541274" lon="-2.879025"/>
+      <trkpt lat="47.541089" lon="-2.879261"/>
+      <trkpt lat="47.540801" lon="-2.878830"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Pas de salage</name>
+    <extensions><gpx_style:line><gpx_style:color>FCF406</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Yellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.540801" lon="-2.878830"/>
+      <trkpt lat="47.539410" lon="-2.875396"/>
+      <trkpt lat="47.538123" lon="-2.869491"/>
+      <trkpt lat="47.536021" lon="-2.862127"/>
+      <trkpt lat="47.534398" lon="-2.856756"/>
+      <trkpt lat="47.533182" lon="-2.852514"/>
+      <trkpt lat="47.532340" lon="-2.849284"/>
+      <trkpt lat="47.531799" lon="-2.844660"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.531799" lon="-2.844660"/>
+      <trkpt lat="47.530477" lon="-2.844059"/>
+      <trkpt lat="47.527291" lon="-2.844395"/>
+      <trkpt lat="47.523778" lon="-2.845094"/>
+      <trkpt lat="47.520533" lon="-2.845081"/>
+      <trkpt lat="47.515802" lon="-2.843879"/>
+      <trkpt lat="47.513829" lon="-2.843150"/>
+      <trkpt lat="47.512792" lon="-2.841496"/>
+      <trkpt lat="47.511941" lon="-2.839977"/>
+      <trkpt lat="47.510806" lon="-2.838712"/>
+      <trkpt lat="47.509561" lon="-2.838120"/>
+      <trkpt lat="47.505792" lon="-2.837765"/>
+      <trkpt lat="47.504145" lon="-2.837471"/>
+      <trkpt lat="47.502852" lon="-2.835505"/>
+      <trkpt lat="47.502437" lon="-2.833007"/>
+      <trkpt lat="47.502572" lon="-2.831083"/>
+      <trkpt lat="47.503548" lon="-2.825487"/>
+      <trkpt lat="47.503791" lon="-2.822948"/>
+      <trkpt lat="47.506763" lon="-2.815288"/>
+      <trkpt lat="47.508608" lon="-2.811611"/>
+      <trkpt lat="47.509453" lon="-2.808623"/>
+      <trkpt lat="47.511715" lon="-2.803565"/>
+      <trkpt lat="47.513726" lon="-2.798879"/>
+      <trkpt lat="47.515080" lon="-2.794976"/>
+      <trkpt lat="47.515878" lon="-2.793694"/>
+      <trkpt lat="47.517035" lon="-2.788287"/>
+      <trkpt lat="47.518471" lon="-2.784279"/>
+      <trkpt lat="47.519570" lon="-2.781603"/>
+      <trkpt lat="47.520314" lon="-2.779858"/>
+      <trkpt lat="47.521245" lon="-2.777449"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.521245" lon="-2.777449"/>
+      <trkpt lat="47.521654" lon="-2.770762"/>
+      <trkpt lat="47.522173" lon="-2.765742"/>
+      <trkpt lat="47.523255" lon="-2.761067"/>
+      <trkpt lat="47.525126" lon="-2.756820"/>
+      <trkpt lat="47.529531" lon="-2.750563"/>
+      <trkpt lat="47.535745" lon="-2.742103"/>
+      <trkpt lat="47.539704" lon="-2.736253"/>
+      <trkpt lat="47.540265" lon="-2.735058"/>
+      <trkpt lat="47.542961" lon="-2.725818"/>
+      <trkpt lat="47.544413" lon="-2.722208"/>
+      <trkpt lat="47.546395" lon="-2.719624"/>
+      <trkpt lat="47.549578" lon="-2.717740"/>
+      <trkpt lat="47.551199" lon="-2.717000"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Pas de salage</name>
+    <extensions><gpx_style:line><gpx_style:color>FCF406</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Yellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.551199" lon="-2.717000"/>
+      <trkpt lat="47.554063" lon="-2.715413"/>
+      <trkpt lat="47.557975" lon="-2.712864"/>
+      <trkpt lat="47.561959" lon="-2.710408"/>
+      <trkpt lat="47.564549" lon="-2.708801"/>
+      <trkpt lat="47.566001" lon="-2.707958"/>
+      <trkpt lat="47.567178" lon="-2.706400"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.567178" lon="-2.706400"/>
+      <trkpt lat="47.566839" lon="-2.706035"/>
+      <trkpt lat="47.565568" lon="-2.705542"/>
+      <trkpt lat="47.564532" lon="-2.705217"/>
+      <trkpt lat="47.562005" lon="-2.704933"/>
+      <trkpt lat="47.561114" lon="-2.704581"/>
+      <trkpt lat="47.559998" lon="-2.704490"/>
+      <trkpt lat="47.555976" lon="-2.701331"/>
+      <trkpt lat="47.555523" lon="-2.700815"/>
+      <trkpt lat="47.555070" lon="-2.700196"/>
+      <trkpt lat="47.553772" lon="-2.699886"/>
+      <trkpt lat="47.551018" lon="-2.697738"/>
+      <trkpt lat="47.547315" lon="-2.696429"/>
+      <trkpt lat="47.545262" lon="-2.695354"/>
+      <trkpt lat="47.542823" lon="-2.693468"/>
+      <trkpt lat="47.541916" lon="-2.693057"/>
+      <trkpt lat="47.541434" lon="-2.693034"/>
+      <trkpt lat="47.539830" lon="-2.694233"/>
+      <trkpt lat="47.537614" lon="-2.696107"/>
+      <trkpt lat="47.536419" lon="-2.696037"/>
+      <trkpt lat="47.525667" lon="-2.697057"/>
+      <trkpt lat="47.524640" lon="-2.696720"/>
+      <trkpt lat="47.523222" lon="-2.695713"/>
+      <trkpt lat="47.520121" lon="-2.691960"/>
+      <trkpt lat="47.517718" lon="-2.688167"/>
+      <trkpt lat="47.516683" lon="-2.687202"/>
+      <trkpt lat="47.515573" lon="-2.686998"/>
+      <trkpt lat="47.514269" lon="-2.686802"/>
+      <trkpt lat="47.512623" lon="-2.686484"/>
+      <trkpt lat="47.509186" lon="-2.685662"/>
+      <trkpt lat="47.507375" lon="-2.685156"/>
+      <trkpt lat="47.506413" lon="-2.685082"/>
+      <trkpt lat="47.506490" lon="-2.685489"/>
+      <trkpt lat="47.507471" lon="-2.688331"/>
+      <trkpt lat="47.507933" lon="-2.689549"/>
+      <trkpt lat="47.507843" lon="-2.691792"/>
+      <trkpt lat="47.507987" lon="-2.692805"/>
+      <trkpt lat="47.508321" lon="-2.693468"/>
+      <trkpt lat="47.509476" lon="-2.694731"/>
+      <trkpt lat="47.510025" lon="-2.696158"/>
+      <trkpt lat="47.510150" lon="-2.697540"/>
+      <trkpt lat="47.510220" lon="-2.700855"/>
+      <trkpt lat="47.510856" lon="-2.702463"/>
+      <trkpt lat="47.512224" lon="-2.704890"/>
+      <trkpt lat="47.513545" lon="-2.707113"/>
+      <trkpt lat="47.514459" lon="-2.707781"/>
+      <trkpt lat="47.515157" lon="-2.708112"/>
+      <trkpt lat="47.516336" lon="-2.710063"/>
+      <trkpt lat="47.516519" lon="-2.711452"/>
+      <trkpt lat="47.516318" lon="-2.714766"/>
+      <trkpt lat="47.516328" lon="-2.717305"/>
+      <trkpt lat="47.516944" lon="-2.720907"/>
+      <trkpt lat="47.516719" lon="-2.723906"/>
+      <trkpt lat="47.516717" lon="-2.725902"/>
+      <trkpt lat="47.517259" lon="-2.727443"/>
+      <trkpt lat="47.517934" lon="-2.728656"/>
+      <trkpt lat="47.520654" lon="-2.732656"/>
+      <trkpt lat="47.523082" lon="-2.736310"/>
+      <trkpt lat="47.523941" lon="-2.736916"/>
+      <trkpt lat="47.525321" lon="-2.740658"/>
+      <trkpt lat="47.525526" lon="-2.741593"/>
+      <trkpt lat="47.525880" lon="-2.744597"/>
+      <trkpt lat="47.526451" lon="-2.749079"/>
+      <trkpt lat="47.526992" lon="-2.751819"/>
+      <trkpt lat="47.527902" lon="-2.752174"/>
+      <trkpt lat="47.528750" lon="-2.753377"/>
+      <trkpt lat="47.528711" lon="-2.754172"/>
+      <trkpt lat="47.527927" lon="-2.755171"/>
+      <trkpt lat="47.527426" lon="-2.755545"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Pas de salage</name>
+    <extensions><gpx_style:line><gpx_style:color>FCF406</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Yellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.527426" lon="-2.755545"/>
+      <trkpt lat="47.528090" lon="-2.755388"/>
+      <trkpt lat="47.528877" lon="-2.754332"/>
+      <trkpt lat="47.528909" lon="-2.753280"/>
+      <trkpt lat="47.528053" lon="-2.751848"/>
+      <trkpt lat="47.527120" lon="-2.751576"/>
+      <trkpt lat="47.526448" lon="-2.747967"/>
+      <trkpt lat="47.525966" lon="-2.744036"/>
+      <trkpt lat="47.525646" lon="-2.741506"/>
+      <trkpt lat="47.525348" lon="-2.740318"/>
+      <trkpt lat="47.523998" lon="-2.736737"/>
+      <trkpt lat="47.523108" lon="-2.736185"/>
+      <trkpt lat="47.520924" lon="-2.732856"/>
+      <trkpt lat="47.518601" lon="-2.729426"/>
+      <trkpt lat="47.517712" lon="-2.728062"/>
+      <trkpt lat="47.517201" lon="-2.727066"/>
+      <trkpt lat="47.516811" lon="-2.725770"/>
+      <trkpt lat="47.516872" lon="-2.723138"/>
+      <trkpt lat="47.517057" lon="-2.720948"/>
+      <trkpt lat="47.516416" lon="-2.717301"/>
+      <trkpt lat="47.516417" lon="-2.714905"/>
+      <trkpt lat="47.516599" lon="-2.711603"/>
+      <trkpt lat="47.516496" lon="-2.710152"/>
+      <trkpt lat="47.516043" lon="-2.709162"/>
+      <trkpt lat="47.515214" lon="-2.707933"/>
+      <trkpt lat="47.513621" lon="-2.706936"/>
+      <trkpt lat="47.511127" lon="-2.702649"/>
+      <trkpt lat="47.510305" lon="-2.700879"/>
+      <trkpt lat="47.510255" lon="-2.697167"/>
+      <trkpt lat="47.510086" lon="-2.695894"/>
+      <trkpt lat="47.509606" lon="-2.694645"/>
+      <trkpt lat="47.508657" lon="-2.693518"/>
+      <trkpt lat="47.508097" lon="-2.692717"/>
+      <trkpt lat="47.508035" lon="-2.691627"/>
+      <trkpt lat="47.508103" lon="-2.689439"/>
+      <trkpt lat="47.506533" lon="-2.685194"/>
+      <trkpt lat="47.509204" lon="-2.685878"/>
+      <trkpt lat="47.512431" lon="-2.686649"/>
+      <trkpt lat="47.515457" lon="-2.687199"/>
+      <trkpt lat="47.516641" lon="-2.687468"/>
+      <trkpt lat="47.517613" lon="-2.688541"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.517613" lon="-2.688541"/>
+      <trkpt lat="47.517976" lon="-2.687439"/>
+      <trkpt lat="47.518588" lon="-2.680832"/>
+      <trkpt lat="47.519397" lon="-2.672163"/>
+      <trkpt lat="47.519815" lon="-2.667559"/>
+      <trkpt lat="47.519837" lon="-2.666706"/>
+      <trkpt lat="47.519358" lon="-2.661465"/>
+      <trkpt lat="47.519275" lon="-2.660401"/>
+      <trkpt lat="47.519463" lon="-2.658510"/>
+      <trkpt lat="47.520143" lon="-2.656444"/>
+      <trkpt lat="47.520794" lon="-2.655372"/>
+      <trkpt lat="47.521943" lon="-2.654382"/>
+      <trkpt lat="47.523421" lon="-2.653583"/>
+      <trkpt lat="47.524918" lon="-2.653000"/>
+      <trkpt lat="47.525678" lon="-2.652652"/>
+      <trkpt lat="47.525862" lon="-2.652458"/>
+      <trkpt lat="47.526027" lon="-2.652233"/>
+      <trkpt lat="47.526167" lon="-2.652348"/>
+      <trkpt lat="47.526201" lon="-2.652636"/>
+      <trkpt lat="47.526622" lon="-2.653508"/>
+      <trkpt lat="47.526888" lon="-2.655190"/>
+      <trkpt lat="47.527798" lon="-2.659123"/>
+      <trkpt lat="47.528255" lon="-2.660455"/>
+      <trkpt lat="47.530768" lon="-2.666768"/>
+      <trkpt lat="47.532034" lon="-2.670126"/>
+      <trkpt lat="47.532773" lon="-2.672001"/>
+      <trkpt lat="47.534283" lon="-2.671933"/>
+      <trkpt lat="47.535332" lon="-2.672216"/>
+      <trkpt lat="47.537381" lon="-2.671007"/>
+      <trkpt lat="47.538750" lon="-2.670268"/>
+      <trkpt lat="47.540676" lon="-2.669988"/>
+      <trkpt lat="47.542228" lon="-2.670238"/>
+      <trkpt lat="47.542996" lon="-2.670349"/>
+      <trkpt lat="47.543790" lon="-2.669891"/>
+      <trkpt lat="47.544387" lon="-2.669155"/>
+      <trkpt lat="47.545297" lon="-2.667911"/>
+      <trkpt lat="47.546055" lon="-2.667421"/>
+      <trkpt lat="47.548184" lon="-2.666534"/>
+      <trkpt lat="47.548934" lon="-2.665815"/>
+      <trkpt lat="47.549911" lon="-2.663608"/>
+      <trkpt lat="47.551630" lon="-2.662420"/>
+      <trkpt lat="47.552209" lon="-2.661626"/>
+      <trkpt lat="47.552573" lon="-2.660894"/>
+      <trkpt lat="47.553651" lon="-2.660181"/>
+      <trkpt lat="47.554746" lon="-2.657929"/>
+      <trkpt lat="47.555813" lon="-2.655445"/>
+      <trkpt lat="47.557332" lon="-2.654407"/>
+      <trkpt lat="47.558886" lon="-2.653431"/>
+      <trkpt lat="47.560808" lon="-2.651637"/>
+      <trkpt lat="47.562432" lon="-2.651209"/>
+      <trkpt lat="47.564736" lon="-2.646716"/>
+      <trkpt lat="47.567965" lon="-2.645059"/>
+      <trkpt lat="47.570576" lon="-2.643794"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Pas de salage</name>
+    <extensions><gpx_style:line><gpx_style:color>FCF406</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Yellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.570576" lon="-2.643794"/>
+      <trkpt lat="47.572547" lon="-2.639607"/>
+      <trkpt lat="47.573969" lon="-2.636960"/>
+      <trkpt lat="47.574352" lon="-2.635430"/>
+      <trkpt lat="47.575253" lon="-2.630387"/>
+      <trkpt lat="47.575736" lon="-2.627584"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.575736" lon="-2.627584"/>
+      <trkpt lat="47.576900" lon="-2.628278"/>
+      <trkpt lat="47.577666" lon="-2.628415"/>
+      <trkpt lat="47.577693" lon="-2.629446"/>
+      <trkpt lat="47.579947" lon="-2.629170"/>
+      <trkpt lat="47.583390" lon="-2.629077"/>
+      <trkpt lat="47.585035" lon="-2.628622"/>
+      <trkpt lat="47.588288" lon="-2.627652"/>
+      <trkpt lat="47.590861" lon="-2.625582"/>
+      <trkpt lat="47.592063" lon="-2.625481"/>
+      <trkpt lat="47.593191" lon="-2.623715"/>
+      <trkpt lat="47.596667" lon="-2.620540"/>
+      <trkpt lat="47.599256" lon="-2.618129"/>
+      <trkpt lat="47.602111" lon="-2.616602"/>
+      <trkpt lat="47.604683" lon="-2.615331"/>
+      <trkpt lat="47.607934" lon="-2.615216"/>
+      <trkpt lat="47.609040" lon="-2.614704"/>
+      <trkpt lat="47.610130" lon="-2.613734"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.610130" lon="-2.613734"/>
+      <trkpt lat="47.611121" lon="-2.613209"/>
+      <trkpt lat="47.612087" lon="-2.612397"/>
+      <trkpt lat="47.611972" lon="-2.611585"/>
+      <trkpt lat="47.610706" lon="-2.610595"/>
+      <trkpt lat="47.609646" lon="-2.609341"/>
+      <trkpt lat="47.608616" lon="-2.607462"/>
+      <trkpt lat="47.607270" lon="-2.604121"/>
+      <trkpt lat="47.605143" lon="-2.596929"/>
+      <trkpt lat="47.604044" lon="-2.594072"/>
+      <trkpt lat="47.604104" lon="-2.591222"/>
+      <trkpt lat="47.604106" lon="-2.590365"/>
+      <trkpt lat="47.603050" lon="-2.586599"/>
+      <trkpt lat="47.601946" lon="-2.583856"/>
+      <trkpt lat="47.601089" lon="-2.582395"/>
+      <trkpt lat="47.599683" lon="-2.581905"/>
+      <trkpt lat="47.598545" lon="-2.579045"/>
+      <trkpt lat="47.597044" lon="-2.574890"/>
+      <trkpt lat="47.596242" lon="-2.569837"/>
+      <trkpt lat="47.594774" lon="-2.565801"/>
+      <trkpt lat="47.593708" lon="-2.563862"/>
+      <trkpt lat="47.592976" lon="-2.561387"/>
+      <trkpt lat="47.592381" lon="-2.558470"/>
+      <trkpt lat="47.591270" lon="-2.555042"/>
+      <trkpt lat="47.590038" lon="-2.551716"/>
+      <trkpt lat="47.590102" lon="-2.549553"/>
+      <trkpt lat="47.588522" lon="-2.551101"/>
+      <trkpt lat="47.584550" lon="-2.551773"/>
+      <trkpt lat="47.579652" lon="-2.552405"/>
+      <trkpt lat="47.577755" lon="-2.552493"/>
+      <trkpt lat="47.573687" lon="-2.553553"/>
+      <trkpt lat="47.570228" lon="-2.554792"/>
+      <trkpt lat="47.567098" lon="-2.554009"/>
+      <trkpt lat="47.563385" lon="-2.552481"/>
+      <trkpt lat="47.560849" lon="-2.553815"/>
+      <trkpt lat="47.556622" lon="-2.554973"/>
+      <trkpt lat="47.553406" lon="-2.557606"/>
+      <trkpt lat="47.549361" lon="-2.561407"/>
+      <trkpt lat="47.548175" lon="-2.561968"/>
+      <trkpt lat="47.544957" lon="-2.561405"/>
+      <trkpt lat="47.539385" lon="-2.563220"/>
+      <trkpt lat="47.536321" lon="-2.564270"/>
+      <trkpt lat="47.532017" lon="-2.565419"/>
+      <trkpt lat="47.526808" lon="-2.569325"/>
+      <trkpt lat="47.524393" lon="-2.571354"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Salage</name>
+    <extensions><gpx_style:line><gpx_style:color>0956F9</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Blue</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.524393" lon="-2.571354"/>
+      <trkpt lat="47.525655" lon="-2.567966"/>
+      <trkpt lat="47.528133" lon="-2.562618"/>
+      <trkpt lat="47.530941" lon="-2.557194"/>
+      <trkpt lat="47.531844" lon="-2.554251"/>
+      <trkpt lat="47.532840" lon="-2.551189"/>
+      <trkpt lat="47.534502" lon="-2.547112"/>
+      <trkpt lat="47.535769" lon="-2.545047"/>
+      <trkpt lat="47.536648" lon="-2.542855"/>
+      <trkpt lat="47.537554" lon="-2.540213"/>
+      <trkpt lat="47.538233" lon="-2.537317"/>
+      <trkpt lat="47.539827" lon="-2.534672"/>
+      <trkpt lat="47.540886" lon="-2.533513"/>
+      <trkpt lat="47.542283" lon="-2.532573"/>
+      <trkpt lat="47.543464" lon="-2.531125"/>
+      <trkpt lat="47.544236" lon="-2.528454"/>
+      <trkpt lat="47.545244" lon="-2.525934"/>
+      <trkpt lat="47.546643" lon="-2.524353"/>
+      <trkpt lat="47.548173" lon="-2.523055"/>
+      <trkpt lat="47.550567" lon="-2.520808"/>
+      <trkpt lat="47.551421" lon="-2.519739"/>
+      <trkpt lat="47.553740" lon="-2.516441"/>
+      <trkpt lat="47.556003" lon="-2.512390"/>
+      <trkpt lat="47.557917" lon="-2.510918"/>
+      <trkpt lat="47.558344" lon="-2.510976"/>
+      <trkpt lat="47.557946" lon="-2.512845"/>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>Pas de salage</name>
+    <extensions><gpx_style:line><gpx_style:color>FCF406</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>Yellow</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <trkseg>
+      <trkpt lat="47.557946" lon="-2.512845"/>
+      <trkpt lat="47.558761" lon="-2.513186"/>
+      <trkpt lat="47.560037" lon="-2.514081"/>
+      <trkpt lat="47.560821" lon="-2.513927"/>
+    </trkseg>
+  </trk>
+</gpx>
