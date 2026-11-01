@@ -1912,11 +1912,15 @@
     }
     return dataCache[url];
   }
-  map.createPane("ref"); map.getPane("ref").style.zIndex = 350;
-  map.createPane("prpts"); map.getPane("prpts").style.zIndex = 360;
-  var refRenderer = L.canvas({ pane: "ref", padding: 0.3, tolerance: 8 });
-  var prRenderer = L.canvas({ pane: "prpts", padding: 0.3, tolerance: 6 });
-  var refLayerGeo = null, prGroup = L.layerGroup().addTo(map), prData = null, refWanted = 0, prWanted = 0;
+  // Un SEUL canvas pour OLD + référentiel + PR : avec un canvas par volet, celui du dessus (couvrant toute la carte)
+  // capte survol et clics et les couches du dessous (OLD) ne reçoivent plus rien (ni popup, ni curseur « main »).
+  map.createPane("vec"); map.getPane("vec").style.zIndex = 350;
+  var vecRenderer = L.canvas({ pane: "vec", padding: 0.3, tolerance: 8 });
+  var refRenderer = vecRenderer, prRenderer = vecRenderer, oldRenderer = vecRenderer;
+  var oldLayer = null, refLayerGeo = null;
+  // Ordre de dessin (donc de priorité au clic) : OLD en bas, référentiel au milieu, PR par-dessus
+  function vecOrder() { if (refLayerGeo) refLayerGeo.bringToBack(); if (oldLayer) oldLayer.bringToBack(); }
+  var prGroup = L.layerGroup().addTo(map), prData = null, refWanted = 0, prWanted = 0;
 
   function drawRefLegend(sitesSeen) {
     var leg = $("legendRef"); leg.innerHTML = "";
@@ -1949,6 +1953,7 @@
           });
         }
       }).addTo(map);
+      vecOrder();
       drawRefLegend(seen);
     }).catch(function () { if (token === refWanted) say("Référentiel indisponible : connexion nécessaire au premier chargement.", true); });
   }
@@ -1986,9 +1991,7 @@
   $("ovOp").oninput = function () { ov.op = parseInt(this.value, 10) || 100; syncOverlays(); };
 
   // ---------- OLD (obligations légales de débroussaillement) ----------
-  map.createPane("old"); map.getPane("old").style.zIndex = 340;
-  var oldRenderer = L.canvas({ pane: "old", padding: 0.3, tolerance: 6 });
-  var oldLayer = null, oldOn = false, oldOpacity = .7, oldWanted = 0;
+  var oldOn = false, oldOpacity = .7, oldWanted = 0;
   var OLD_COLOR = "#ffd43b";
   function oldStyle() { return { renderer: oldRenderer, color: "#c99700", weight: 1.5, opacity: Math.min(1, oldOpacity + .2), fillColor: OLD_COLOR, fillOpacity: oldOpacity * .55, bubblingMouseEvents: false }; }
   function oldPopup(p, ll) {
@@ -2012,7 +2015,7 @@
   function syncOld() {
     var token = ++oldWanted;
     if (!oldOn) { if (oldLayer) { map.removeLayer(oldLayer); oldLayer = null; } return; }
-    if (oldLayer) { oldLayer.setStyle(oldStyle()); if (!map.hasLayer(oldLayer)) oldLayer.addTo(map); return; }
+    if (oldLayer) { oldLayer.setStyle(oldStyle()); if (!map.hasLayer(oldLayer)) oldLayer.addTo(map); vecOrder(); return; }
     loadJson("donnees/old.json").then(function (fc) {
       if (token !== oldWanted || !oldOn || oldLayer) return;
       oldLayer = L.geoJSON(fc, {
@@ -2022,6 +2025,7 @@
           if (f.properties && f.properties.id) layer.bindTooltip(String(f.properties.id), { permanent: true, direction: "center", className: "old-lbl", interactive: false });
         }
       }).addTo(map);
+      vecOrder();
       oldLabelsZoom();
       say("OLD affichées (" + fc.features.length + " zones).");
     }).catch(function () { if (token === oldWanted) say("OLD indisponibles : connexion nécessaire au premier chargement.", true); });
