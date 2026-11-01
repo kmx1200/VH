@@ -151,6 +151,9 @@
   .measure-panel .row { display:flex; flex-wrap:wrap; gap:6px; }
   .measure-panel button { padding:9px 11px; }
   .measure-panel button:disabled { opacity:.45; cursor:not-allowed; }
+  .measure-panel button.busy { cursor:progress; opacity:.85; }
+  .measure-panel button.busy::before { content:""; display:inline-block; width:.85em; height:.85em; margin-right:7px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; vertical-align:-2px; animation:vhspin .7s linear infinite; }
+  @keyframes vhspin { to { transform:rotate(360deg); } }
   :root { --measure: #d90429; }   /* rouge des mesures (doit rester identique à MEASURE_COLOR dans le script) */
   #measureHead { display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; }
   #measureHead #measureValue { flex:1 1 auto; min-width:0; }
@@ -1635,9 +1638,23 @@
     return a;
   }
   function r2(v){return Math.round(v*100)/100;}
+  // Le bouton affiche « Export en cours… » avec une roue ; on laisse d'abord le navigateur l'afficher, puis on génère le fichier
+  var xlsBusy=false;
   function exportMeasuresXlsx(){
+    if(xlsBusy)return;
     var all=allMeasures();
     if(!all.length){say("Aucune mesure à exporter.",true);return;}
+    xlsBusy=true;
+    var b=$("measureXls"),label=b.textContent;
+    b.classList.add("busy");b.setAttribute("aria-busy","true");b.textContent="Export en cours…";
+    say("Export Excel en cours, merci de patienter…");
+    var done=function(){xlsBusy=false;b.classList.remove("busy");b.removeAttribute("aria-busy");b.textContent=label;};
+    requestAnimationFrame(function(){setTimeout(function(){
+      try{buildMeasuresXlsx(all,done);}
+      catch(err){done();say("Échec de l'export Excel.",true);if(window.console)console.error(err);}
+    },30);});
+  }
+  function buildMeasuresXlsx(all,done){
     var H=function(t){return {v:t,s:1};};
     var areas=all.filter(function(m){return m.type==="area";}),lines=all.filter(function(m){return m.type!=="area";});
     var sheets=[];
@@ -1687,7 +1704,7 @@
     a.href=URL.createObjectURL(zipStore(files));
     a.download="vhmaps-mesures-"+new Date().toISOString().slice(0,10)+".xlsx";
     a.click();
-    setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+    setTimeout(function(){URL.revokeObjectURL(a.href);done();},1000);   // l'indicateur reste le temps de la remise du fichier au navigateur
     say("Export Excel généré ("+all.length+" mesure"+(all.length>1?"s":"")+").");
   }
   $("measureXls").onclick=exportMeasuresXlsx;
