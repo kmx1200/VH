@@ -3,7 +3,7 @@
   <metadata><name>MU_6m3_Ouest_BC1</name></metadata>
   <trk>
     <name>Traitement</name>
-    <extensions><gpx_style:line><gpx_style:color>0EC87E</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>DarkCyan</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
+    <extensions><gpx_style:line><gpx_style:color>1D6FD8</gpx_style:color></gpx_style:line><gpxx:TrackExtension><gpxx:DisplayColor>DarkCyan</gpxx:DisplayColor></gpxx:TrackExtension></extensions>
     <trkseg>
       <trkpt lat="47.560802" lon="-2.514111"/>
       <trkpt lat="47.560134" lon="-2.514241"/>
