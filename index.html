@@ -208,7 +208,7 @@
   <b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span>
   <div id="measureTotals" hidden></div>
   <ul id="measureList" hidden></ul>
-  <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
+  <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx)" disabled>Export Excel</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
   <small id="measureHelp">Déplacez les poignées pour ajuster le tracé. Touchez un segment pour ajouter un sommet.</small>
 </div>
 
@@ -1381,6 +1381,7 @@
     var box=$("measureTotals");
     box.hidden=!(nl+na>1);   // un seul tracé : le total serait redondant
     box.textContent=parts.join(" · ");
+    $("measureXls").disabled=!(nl+na);
   }
   function commitMeasure(){
     if(!measureValid(measureType,measurePoints))return false;
@@ -1492,6 +1493,110 @@
     renderMeasureDone();
     setMeasure(null);
   };
+
+  // ---------- Export Excel (.xlsx) des mesures : généré dans le navigateur, sans bibliothèque (fonctionne hors ligne) ----------
+  var CRC_T=(function(){var t=[],c,n,k;for(n=0;n<256;n++){c=n;for(k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}return t;})();
+  function crc32(b){var c=0xFFFFFFFF;for(var i=0;i<b.length;i++)c=CRC_T[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+  function zipStore(files){   // archive ZIP sans compression : [{name, data:Uint8Array}]
+    var enc=new TextEncoder(),parts=[],central=[],offset=0,d=new Date();
+    var dt=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1),dd=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
+    files.forEach(function(f){
+      var name=enc.encode(f.name),crc=crc32(f.data),sz=f.data.length;
+      var h=new DataView(new ArrayBuffer(30));
+      h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(10,dt,true);h.setUint16(12,dd,true);
+      h.setUint32(14,crc,true);h.setUint32(18,sz,true);h.setUint32(22,sz,true);h.setUint16(26,name.length,true);
+      parts.push(new Uint8Array(h.buffer),name,f.data);
+      var c=new DataView(new ArrayBuffer(46));
+      c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(12,dt,true);c.setUint16(14,dd,true);
+      c.setUint32(16,crc,true);c.setUint32(20,sz,true);c.setUint32(24,sz,true);c.setUint16(28,name.length,true);c.setUint32(42,offset,true);
+      central.push(new Uint8Array(c.buffer),name);
+      offset+=30+name.length+sz;
+    });
+    var csize=0;central.forEach(function(q){csize+=q.length;});
+    var e=new DataView(new ArrayBuffer(22));
+    e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,csize,true);e.setUint32(16,offset,true);
+    return new Blob(parts.concat(central,[new Uint8Array(e.buffer)]),{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  }
+  function xlEsc(t){return String(t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  // Cellule : valeur simple, ou {v, s (style : 1 gras, 2 nombre 0,00, 3 coordonnée, 4 total gras), f (formule)}
+  function xlSheet(rows,widths){
+    var x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols>'+
+      widths.map(function(w,i){return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>';}).join("")+'</cols><sheetData>';
+    rows.forEach(function(r,ri){
+      x+='<row r="'+(ri+1)+'">';
+      r.forEach(function(c,ci){
+        if(c===null||c===undefined||c==="")return;
+        var o=(typeof c==="object")?c:{v:c},ref=String.fromCharCode(65+ci)+(ri+1),st=o.s?' s="'+o.s+'"':"";
+        if(o.f!==undefined)x+='<c r="'+ref+'"'+st+'><f>'+xlEsc(o.f)+'</f><v>'+o.v+'</v></c>';
+        else if(typeof o.v==="number")x+='<c r="'+ref+'"'+st+'><v>'+o.v+'</v></c>';
+        else x+='<c r="'+ref+'"'+st+' t="inlineStr"><is><t>'+xlEsc(o.v)+'</t></is></c>';
+      });
+      x+='</row>';
+    });
+    return x+'</sheetData></worksheet>';
+  }
+  function allMeasures(){
+    var a=measureDone.slice();
+    if(measureValid(measureType,measurePoints))a.push({type:measureType,points:measurePoints.slice()});
+    return a;
+  }
+  function r2(v){return Math.round(v*100)/100;}
+  function exportMeasuresXlsx(){
+    var all=allMeasures();
+    if(!all.length){say("Aucune mesure à exporter.",true);return;}
+    var H=function(t){return {v:t,s:1};};
+    var areas=all.filter(function(m){return m.type==="area";}),lines=all.filter(function(m){return m.type!=="area";});
+    var sheets=[];
+    if(areas.length){
+      var rows=[[H("N°"),H("Nom"),H("Surface (m²)"),H("Surface (ha)"),H("Périmètre (m)"),H("Nb sommets")]],tm=0,tp=0;
+      areas.forEach(function(m,i){
+        var a=r2(areaMeters(m.points)),per=r2(measureLength(m.points)+m.points[m.points.length-1].distanceTo(m.points[0])),n=i+2;
+        tm+=a;tp+=per;
+        rows.push([i+1,"Surface "+(i+1),{v:a,s:2},{f:"C"+n+"/10000",v:a/10000,s:2},{v:per,s:2},m.points.length]);
+      });
+      var last=areas.length+1;
+      rows.push([null,{v:"Total",s:1},{f:"SUM(C2:C"+last+")",v:r2(tm),s:4},{f:"SUM(D2:D"+last+")",v:tm/10000,s:4},{f:"SUM(E2:E"+last+")",v:r2(tp),s:4},null]);
+      sheets.push({name:"Surfaces",xml:xlSheet(rows,[6,16,16,16,16,13])});
+    }
+    if(lines.length){
+      var rl=[[H("N°"),H("Nom"),H("Distance (m)"),H("Distance (km)"),H("Nb points")]],td=0;
+      lines.forEach(function(m,i){
+        var d=r2(measureLength(m.points)),n=i+2;td+=d;
+        rl.push([i+1,"Distance "+(i+1),{v:d,s:2},{f:"C"+n+"/1000",v:d/1000,s:2},m.points.length]);
+      });
+      var ll=lines.length+1;
+      rl.push([null,{v:"Total",s:1},{f:"SUM(C2:C"+ll+")",v:r2(td),s:4},{f:"SUM(D2:D"+ll+")",v:td/1000,s:4},null]);
+      sheets.push({name:"Distances",xml:xlSheet(rl,[6,16,16,16,13])});
+    }
+    var rs=[[H("Mesure"),H("Type"),H("N° sommet"),H("Latitude (WGS84)"),H("Longitude (WGS84)")]],na=0,nl=0;
+    all.forEach(function(m){
+      var isA=m.type==="area",name=(isA?"Surface ":"Distance ")+(isA?++na:++nl);
+      m.points.forEach(function(pt,i){rs.push([name,isA?"Surface":"Distance",i+1,{v:pt.lat,s:3},{v:pt.lng,s:3}]);});
+    });
+    sheets.push({name:"Sommets",xml:xlSheet(rs,[16,12,12,18,18])});
+
+    var NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',R='http://schemas.openxmlformats.org/officeDocument/2006/relationships',X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    var files=[
+      {name:"[Content_Types].xml",txt:X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
+        sheets.map(function(_,i){return '<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';}).join("")+'</Types>'},
+      {name:"_rels/.rels",txt:X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+R+'/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+      {name:"xl/workbook.xml",txt:X+'<workbook '+NS+' xmlns:r="'+R+'"><sheets>'+sheets.map(function(sh,i){return '<sheet name="'+sh.name+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>';}).join("")+'</sheets></workbook>'},
+      {name:"xl/_rels/workbook.xml.rels",txt:X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+        sheets.map(function(_,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+R+'/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>';}).join("")+
+        '<Relationship Id="rId'+(sheets.length+1)+'" Type="'+R+'/styles" Target="styles.xml"/></Relationships>'},
+      {name:"xl/styles.xml",txt:X+'<styleSheet '+NS+'><numFmts count="1"><numFmt numFmtId="164" formatCode="0.000000"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="2" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'}
+    ];
+    sheets.forEach(function(sh,i){files.push({name:"xl/worksheets/sheet"+(i+1)+".xml",txt:sh.xml});});
+    var enc=new TextEncoder();
+    files.forEach(function(f){f.data=enc.encode(f.txt);});
+    var a=document.createElement("a");
+    a.href=URL.createObjectURL(zipStore(files));
+    a.download="vhmaps-mesures-"+new Date().toISOString().slice(0,10)+".xlsx";
+    a.click();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+    say("Export Excel généré ("+all.length+" mesure"+(all.length>1?"s":"")+").");
+  }
+  $("measureXls").onclick=exportMeasuresXlsx;
 
   // ---------- Parcelles cadastrales IGN ----------
   var cadastreLayer=null,cadastreOn=false,cadastreOpacity=.85;
