@@ -254,6 +254,7 @@
       <option value="osm">OpenStreetMap (en ligne uniquement)</option>
     </select>
   </label>
+  <label>Opacité du fond de carte <input type="range" id="baseOp" min="10" max="100" step="5" value="100"></label>
   <h3>Superpositions</h3>
   <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
   <label class="chk"><input type="checkbox" id="ovPr"> PR (points et numéros)</label>
@@ -359,6 +360,8 @@
   });
   var BKEY = "vhmaps-base", baseKey = "ign", baseLayer = null;
   try { var sb = localStorage.getItem(BKEY); if (BASES[sb]) baseKey = sb; } catch (e) {}
+  var BOKEY = "vhmaps-base-op", baseOpacity = 1;
+  try { var bo = Number(localStorage.getItem(BOKEY)); if (bo >= 10 && bo <= 100) baseOpacity = bo / 100; } catch (e) {}
   function setBase(k, fit) {
     if (!BASES[k]) return;
     var b = BASES[k];
@@ -367,6 +370,7 @@
     baseLayer = (b.pack
       ? new PackLayer({ pack: b.pack, maxZoom: 21, maxNativeZoom: b.native, minZoom: 0, className: b.cls, attribution: b.attr })
       : L.tileLayer(b.url, { maxZoom: 21, maxNativeZoom: b.native, className: b.cls, attribution: b.attr })).addTo(map);
+    baseLayer.setOpacity(baseOpacity);
     baseLayer.bringToBack();
     if (b.pack) setTimeout(function () {
       if (baseKey !== k) return;
@@ -382,6 +386,13 @@
     try { localStorage.setItem(BKEY, k); } catch (e) {}
   }
   setBase(baseKey);
+  var baseOpEl = document.getElementById("baseOp");
+  baseOpEl.value = Math.round(baseOpacity * 100);
+  baseOpEl.oninput = function () {
+    baseOpacity = Number(this.value) / 100;
+    if (baseLayer) baseLayer.setOpacity(baseOpacity);
+    try { localStorage.setItem(BOKEY, this.value); } catch (e) {}
+  };
   var refLayer = L.featureGroup().addTo(map);
   var line = L.polyline([], { color: "#d6336c", weight: 5 }).addTo(map);
   var marker = null;
