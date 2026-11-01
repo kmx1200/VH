@@ -2379,6 +2379,13 @@
   syncSheet();
   window.addEventListener("resize", syncSheet);
   if (window.ResizeObserver) new ResizeObserver(syncSheet).observe(document.querySelector(".sheet"));
+  // Boussole : visible uniquement quand la fenêtre de suivi l'est (itinéraire choisi ou enregistrement en cours)
+  (function () {
+    var sh = document.querySelector(".sheet"), cp = $("compass");
+    function syncCompass() { cp.hidden = sh.hidden; }
+    syncCompass();
+    new MutationObserver(syncCompass).observe(sh, { attributes: true, attributeFilter: ["hidden"] });
+  })();
 
   // Info-bulles sur écran tactile : appui long (≈ 0,5 s) sur un bouton ; le toucher qui suit n'active pas le bouton
   (function () {
