@@ -145,6 +145,11 @@
   .measure-panel button { padding:9px 11px; }
   .measure-panel button:disabled { opacity:.45; cursor:not-allowed; }
   :root { --measure: #d90429; }   /* rouge des mesures (doit rester identique à MEASURE_COLOR dans le script) */
+  #measureHead { display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; }
+  #measureHead #measureValue { flex:1 1 auto; min-width:0; }
+  #measureHead #measureFold { padding:4px 12px; margin-left:auto; font-size:1.1rem; line-height:1.2; }
+  .measure-panel.folded { right:auto; }
+  .measure-panel.folded > :not(#measureHead):not(#measureTotals) { display:none; }
   .measure-panel ul { list-style:none; margin:0; padding:0; max-height:8.5em; overflow:auto; display:grid; gap:4px; }
   .measure-panel li { display:flex; gap:6px; }
   .measure-panel li .ml-go { flex:1; text-align:left; padding:6px 10px; }
@@ -205,7 +210,7 @@
   <button id="measureArea" class="tool" data-help="Posez au moins 3 points pour mesurer une surface." aria-label="Mesurer une surface">□</button>
 </div>
 <div id="measurePanel" class="measure-panel" hidden>
-  <b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span>
+  <div id="measureHead"><b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span><button id="measureFold" class="ghost" aria-expanded="true" aria-label="Réduire la fenêtre de mesure" title="Réduire pour mieux voir la carte (les tracés sont conservés)">▾</button></div>
   <div id="measureTotals" hidden></div>
   <ul id="measureList" hidden></ul>
   <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx)" disabled>Export Excel</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
@@ -1450,6 +1455,7 @@
     $("measurePanel").hidden=!mode&&!measurePoints.length&&!measureDone.length;
     $("measureTitle").textContent=measureType==="line"?"Mesure linéaire":"Mesure surfacique";
     $("measureLine").classList.toggle("live",measureMode==="line");$("measureArea").classList.toggle("live",measureMode==="area");
+    if(mode)foldMeasure(false);
     if(mode){say("Mode mesure activé : cliquez pour ajouter des points. « Nouveau tracé » valide celui-ci et en démarre un autre, cumulé au total.");}
     drawMeasure();
   }
@@ -1458,6 +1464,16 @@
     if(insertMeasurePoint(e))return;
     measurePoints.push(e.latlng);measureSelected=-1;drawMeasure();
   });
+  // Réduire / rouvrir la fenêtre sans toucher aux tracés
+  function foldMeasure(fold){
+    var pnl=$("measurePanel"),b=$("measureFold");
+    pnl.classList.toggle("folded",!!fold);
+    b.textContent=fold?"▴":"▾";
+    b.setAttribute("aria-expanded",fold?"false":"true");
+    b.setAttribute("aria-label",fold?"Rouvrir la fenêtre de mesure":"Réduire la fenêtre de mesure");
+    b.title=fold?"Rouvrir la fenêtre de mesure":"Réduire pour mieux voir la carte (les tracés sont conservés)";
+  }
+  $("measureFold").onclick=function(){foldMeasure(!$("measurePanel").classList.contains("folded"));};
   $("measureLine").onclick=function(){setMeasure(measureMode==="line"?null:"line");};
   $("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
   $("measureUndo").onclick=function(){if(measurePoints.length){measurePoints.pop();measureSelected=-1;drawMeasure();}};
@@ -1490,6 +1506,7 @@
     measurePoints=[];
     measureSelected=-1;
     measureDone=[];
+    foldMeasure(false);
     renderMeasureDone();
     setMeasure(null);
   };
