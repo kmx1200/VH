@@ -147,7 +147,13 @@
   .shot-toast.on { opacity: 1; }
   .tool:disabled { opacity: .55; cursor: progress; }
   .tool.live { color: var(--go); border-color: var(--go); }
-  .measure-panel { position:absolute; z-index:1200; left:10px; right:10px; bottom:calc(var(--sheet-h, 0px) + 12px); max-width:460px;
+  .guide { position:absolute; z-index:1200; left:10px; right:10px; bottom:calc(var(--sheet-h, 0px) + 12px); max-width:460px; padding:12px; display:grid; gap:8px;
+    background:var(--surface-a); color:var(--ink); border:1px solid var(--line); border-radius:14px; box-shadow:0 3px 14px rgba(0,0,0,.22); }
+  .guide .gd-main { font-weight:700; font-size:1.05rem; line-height:1.25; }
+  .guide .gd-sub { font-size:.85rem; opacity:.85; }
+  .guide .row { flex-wrap:wrap; gap:6px; }
+  .guide button { padding:9px 11px; }
+  .measure-panel { position:absolute; z-index:1200; left:10px; right:10px; bottom:calc(var(--sheet-h, 0px) + var(--guide-h, 0px) + 12px); max-width:460px;
     padding:12px; display:grid; gap:8px; background:var(--surface-a); color:var(--ink); border:1px solid var(--line);
     border-radius:14px; box-shadow:0 3px 14px rgba(0,0,0,.22); }
   .measure-panel .row { display:flex; flex-wrap:wrap; gap:6px; }
@@ -230,6 +236,17 @@
   <ul id="measureList" hidden></ul>
   <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx)" disabled>Export Excel</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
   <small id="measureHelp">Déplacez les poignées pour ajuster le tracé. Touchez un segment pour ajouter un sommet.</small>
+</div>
+
+<div class="guide" id="guide" role="status" aria-live="polite" hidden>
+  <div class="gd-main" id="gdMain"></div>
+  <div class="gd-sub" id="gdSub"></div>
+  <div class="row">
+    <button id="gdStop">Arrêter</button>
+    <button id="gdRecenter" class="ghost">Recentrer</button>
+    <button id="gdVoice" class="ghost" aria-pressed="false">Voix : non</button>
+    <button id="gdMaps" class="ghost" data-tip="Ouvrir ce trajet dans Google Maps pour la navigation guidée">Google Maps</button>
+  </div>
 </div>
 
 <section class="sheet" id="sheet" hidden>
@@ -2064,15 +2081,149 @@
     else window.prompt("Copiez ce lien d’itinéraire :",shareData.url);
   };
   $("shareClose").onclick=function(){$("shareDlg").close();};
-  function startGuidance(r){destination={lat:r.lat,lng:r.lon,label:r.label};if(guidanceLine)map.removeLayer(guidanceLine);if(guidanceMarker)map.removeLayer(guidanceMarker);guidanceMarker=L.marker([r.lat,r.lon]).addTo(map).bindPopup("Destination : "+r.label).openPopup();
-    if(guidanceWatch!==null)navigator.geolocation.clearWatch(guidanceWatch);if(!navigator.geolocation){say("Géolocalisation indisponible sur cet appareil.",true);return;}say("Calcul de l’itinéraire…");
-    navigator.geolocation.getCurrentPosition(function(pos){var origin=L.latLng(pos.coords.latitude,pos.coords.longitude),dest=L.latLng(r.lat,r.lon);if(guidanceOrigin)map.removeLayer(guidanceOrigin);
-      guidanceOrigin=L.circleMarker(origin,{radius:8,color:"#fff",weight:3,fillColor:"#1976d2",fillOpacity:1}).addTo(map).bindTooltip("Votre position");var straight=origin.distanceTo(dest);
-      guidanceLine=L.polyline([origin,dest],{color:"#1976d2",weight:5,dashArray:"8 6"}).addTo(map);map.fitBounds(L.latLngBounds(origin,dest).pad(.18));
-      var api="https://router.project-osrm.org/route/v1/driving/"+origin.lng+","+origin.lat+";"+dest.lng+","+dest.lat+"?overview=full&geometries=geojson";
-      fetch(api).then(function(x){if(!x.ok)throw Error();return x.json();}).then(function(j){if(j.routes&&j.routes[0]){var rt=j.routes[0];guidanceLine.setLatLngs(rt.geometry.coordinates.map(function(c){return[c[1],c[0]];}));say("Itinéraire : "+fmtDistance(rt.distance)+" · durée estimée "+Math.round(rt.duration/60)+" min.");}else say("Distance à vol d’oiseau : "+fmtDistance(straight)+".");}).catch(function(){say("Guidage indicatif : "+fmtDistance(straight)+" à vol d’oiseau. Service de routage indisponible.");});
-      guidanceWatch=navigator.geolocation.watchPosition(function(p){var here=L.latLng(p.coords.latitude,p.coords.longitude),left=here.distanceTo(dest),dir=compassText(bearing(here,dest));if(guidanceOrigin)guidanceOrigin.setLatLng(here);say("Vers "+r.label+" · reste "+fmtDistance(left)+" · direction "+dir+".");},function(){},{enableHighAccuracy:true,maximumAge:5000,timeout:15000});
-    },function(){say("Autorisez la géolocalisation pour démarrer le guidage.",true);},{enableHighAccuracy:true,timeout:15000});}
+  // ---------- Guidage vers un lieu recherché (itinéraire routier, consignes, recalcul) ----------
+  var gd = null, gdVoice = false, GD_REACHED = 25, GD_OFF = 60;
+  function gdDir(mod) {
+    return ({ "left": "à gauche", "right": "à droite", "slight left": "légèrement à gauche", "slight right": "légèrement à droite",
+      "sharp left": "franchement à gauche", "sharp right": "franchement à droite", "straight": "tout droit" })[mod] || "";
+  }
+  function gdText(s) {
+    var m = s.maneuver || {}, t = m.type, d = gdDir(m.modifier), on = s.name ? " sur " + s.name : "";
+    if (t === "arrive") return "Vous êtes arrivé à destination";
+    if (m.modifier === "uturn") return "Faites demi-tour" + on;
+    if (t === "roundabout" || t === "rotary" || t === "roundabout turn") return "Au rond-point, prenez la sortie " + (m.exit || "suivante") + on;
+    if (t === "fork") return "À l’embranchement, prenez " + (/left/.test(m.modifier || "") ? "à gauche" : "à droite") + on;
+    if (t === "on ramp" || t === "off ramp") return "Prenez la bretelle " + d + on;
+    if (t === "merge") return "Insérez-vous" + on;
+    if ((t === "turn" || t === "end of road") && d && d !== "tout droit") return "Tournez " + d + on;
+    if (t === "depart") return "Partez" + on;
+    return "Continuez " + (d || "tout droit") + on;
+  }
+  function gdSegDist(p, a, b) {   // distance (m) d'un point au segment [a,b] ; a et b = [lat, lon]
+    var k = Math.cos(p.lat * Math.PI / 180), mx = 111320;
+    var ax = (a[1] - p.lon) * k * mx, ay = (a[0] - p.lat) * mx, bx = (b[1] - p.lon) * k * mx, by = (b[0] - p.lat) * mx;
+    var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    var t = l2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / l2)) : 0, cx = ax + t * dx, cy = ay + t * dy;
+    return Math.sqrt(cx * cx + cy * cy);
+  }
+  function gdOffRoute(p) {
+    var c = gd.coords, best = Infinity;
+    for (var i = 1; i < c.length; i++) { var d = gdSegDist(p, c[i - 1], c[i]); if (d < best) best = d; }
+    return best;
+  }
+  function gdSync() {
+    var g = $("guide");
+    document.documentElement.style.setProperty("--guide-h", (g.hidden ? 0 : g.offsetHeight + 8) + "px");
+  }
+  function gdShow(main, sub) {
+    $("guide").hidden = false; $("gdMain").textContent = main; $("gdSub").textContent = sub || ""; gdSync();
+  }
+  function gdSpeak(t) {
+    try { if (!gdVoice || !window.speechSynthesis) return; speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(t); u.lang = "fr-FR"; speechSynthesis.speak(u); } catch (e) {}
+  }
+  function gdRoute(from, dest, cb) {
+    var api = "https://router.project-osrm.org/route/v1/driving/" + from.lng + "," + from.lat + ";" + dest.lng + "," + dest.lat + "?overview=full&geometries=geojson&steps=true";
+    fetch(api).then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) { if (!(j.routes && j.routes[0])) throw 0; cb(j.routes[0]); })
+      .catch(function () { cb(null); });
+  }
+  function gdApply(rt) {
+    gd.coords = rt.geometry.coordinates.map(function (c) { return [c[1], c[0]]; });
+    gd.steps = (rt.legs && rt.legs[0] && rt.legs[0].steps) || [];
+    gd.idx = 0; gd.dist = rt.distance; gd.dur = rt.duration; gd.spoken = {}; gd.off = 0; gd.noRoute = false;
+    guidanceLine.setLatLngs(gd.coords); guidanceLine.setStyle({ dashArray: null });
+  }
+  function gdUpdate(here, acc) {
+    if (!gd || gd.error) return;
+    gd.here = here;
+    if (guidanceOrigin) guidanceOrigin.setLatLng(here);
+    if (gd.follow) map.panTo(here);
+    var me = { lat: here.lat, lon: here.lng }, straight = here.distanceTo(gd.dest), st = gd.steps, n = st.length;
+    if (straight < 30) {
+      gdShow("Vous êtes arrivé à destination", gd.label);
+      if (!gd.arrived) { gd.arrived = true; gdSpeak("Vous êtes arrivé à destination"); }
+      return;
+    }
+    gd.arrived = false;
+    if (!n) {
+      gdShow(fmtDistance(straight) + " · direction " + compassText(bearing(me, { lat: gd.dest.lat, lon: gd.dest.lng })),
+        (gd.noRoute ? "Itinéraire routier indisponible : guidage indicatif · " : "Calcul de l’itinéraire… · ") + gd.label);
+      return;
+    }
+    while (gd.idx + 1 < n - 1) {
+      var l = st[gd.idx + 1].maneuver.location;
+      if (haversine(me, { lat: l[1], lon: l[0] }) < GD_REACHED) gd.idx++; else break;
+    }
+    var nx = st[Math.min(gd.idx + 1, n - 1)], loc = nx.maneuver.location, dn = haversine(me, { lat: loc[1], lon: loc[0] });
+    var remain = dn; for (var j = gd.idx + 1; j < n; j++) remain += st[j].distance || 0;
+    var mins = Math.max(1, Math.round(gd.dur * (remain / Math.max(gd.dist, 1)) / 60));
+    var txt = gdText(nx), isArrive = nx.maneuver.type === "arrive";
+    gdShow(fmtDistance(dn) + " · " + txt, "Reste " + fmtDistance(remain) + " · environ " + mins + " min · vers " + gd.label);
+    if (dn <= 250 && !gd.spoken[gd.idx]) {
+      gd.spoken[gd.idx] = 1;
+      var rd = Math.max(10, Math.round(dn / 10) * 10);
+      gdSpeak(isArrive ? "Destination dans " + rd + " mètres" : "Dans " + rd + " mètres, " + txt.charAt(0).toLowerCase() + txt.slice(1));
+    }
+    // Sortie d'itinéraire : recalcul depuis la position actuelle
+    if (!(acc > 50)) {
+      gd.off = gdOffRoute(me) > GD_OFF ? gd.off + 1 : 0;
+      if (gd.off >= 3 && Date.now() - gd.lastCalc > 15000) {
+        gd.lastCalc = Date.now(); gd.off = 0;
+        gdShow("Recalcul de l’itinéraire…", gd.label);
+        gdRoute(here, gd.dest, function (rt) { if (gd && rt) { gdApply(rt); gdUpdate(here, acc); } });
+      }
+    }
+  }
+  function stopGuidance(silent) {
+    if (guidanceWatch !== null) { try { navigator.geolocation.clearWatch(guidanceWatch); } catch (e) {} guidanceWatch = null; }
+    [guidanceLine, guidanceMarker, guidanceOrigin].forEach(function (l) { if (l) map.removeLayer(l); });
+    guidanceLine = guidanceMarker = guidanceOrigin = null;
+    gd = null;
+    $("guide").hidden = true; gdSync();
+    try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
+    if (wakeLock && startedAt === null) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    if (!silent) say("Guidage arrêté.");
+  }
+  function startGuidance(r) {
+    stopGuidance(true);
+    destination = { lat: r.lat, lng: r.lon, label: r.label };
+    if (!navigator.geolocation) { say("Géolocalisation indisponible sur cet appareil.", true); return; }
+    guidanceMarker = L.marker([r.lat, r.lon]).addTo(map).bindPopup("Destination : " + r.label);
+    gd = { dest: L.latLng(r.lat, r.lon), label: r.label, steps: [], coords: [], idx: 0, dist: 0, dur: 0, follow: false, off: 0, lastCalc: 0, spoken: {}, noRoute: false };
+    gdShow("Recherche de votre position…", "Vers " + r.label);
+    lockScreen();
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      if (!gd) return;
+      var origin = L.latLng(pos.coords.latitude, pos.coords.longitude);
+      guidanceOrigin = L.circleMarker(origin, { radius: 8, color: "#fff", weight: 3, fillColor: "#1976d2", fillOpacity: 1 }).addTo(map).bindTooltip("Votre position");
+      guidanceLine = L.polyline([origin, gd.dest], { color: "#1976d2", weight: 5, dashArray: "8 6" }).addTo(map);
+      map.fitBounds(L.latLngBounds(origin, gd.dest).pad(.18));
+      gdShow("Calcul de l’itinéraire…", "Vers " + r.label);
+      gdRoute(origin, gd.dest, function (rt) {
+        if (!gd) return;
+        if (rt) { gdApply(rt); gd.follow = true; map.setView(origin, Math.max(map.getZoom(), 16)); } else gd.noRoute = true;
+        gdUpdate(gd.here || origin, 0);
+      });
+      guidanceWatch = navigator.geolocation.watchPosition(function (p) {
+        gdUpdate(L.latLng(p.coords.latitude, p.coords.longitude), p.coords.accuracy);
+      }, function () {}, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+    }, function () {
+      if (!gd) return;
+      gd.error = true; gdShow("Autorisez la géolocalisation pour démarrer le guidage.", "Vers " + r.label);
+    }, { enableHighAccuracy: true, timeout: 15000 });
+  }
+  $("gdStop").onclick = function () { stopGuidance(); };
+  $("gdRecenter").onclick = function () { if (gd) { gd.follow = true; if (gd.here) map.panTo(gd.here); } };
+  $("gdVoice").onclick = function () {
+    gdVoice = !gdVoice; this.textContent = "Voix : " + (gdVoice ? "oui" : "non"); this.setAttribute("aria-pressed", gdVoice ? "true" : "false");
+    if (gdVoice) gdSpeak("Guidage vocal activé"); else { try { speechSynthesis.cancel(); } catch (e) {} }
+  };
+  $("gdMaps").onclick = function () {
+    if (!destination) return;
+    window.open("https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(destination.lat + "," + destination.lng) + "&travelmode=driving", "_blank", "noopener");
+  };
+  map.on("dragstart", function () { if (gd) gd.follow = false; });
+  window.addEventListener("resize", gdSync);
 
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
