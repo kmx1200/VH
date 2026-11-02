@@ -2133,6 +2133,16 @@
     }
     return false;
   }
+  // Jointivité : en mesure surfacique, aimante un point sur le sommet le plus proche d'un autre polygone déjà validé
+  function msAreaSnap(ll){
+    if(measureType!=="area")return null;
+    var p=map.latLngToContainerPoint(ll),best=Infinity,r=null,tol=L.Browser.touch?20:14;
+    measureDone.forEach(function(m){
+      if(m.type!=="area")return;
+      m.points.forEach(function(v){var d=p.distanceTo(map.latLngToContainerPoint(v));if(d<best&&d<=tol){best=d;r=v;}});
+    });
+    return r?L.latLng(r.lat,r.lng):null;
+  }
   function measureValid(t,pts){return !!t&&pts.length>=(t==="area"?3:2);}
   function measureVal(t,pts){return t==="area"?areaMeters(pts):measureLength(pts);}
   function measureFmt(t,v){return t==="area"?fmtArea(v):fmtDistance(v);}
@@ -2214,13 +2224,14 @@
       var lastOk=p;
       marker.on("drag",function(e){
         var ll=e.target.getLatLng();
+        var sn0=msAreaSnap(ll);if(sn0){ll=sn0;e.target.setLatLng(ll);}
         if(measureType==="area"){
           var cand=measurePoints.slice();cand[i]=ll;
           if(polyCrosses(cand)){e.target.setLatLng(lastOk);return;}
           lastOk=ll;
         }
         measurePoints[i]=e.target.getLatLng();if(measureShape)measureShape.setLatLngs(validArea?measurePoints:measureGeom(measurePoints));updateMeasureValue();});
-      marker.on("dragend",function(e){var ll=e.target.getLatLng();if(measureType==="area"&&polyCrosses(measurePoints.map(function(q,k){return k===i?ll:q;})))ll=lastOk;if(measureType==="line")ll=msResnap(ll);measurePoints[i]=ll;drawMeasure();});
+      marker.on("dragend",function(e){var ll=e.target.getLatLng();var sn1=msAreaSnap(ll);if(sn1)ll=sn1;if(measureType==="area"&&polyCrosses(measurePoints.map(function(q,k){return k===i?ll:q;})))ll=lastOk;if(measureType==="line")ll=msResnap(ll);measurePoints[i]=ll;drawMeasure();});
       measureMarkers.push(marker);
     });
     updateMeasureValue();
@@ -2245,8 +2256,9 @@
     if(!measureMode)return;
     if(insertMeasurePoint(e))return;
     var last=measurePoints.length?measurePoints[measurePoints.length-1]:null;
-    if(measureType==="area"&&polyCrosses(measurePoints.concat([e.latlng]))){say("Point refusé : le polygone ne doit pas se croiser.",true);return;}
-    measurePoints.push(measureType==="line"?msResnap(e.latlng,last&&last.snap):e.latlng);measureSelected=-1;drawMeasure();
+    var np=msAreaSnap(e.latlng)||e.latlng;
+    if(measureType==="area"&&polyCrosses(measurePoints.concat([np]))){say("Point refusé : le polygone ne doit pas se croiser.",true);return;}
+    measurePoints.push(measureType==="line"?msResnap(e.latlng,last&&last.snap):np);measureSelected=-1;drawMeasure();
     if(msLast)msUpdate(msLast.ll,msLast.cp);
   });
   // --- Ligne élastique : dernier point cliqué → curseur (mesures linéaire et surfacique), accrochée au référentiel en mesure linéaire ---
@@ -2260,7 +2272,8 @@
   function msUpdate(ll, cp) {
     if (!measureMode) { msRubHide(); return; }
     var last = measurePoints.length ? measurePoints[measurePoints.length - 1] : null;
-    var sn = (measureType === "line" && msWanted()) ? msSnapAt(ll, last && last.snap) : null, tgt = sn ? sn.ll : ll, pts = null, html = "";
+    var sn = (measureType === "line" && msWanted()) ? msSnapAt(ll, last && last.snap) : null, tgt = sn ? sn.ll : ll, pts = null, html = "", asn = (measureType === "area") ? msAreaSnap(ll) : null;
+    if (asn) tgt = asn;
     msRub.clearLayers();
     if (last) {
       var path = sn && last.snap && last.snap.axe === sn.axe && last.snap.ci === sn.ci ? msSub(sn.c, sn.ci, last.snap.s, sn.s) : null;
@@ -2268,6 +2281,7 @@
       msLine.setLatLngs(pts); msRub.addLayer(msLine);
     }
     if (measureType === "area" && measurePoints.length >= 2) { msClose.setLatLngs([tgt, measurePoints[0]]); msRub.addLayer(msClose); }
+    if (asn) { msDot.setLatLng(asn); msRub.addLayer(msDot); html += "<b>Sommet voisin</b><br>"; }
     if (sn) { msDot.setLatLng(sn.ll); msRub.addLayer(msDot); html += "<b>" + esc(shortRoute(sn.axe)) + "</b> · " + msPrTxt(msPr(sn.c, sn.ci, sn.s)) + "<br>"; }
     if (last) {
       var seg = msPathLen(pts);
