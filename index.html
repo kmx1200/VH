@@ -114,6 +114,9 @@
   .pk-tip { position: absolute; z-index: 1150; pointer-events: none; padding: 5px 9px; border-radius: 9px; background: var(--surface-a);
     color: var(--ink); border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(0,0,0,.25); font-size: .82rem; line-height: 1.35; white-space: nowrap; }
   .pk-tip small { opacity: .7; }
+  .ms-modes { display:flex; gap:6px; }
+  .ms-modes button { flex:1; padding:8px 10px; }
+  .ms-modes button[aria-pressed="true"] { background:var(--ink); color:var(--paper); }
   .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--ink); }
   .leaflet-popup-content a { color: var(--go); font-weight: 600; }
   .searchbar { position: absolute; z-index: 1100; left: 10px; right: 10px; top: calc(62px + env(safe-area-inset-top, 0px));
@@ -147,6 +150,19 @@
   .shot-toast.on { opacity: 1; }
   .tool:disabled { opacity: .55; cursor: progress; }
   .tool.live { color: var(--go); border-color: var(--go); }
+  .recens { position:absolute; z-index:1190; left:10px; right:10px; max-width:460px; bottom:calc(var(--sheet-h, 0px) + var(--guide-h, 0px) + var(--measure-h, 0px) + 12px);
+    padding:12px; display:grid; gap:8px; max-height:62vh; overflow:auto; background:var(--surface-a); color:var(--ink); border:1px solid var(--line); border-radius:14px; box-shadow:0 3px 14px rgba(0,0,0,.22); }
+  .recens .rc-head { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:.95rem; }
+  .recens .rc-head span { flex:1; text-align:right; font-size:.85rem; opacity:.85; }
+  .recens .rc-live { font-size:.9rem; font-weight:600; min-height:1.2em; }
+  .recens .rc-start { padding:14px; font-size:1.05rem; font-weight:700; }
+  .recens .rc-stop { background:#c62828; color:#fff; }
+  .recens .rc-list { list-style:none; margin:0; padding:0; display:grid; gap:4px; max-height:26vh; overflow:auto; }
+  .recens .rc-list li { display:flex; gap:6px; }
+  .recens .rc-go { flex:1; text-align:left; font-size:.85rem; padding:7px 9px; }
+  .recens .rc-del { padding:7px 10px; }
+  .recens .row { flex-wrap:wrap; gap:6px; }
+  .recens.min .rc-list, .recens.min .rc-actions { display:none; }
   .guide { position:absolute; z-index:1200; left:10px; right:10px; bottom:calc(var(--sheet-h, 0px) + 12px); max-width:460px; padding:12px; display:grid; gap:8px;
     background:var(--surface-a); color:var(--ink); border:1px solid var(--line); border-radius:14px; box-shadow:0 3px 14px rgba(0,0,0,.22); }
   .guide .gd-main { font-weight:700; font-size:1.05rem; line-height:1.25; }
@@ -220,6 +236,7 @@
   <button id="search" class="tool" data-help="Cherchez une adresse, un lieu ou des coordonnées, puis centrez la carte dessus." aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
   <button id="locate" class="tool" data-help="Affiche votre position et votre direction sans enregistrer de tracé. Touchez de nouveau pour désactiver." aria-pressed="false" aria-label="Activer ma position"></button>
   <button id="trace" class="tool" data-help="Enregistre et affiche le chemin que vous parcourez à partir de votre position, sans suivre de circuit. Touchez de nouveau pour arrêter." aria-pressed="false" aria-label="Tracer mon parcours"></button>
+  <button id="rcBtn" class="tool" data-help="Recensement linéaire : parcourez la route et marquez le début et la fin de chaque segment. Longueurs, PR et abscisses, export Excel et QGIS." aria-pressed="false" aria-label="Recensement linéaire"></button>
   <button id="fs" class="tool" data-help="Masque la barre du navigateur pour agrandir la carte." aria-pressed="false" aria-label="Plein écran"></button>
   <button id="sv" class="tool" data-help="Touchez ensuite un point de la carte pour ouvrir Google Street View à cet endroit." aria-pressed="false" aria-label="Street View : choisir un point"></button>
   <button id="pk" class="tool" data-help="Touchez ensuite un point proche d’une route du référentiel pour obtenir la route, le PR et l’abscisse." aria-pressed="false" aria-label="Localiser un PR : choisir un point"></button>
@@ -235,7 +252,23 @@
   <div id="measureTotals" hidden></div>
   <ul id="measureList" hidden></ul>
   <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx)" disabled>Export Excel</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
+  <div class="ms-modes" id="measureSnapRow" role="group" aria-label="Mode de la mesure linéaire">
+    <button id="measureModeSnap" class="ghost" aria-pressed="true" data-tip="Les points s’accrochent au référentiel (RD) et la mesure suit la route">Accrochage RD</button>
+    <button id="measureModeFree" class="ghost" aria-pressed="false" data-tip="Points libres : aucune contrainte d’accrochage, segments droits">Libre</button>
+  </div>
   <small id="measureHelp">Déplacez les poignées pour ajuster le tracé. Touchez un segment pour ajouter un sommet.</small>
+</div>
+
+<div class="recens" id="recens" hidden>
+  <div class="rc-head"><b>Recensement linéaire</b><span id="rcTotal"></span><button id="rcMin" class="ghost" aria-label="Réduire ou agrandir">▾</button></div>
+  <div class="rc-live" id="rcLive" role="status" aria-live="polite"></div>
+  <button id="rcToggle" class="rc-start">▶ Début du segment</button>
+  <ol class="rc-list" id="rcList"></ol>
+  <div class="row rc-actions">
+    <button id="rcXls" class="ghost" disabled>Export Excel</button>
+    <button id="rcGeo" class="ghost" disabled>Export QGIS</button>
+    <button id="rcClear" class="ghost" disabled>Tout effacer</button>
+  </div>
 </div>
 
 <div class="guide" id="guide" role="status" aria-live="polite" hidden>
@@ -321,6 +354,7 @@
     <button id="offDel" class="ghost">Tout supprimer</button>
   </div>
   </details>
+  <p class="hint" id="appVer"></p>
   <div class="row" style="margin-top:10px">
     <button id="offClose" class="ghost" style="flex:1">Fermer</button>
   </div>
@@ -1260,30 +1294,284 @@
   };
   syncTrace();
 
-  // ---------- Street View ----------
-  var svArmed = false, svPin = null;
-  function svUrl(ll) { return "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + ll.lat.toFixed(6) + "," + ll.lng.toFixed(6); }
+  // ---------- Recensement linéaire : segments « début / fin » parcourus au GPS, avec PR + abscisse ----------
+  var REC_KEY = "vhmaps-recensement", REC_MAX_ACC = 25, REC_STEP = 3, REC_COL = "#8e24aa", REC_CUR = "#ff6f00";
+  var rec = { segs: [], cur: null, watch: null, me: null, follow: true, open: false };
+  var recLayer = L.layerGroup().addTo(map), recCurLayer = L.layerGroup().addTo(map);
+  map.createPane("rec").style.zIndex = 455;
+  var recRenderer = L.svg({ pane: "rec" });
+  $("rcBtn").innerHTML = ICON("M3 17L17 3l4 4L7 21zM8 12l2 2M11 9l2 2M14 6l2 2");
+  function recStyle(col) { return { pane: "rec", renderer: recRenderer, color: col, weight: 8, opacity: .85, interactive: false }; }
+  function recLen(s) { return s.lenRef !== null && s.lenRef !== undefined ? s.lenRef : Math.round(s.lenGps); }
+  function recPad(n) { return (n < 10 ? "0" : "") + n; }
+  function recDate(t) { var d = new Date(t); return d.getFullYear() + "-" + recPad(d.getMonth() + 1) + "-" + recPad(d.getDate()) + " " + recPad(d.getHours()) + ":" + recPad(d.getMinutes()) + ":" + recPad(d.getSeconds()); }
+  function recPrFmt(x) { return !x ? "?" : (x.pr === null || x.pr === undefined) ? "PR ?" : x.m >= 0 ? "PR " + x.pr + "+" + x.m : "PR " + x.pr + "−" + (-x.m); }
+  function recPrVal(x) { return !x || x.pr === null || x.pr === undefined ? "" : (/^\d+$/.test(String(x.pr)) ? parseInt(x.pr, 10) : String(x.pr)); }
+  function recPrTxt(s) {
+    if (s.pending) return "PR en calcul…";
+    if (!s.deb && !s.fin) return "hors référentiel";
+    return recPrFmt(s.deb) + " → " + recPrFmt(s.fin);
+  }
+  function recCtl(s) {
+    if (!s.axe) return "Hors référentiel : longueur GPS";
+    if (s.mixed) return "Début et fin sur des routes différentes : longueur GPS";
+    if (s.lenRef === null || s.lenRef === undefined) return "Chaînage indisponible : longueur GPS";
+    if (Math.abs(s.lenRef - s.lenGps) > 0.15 * Math.max(s.lenRef, 1)) return "Écart GPS / référentiel > 15 % : à vérifier";
+    return "OK";
+  }
+  function recLive(t) { $("rcLive").textContent = t; }
+  function recSave() {
+    try {
+      var r6 = function (a) { return a.map(function (p) { return [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6]; }); };
+      localStorage.setItem(REC_KEY, JSON.stringify({
+        segs: rec.segs.map(function (s) { var o = {}; for (var k in s) o[k] = s[k]; o.pts = r6(s.pts); return o; }),
+        cur: rec.cur ? { pts: r6(rec.cur.pts), len: rec.cur.len, t0: rec.cur.t0, t1: Date.now() } : null
+      }));
+    } catch (e) {}
+  }
+  function recDrawAll() {
+    recLayer.clearLayers();
+    rec.segs.forEach(function (s, i) {
+      var a = s.pts[0], b = s.pts[s.pts.length - 1], mid = s.pts[Math.floor(s.pts.length / 2)];
+      L.polyline(s.pts, recStyle(REC_COL)).addTo(recLayer);
+      L.circleMarker(a, { pane: "rec", renderer: recRenderer, radius: 5, color: "#fff", weight: 2, fillColor: "#2e7d32", fillOpacity: 1, interactive: false }).addTo(recLayer);
+      L.circleMarker(b, { pane: "rec", renderer: recRenderer, radius: 5, color: "#fff", weight: 2, fillColor: "#c62828", fillOpacity: 1, interactive: false }).addTo(recLayer);
+      L.circleMarker(mid, { pane: "rec", renderer: recRenderer, radius: 1, opacity: 0, fillOpacity: 0, interactive: false }).addTo(recLayer)
+        .bindTooltip((i + 1) + " · " + fmtDistance(recLen(s)), { permanent: true, direction: "center", className: "measure-label" });
+    });
+  }
+  function recUi() {
+    var cur = rec.cur, tot = 0;
+    rec.segs.forEach(function (s) { tot += recLen(s); });
+    $("rcTotal").textContent = rec.segs.length ? rec.segs.length + " segment" + (rec.segs.length > 1 ? "s" : "") + " · " + fmtDistance(tot) : "Aucun segment";
+    var t = $("rcToggle"); t.textContent = cur ? "■ Fin du segment" : "▶ Début du segment"; t.classList.toggle("rc-stop", !!cur);
+    var ul = $("rcList"); ul.textContent = "";
+    rec.segs.forEach(function (s, i) {
+      var li = document.createElement("li"), go = document.createElement("button"), del = document.createElement("button");
+      go.className = "ghost rc-go"; go.textContent = (i + 1) + " · " + (s.axe ? shortRoute(s.axe) : "hors référentiel") + " · " + fmtDistance(recLen(s)) + " · " + recPrTxt(s);
+      go.onclick = function () { rec.follow = false; map.fitBounds(L.latLngBounds(s.pts).pad(.3)); };
+      del.className = "ghost rc-del"; del.textContent = "✕"; del.setAttribute("aria-label", "Supprimer le segment " + (i + 1));
+      del.onclick = function () {
+        if (!confirm("Supprimer le segment " + (i + 1) + " ?")) return;
+        rec.segs.splice(i, 1); recDrawAll(); recSave(); recUi();
+      };
+      li.appendChild(go); li.appendChild(del); ul.appendChild(li);
+    });
+    ["rcXls", "rcGeo", "rcClear"].forEach(function (id) { $(id).disabled = !rec.segs.length || !!cur; });
+    $("rcBtn").setAttribute("aria-pressed", rec.open ? "true" : "false");
+    $("recens").hidden = !rec.open;
+  }
+  function recWatchStop() { if (rec.watch !== null) { try { navigator.geolocation.clearWatch(rec.watch); } catch (e) {} rec.watch = null; } }
+  function recFix(p) {
+    var c = rec.cur; if (!c) return;
+    var ll = L.latLng(p.coords.latitude, p.coords.longitude), acc = p.coords.accuracy;
+    if (!rec.me) rec.me = L.circleMarker(ll, { radius: 7, color: "#fff", weight: 3, fillColor: "#1976d2", fillOpacity: 1, interactive: false }).addTo(map); else rec.me.setLatLng(ll);
+    if (acc > REC_MAX_ACC) { recLive("Précision insuffisante (±" + Math.round(acc) + " m) : attendez le signal…"); return; }
+    var last = c.pts.length ? c.pts[c.pts.length - 1] : null;
+    if (last) {
+      var d = haversine({ lat: last[0], lon: last[1] }, { lat: ll.lat, lon: ll.lng });
+      if (d < REC_STEP) return;
+      c.len += d;
+    } else {
+      L.circleMarker(ll, { pane: "rec", renderer: recRenderer, radius: 5, color: "#fff", weight: 2, fillColor: "#2e7d32", fillOpacity: 1, interactive: false }).addTo(recCurLayer);
+    }
+    c.pts.push([ll.lat, ll.lng]); c.line.setLatLngs(c.pts);
+    if (rec.follow) map.panTo(ll);
+    recLive("Segment en cours : " + fmtDistance(c.len) + " (±" + Math.round(acc) + " m)");
+    if (c.pts.length % 5 === 0) recSave();
+  }
+  function recStart() {
+    if (rec.cur) return;
+    if (!navigator.geolocation) { shotToast("Géolocalisation indisponible sur cet appareil."); return; }
+    rec.cur = { pts: [], len: 0, t0: Date.now(), line: L.polyline([], recStyle(REC_CUR)).addTo(recCurLayer) };
+    rec.follow = true; lockScreen();
+    recLive("Attente du signal GPS…");
+    rec.watch = navigator.geolocation.watchPosition(recFix, function () { recLive("Position indisponible : autorisez la localisation."); }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+    recUi();
+  }
+  function recLocate(s) {
+    qIndex().then(function (idx) {
+      var p0 = s.pts[0], p1 = s.pts[s.pts.length - 1];
+      var A = pkFind(L.latLng(p0[0], p0[1]), idx, 40), B = pkFind(L.latLng(p1[0], p1[1]), idx, 40), pair = null;
+      A.forEach(function (x) { B.forEach(function (y) { if (x.e.axe === y.e.axe) { var sc = x.d + y.d; if (!pair || sc < pair.sc) pair = { x: x, y: y, sc: sc }; } }); });
+      if (!pair) pair = { x: A[0] || null, y: B[0] || null };
+      var x = pair.x, y = pair.y, pk = function (r) { return r ? { pr: r.pr, m: r.m, approx: !!r.approx, d: Math.round(r.d) } : null; };
+      s.axe = x ? x.e.axe : (y ? y.e.axe : ""); s.site = x ? x.site : (y ? y.site : "");
+      s.deb = pk(x); s.fin = pk(y);
+      s.mixed = !!(x && y && x.e.axe !== y.e.axe);
+      s.lenRef = (x && y && x.e.axe === y.e.axe && x.ci === y.ci) ? Math.round(Math.abs(y.s - x.s)) : null;
+    }).catch(function () { s.err = true; }).then(function () {
+      s.pending = false; recDrawAll(); recSave(); recUi();
+      var n = rec.segs.indexOf(s) + 1;
+      recLive("Segment " + n + " : " + (s.axe ? shortRoute(s.axe) + " · " : "") + fmtDistance(recLen(s)) + " · " + recPrTxt(s));
+    });
+  }
+  function recEnd() {
+    var c = rec.cur; if (!c) return;
+    recWatchStop(); rec.cur = null; recCurLayer.clearLayers();
+    if (rec.me) { map.removeLayer(rec.me); rec.me = null; }
+    if (wakeLock && startedAt === null && !gd) { wakeLock.release().catch(function () {}); wakeLock = null; }
+    if (c.pts.length < 2 || c.len < REC_STEP) { recLive("Segment trop court : ignoré."); recSave(); recUi(); return; }
+    var s = { pts: c.pts, t0: c.t0, t1: Date.now(), lenGps: Math.round(c.len * 10) / 10, lenRef: null, pending: true };
+    rec.segs.push(s); recDrawAll(); recSave(); recUi();
+    recLive("Segment " + rec.segs.length + " enregistré : " + fmtDistance(s.lenGps) + ". Calcul des PR…");
+    recLocate(s);
+  }
+  // --- Exports ---
+  function xlsxFromSheets(sheets) {
+    var NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',R='http://schemas.openxmlformats.org/officeDocument/2006/relationships',X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    var files=[
+      {name:"[Content_Types].xml",txt:X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+
+        sheets.map(function(_,i){return '<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>';}).join("")+'</Types>'},
+      {name:"_rels/.rels",txt:X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+R+'/officeDocument" Target="xl/workbook.xml"/></Relationships>'},
+      {name:"xl/workbook.xml",txt:X+'<workbook '+NS+' xmlns:r="'+R+'"><sheets>'+sheets.map(function(sh,i){return '<sheet name="'+sh.name+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>';}).join("")+'</sheets></workbook>'},
+      {name:"xl/_rels/workbook.xml.rels",txt:X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+
+        sheets.map(function(_,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+R+'/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>';}).join("")+
+        '<Relationship Id="rId'+(sheets.length+1)+'" Type="'+R+'/styles" Target="styles.xml"/></Relationships>'},
+      {name:"xl/styles.xml",txt:X+'<styleSheet '+NS+'><numFmts count="1"><numFmt numFmtId="164" formatCode="0.000000"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="2" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'}
+    ];
+    sheets.forEach(function(sh,i){files.push({name:"xl/worksheets/sheet"+(i+1)+".xml",txt:sh.xml});});
+    var enc=new TextEncoder();
+    files.forEach(function(f){f.data=enc.encode(f.txt);});
+    return zipStore(files);
+  }
+  function recBuildXlsx() {
+    var H = function (t) { return { v: t, s: 1 }; }, rows = [[H("N°"), H("Route"), H("Site"), H("Début"), H("Fin"), H("PR début"), H("Abscisse début (m)"), H("PR fin"), H("Abscisse fin (m)"),
+      H("Longueur retenue (m)"), H("Longueur référentiel (m)"), H("Longueur GPS (m)"), H("Nb points GPS"), H("Contrôle")]], tot = 0, totGps = 0, byRoute = {}, order = [];
+    rec.segs.forEach(function (s, i) {
+      var L1 = recLen(s); tot += L1; totGps += s.lenGps;
+      var k = s.axe || "Hors référentiel"; if (!byRoute[k]) { byRoute[k] = { n: 0, len: 0, site: s.site || "" }; order.push(k); } byRoute[k].n++; byRoute[k].len += L1;
+      rows.push([i + 1, s.axe || "", s.site || "", recDate(s.t0), recDate(s.t1), recPrVal(s.deb), s.deb && s.deb.pr !== null && s.deb.pr !== undefined ? s.deb.m : "",
+        recPrVal(s.fin), s.fin && s.fin.pr !== null && s.fin.pr !== undefined ? s.fin.m : "", { v: L1, s: 2 }, s.lenRef !== null && s.lenRef !== undefined ? { v: s.lenRef, s: 2 } : "",
+        { v: r2(s.lenGps), s: 2 }, s.pts.length, recCtl(s)]);
+    });
+    var last = rec.segs.length + 1;
+    rows.push([null, { v: "Total", s: 1 }, null, null, null, null, null, null, null, { f: "SUM(J2:J" + last + ")", v: r2(tot), s: 4 }, null, { f: "SUM(L2:L" + last + ")", v: r2(totGps), s: 4 }]);
+    var sheets = [{ name: "Synthèse", xml: xlSheet(rows, [6, 16, 14, 20, 20, 10, 18, 10, 16, 20, 22, 18, 14, 46]) }];
+    var rr = [[H("Route"), H("Site"), H("Nb segments"), H("Longueur totale (m)"), H("Longueur totale (km)")]];
+    order.forEach(function (k, i) { var g = byRoute[k], n = i + 2; rr.push([k, g.site, g.n, { v: r2(g.len), s: 2 }, { f: "D" + n + "/1000", v: g.len / 1000, s: 2 }]); });
+    var lr = order.length + 1;
+    rr.push([{ v: "Total", s: 1 }, null, { f: "SUM(C2:C" + lr + ")", v: rec.segs.length, s: 1 }, { f: "SUM(D2:D" + lr + ")", v: r2(tot), s: 4 }, { f: "SUM(E2:E" + lr + ")", v: tot / 1000, s: 4 }]);
+    sheets.push({ name: "Par route", xml: xlSheet(rr, [18, 16, 14, 20, 20]) });
+    var rs = [[H("Segment"), H("N° point"), H("Latitude (WGS84)"), H("Longitude (WGS84)"), H("X (Lambert 93)"), H("Y (Lambert 93)")]];
+    rec.segs.forEach(function (s, i) { s.pts.forEach(function (p, j) { var q = toLambert93(p[0], p[1]); rs.push(["Segment " + (i + 1), j + 1, { v: p[0], s: 3 }, { v: p[1], s: 3 }, { v: r2(q.x), s: 2 }, { v: r2(q.y), s: 2 }]); }); });
+    sheets.push({ name: "Points GPS", xml: xlSheet(rs, [14, 10, 18, 18, 16, 16]) });
+    return xlsxFromSheets(sheets);
+  }
+  function recBuildGeo() {
+    return JSON.stringify({
+      type: "FeatureCollection", name: "recensement_lineaire",
+      features: rec.segs.map(function (s, i) {
+        return { type: "Feature", properties: {
+          num: i + 1, route: s.axe || "", site: s.site || "", long_m: recLen(s), long_ref_m: s.lenRef === undefined ? null : s.lenRef, long_gps_m: Math.round(s.lenGps),
+          pr_deb: recPrVal(s.deb) === "" ? null : recPrVal(s.deb), abs_deb_m: s.deb && s.deb.pr !== null && s.deb.pr !== undefined ? s.deb.m : null,
+          pr_fin: recPrVal(s.fin) === "" ? null : recPrVal(s.fin), abs_fin_m: s.fin && s.fin.pr !== null && s.fin.pr !== undefined ? s.fin.m : null,
+          debut: recDate(s.t0), fin: recDate(s.t1), controle: recCtl(s) },
+          geometry: { type: "LineString", coordinates: s.pts.map(function (p) { return [Math.round(p[1] * 1e6) / 1e6, Math.round(p[0] * 1e6) / 1e6]; }) } };
+      })
+    });
+  }
+  function recDownload(blob, name) {
+    var url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    shotToast("Fichier enregistré : " + name);
+  }
+  function recDay() { return new Date().toISOString().slice(0, 10); }
+  function recPanel(on) {
+    if (!on && rec.cur) { shotToast("Terminez d’abord le segment en cours (Fin du segment)."); return; }
+    rec.open = on; recUi();
+    if (on && !rec.segs.length && !rec.cur) recLive("Placez-vous au début du tronçon à recenser, puis touchez « Début du segment ».");
+  }
+  $("rcBtn").onclick = function () { recPanel(!rec.open); };
+  $("rcToggle").onclick = function () { if (rec.cur) recEnd(); else recStart(); };
+  $("rcXls").onclick = function () {
+    try { recDownload(recBuildXlsx(), "vhmaps-recensement-" + recDay() + ".xlsx"); } catch (e) { shotToast("Échec de l’export Excel."); if (window.console) console.error(e); }
+  };
+  $("rcGeo").onclick = function () { recDownload(new Blob([recBuildGeo()], { type: "application/geo+json" }), "vhmaps-recensement-" + recDay() + ".geojson"); };
+  $("rcClear").onclick = function () {
+    if (!rec.segs.length || !confirm("Effacer les " + rec.segs.length + " segment(s) recensé(s) ?")) return;
+    rec.segs = []; recDrawAll(); recSave(); recUi(); recLive("Recensement effacé.");
+  };
+  $("rcMin").onclick = function () { var r = $("recens"); r.classList.toggle("min"); this.textContent = r.classList.contains("min") ? "▴" : "▾"; };
+  map.on("dragstart", function () { if (rec.cur) rec.follow = false; });
+  if (window.ResizeObserver) new ResizeObserver(function () {
+    var m = $("measurePanel"); document.documentElement.style.setProperty("--measure-h", m.hidden ? "0px" : (m.offsetHeight + 8) + "px");
+  }).observe($("measurePanel"));
+  (function recLoad() {   // reprise après fermeture : segments conservés ; un segment interrompu est clôturé à son dernier point
+    var d = null; try { d = JSON.parse(localStorage.getItem(REC_KEY) || "null"); } catch (e) {}
+    if (!d) return;
+    rec.segs = (d.segs || []).filter(function (s) { return s.pts && s.pts.length > 1; });
+    if (d.cur && d.cur.pts && d.cur.pts.length > 1 && d.cur.len >= REC_STEP) {
+      var s = { pts: d.cur.pts, t0: d.cur.t0, t1: d.cur.t1 || Date.now(), lenGps: Math.round(d.cur.len * 10) / 10, lenRef: null, pending: true };
+      rec.segs.push(s);
+    }
+    rec.segs.forEach(function (s) { if (s.pending) recLocate(s); });
+    if (rec.segs.length) { recDrawAll(); recSave(); }
+    recUi();
+  })();
+
+  // ---------- Street View (deux points : le lieu, puis l'azimut du regard avec ligne élastique) ----------
+  var svArmed = false, svPin = null, svStart = null, svLine = null, svDot = null, svTipEl = null, svFinal = null;
+  function svUrl(ll, heading) {
+    var u = "https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=" + ll.lat.toFixed(6) + "," + ll.lng.toFixed(6);
+    return heading === null || heading === undefined ? u : u + "&heading=" + Math.round(heading) + "&pitch=0&fov=90";
+  }
   function svLink(ll) { return '<br><a href="' + svUrl(ll) + '" target="_blank" rel="noopener">Ouvrir Street View ici</a>'; }
-  function openStreetView(ll) {
+  function svAzimuth(a, b) {
+    var t = Math.PI / 180, f1 = a.lat * t, f2 = b.lat * t, dl = (b.lng - a.lng) * t;
+    var y = Math.sin(dl) * Math.cos(f2), x = Math.cos(f1) * Math.sin(f2) - Math.sin(f1) * Math.cos(f2) * Math.cos(dl);
+    return (Math.atan2(y, x) / t + 360) % 360;
+  }
+  function svReset() {
+    svStart = null;
+    [svLine, svDot].forEach(function (l) { if (l) map.removeLayer(l); });
+    svLine = svDot = null;
+    if (svTipEl) svTipEl.style.display = "none";
+  }
+  function openStreetView(ll, heading, aim) {
     if (navigator.onLine === false) { say("Street View nécessite une connexion.", true); return; }
     if (svPin) map.removeLayer(svPin);
+    if (svFinal) map.removeLayer(svFinal);
     svPin = L.circleMarker(ll, { radius: 9, color: "#fff", weight: 3, fillColor: "#f76707", fillOpacity: 1, interactive: false }).addTo(map);
-    setTimeout(function () { if (svPin) { map.removeLayer(svPin); svPin = null; } }, 6000);
-    var w = window.open(svUrl(ll), "_blank");
-    if (w) { w.opener = null; say("Street View ouvert."); }
+    svFinal = aim ? L.polyline([ll, aim], { color: "#f76707", weight: 4, interactive: false }).addTo(map) : null;
+    setTimeout(function () { if (svPin) { map.removeLayer(svPin); svPin = null; } if (svFinal) { map.removeLayer(svFinal); svFinal = null; } }, 6000);
+    var w = window.open(svUrl(ll, heading), "_blank");
+    if (w) { w.opener = null; say("Street View ouvert" + (heading === null || heading === undefined ? "." : " (azimut " + Math.round(heading) + "°).")); }
     else say("Street View bloqué par le navigateur : autorisez les fenêtres, puis recommencez.", true);
   }
   function setSv(on) {
     svArmed = on;
     if (on && pkArmed) setPk(false);
+    if (!on) svReset();
     $("sv").setAttribute("aria-pressed", on ? "true" : "false");
-    $("sv").setAttribute("aria-label", on ? "Annuler Street View" : "Street View : choisir un point");
+    $("sv").setAttribute("aria-label", on ? "Annuler Street View" : "Street View : choisir un lieu puis une direction");
     $("map").classList.toggle("sv-armed", on);
-    if (on) say("Street View : touchez un point de la carte.");
+    if (on) say("Street View : touchez le lieu à observer, puis un second point dans la direction du regard.");
   }
   $("sv").innerHTML = ICON("M9 6a3 3 0 1 0 6 0a3 3 0 1 0-6 0M12 9v6M7.5 12h9M10 21l2-6 2 6");
   $("sv").onclick = function () { setSv(!svArmed); };
-  map.on("click", function (e) { if (svArmed) { setSv(false); openStreetView(e.latlng); } });
+  function svPick(ll) {   // 1er appel : le lieu ; 2e appel : le point de visée (azimut)
+    if (!svArmed) return;
+    if (!svStart) {
+      svStart = ll;
+      svDot = L.circleMarker(svStart, { radius: 8, color: "#fff", weight: 3, fillColor: "#f76707", fillOpacity: 1, interactive: false }).addTo(map);
+      say("Touchez maintenant un second point dans la direction du regard (ou touchez de nouveau le lieu pour ouvrir sans orientation).");
+      return;
+    }
+    var p1 = svStart, close = map.latLngToContainerPoint(p1).distanceTo(map.latLngToContainerPoint(ll)) < 12;
+    setSv(false);
+    openStreetView(p1, close ? null : svAzimuth(p1, ll), close ? null : ll);
+  }
+  map.on("click", function (e) { svPick(e.latlng); });
+  map.on("mousemove", function (e) {   // ligne élastique du lieu vers le curseur + azimut
+    if (!svArmed || !svStart) return;
+    if (!svLine) svLine = L.polyline([svStart, e.latlng], { color: "#f76707", weight: 3, dashArray: "6 6", interactive: false }).addTo(map);
+    else svLine.setLatLngs([svStart, e.latlng]);
+    if (!svTipEl) svTipEl = tipNew();
+    var close = map.latLngToContainerPoint(svStart).distanceTo(e.containerPoint) < 12;
+    tipPut(svTipEl, e.containerPoint, close ? "<small>Sans orientation</small>" : "Azimut : <b>" + Math.round(svAzimuth(svStart, e.latlng)) + "°</b>");
+  });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && svArmed) setSv(false); });
 
   // ---------- Localiser un PR : d'un point de la carte vers route + PR + abscisse ----------
@@ -1371,7 +1659,7 @@
     var d0 = cands[0].d, out = [], C = { x: 0, y: 0 };
     cands.filter(function (c) { return c.d <= d0 + 10; }).slice(0, 3).forEach(function (c) {
       var chains = buildChains(c.e, o), best = null;
-      chains.forEach(function (ch) { var pj = projectOn(ch, C); if (!best || pj.d < best.pj.d) best = { ch: ch, pj: pj }; });
+      chains.forEach(function (ch, ci) { var pj = projectOn(ch, C); if (!best || pj.d < best.pj.d) best = { ch: ch, pj: pj, ci: ci }; });
       if (!best) return;
       var sc = best.pj.s, list = [];
       c.e.prs.forEach(function (q) {
@@ -1379,7 +1667,7 @@
         var pj = projectOn(best.ch, { x: (q[0] - o.lon0) * o.kx, y: (q[1] - o.lat0) * o.ky });
         if (pj.d < 200) list.push({ n: parseInt(q[3], 10), s: pj.s, q: q });
       });
-      var snap = pointAt(best.ch, sc), res = { e: c.e, d: c.d, site: c.f.properties.site, lat: o.lat0 + snap.y / o.ky, lon: o.lon0 + snap.x / o.kx, pr: null };
+      var snap = pointAt(best.ch, sc), res = { e: c.e, d: c.d, site: c.f.properties.site, lat: o.lat0 + snap.y / o.ky, lon: o.lon0 + snap.x / o.kx, pr: null, s: sc, ci: best.ci };
       if (list.length) {
         list.sort(function (a, b) { return a.n - b.n; });
         var sum = 0; for (var i = 1; i < list.length; i++) sum += Math.sign(list[i].s - list[i - 1].s);
@@ -1424,7 +1712,7 @@
   }
   function attachPopup(layer, htmlFor) {
     layer.on("click", function (e) {
-      if (svArmed) { setSv(false); openStreetView(e.latlng); return; }
+      if (svArmed) { if (e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent); svPick(e.latlng); return; }
       if (pkArmed) { setPk(false); locatePk(e.latlng); return; }
       L.popup().setLatLng(e.latlng).setContent(htmlFor(e.latlng)).openOn(map);
     });
@@ -1502,6 +1790,7 @@
   function extendGeom(b, g) {
     (function walk(a) { if (typeof a[0] === "number") b.extend([a[1], a[0]]); else a.forEach(walk); })(g.coordinates);
   }
+  var qIdxVal = null;   // index du référentiel une fois chargé (accès synchrone pour l'accrochage)
   function qIndex() {
     if (!qIdxP) {
       qIdxP = Promise.all([loadJson("donnees/pr.json").catch(function () { return null; }), loadJson("donnees/lineaire.json").catch(function () { return null; })])
@@ -1516,7 +1805,7 @@
           ((r[0] && r[0].pr) || []).forEach(function (q) { var e = get(q[2]); if (e) { e.prs.push(q); e.b.extend([q[1], q[0]]); } });
           ((r[1] && r[1].features) || []).forEach(function (f) { var e = get(f.properties.axe); if (e && f.geometry) { e.feats.push(f); e.sites[f.properties.site] = 1; extendGeom(e.b, f.geometry); } });
           return Object.keys(ax).map(function (k) { return ax[k]; }).filter(function (e) { return e.b.isValid(); });
-        });
+        }).then(function (v) { qIdxVal = v; return v; });
       qIdxP.catch(function () { qIdxP = null; });
     }
     return qIdxP;
@@ -1703,6 +1992,108 @@
   });
   map.on("click", function () { if (!qBar.hidden) qOpen(false); });
 
+  // ---------- Accrochage de la mesure linéaire au référentiel routier (RD) ----------
+  var msCache = {}, msPairCache = {};
+  function msEntry(e) {   // géométrie « en chaînes » de la route, calculée une fois ; repère local centré sur la route
+    var c = msCache[e.axe]; if (c) return c;
+    var ctr = e.b.getCenter(), o = { lon0: ctr.lng, lat0: ctr.lat, kx: 111320 * Math.cos(ctr.lat * Math.PI / 180), ky: 110574 };
+    return (msCache[e.axe] = { e: e, o: o, chains: buildChains(e, o), prl: [] });
+  }
+  function msXY(o, ll) { return { x: (ll.lng - o.lon0) * o.kx, y: (ll.lat - o.lat0) * o.ky }; }
+  function msLL(o, p) { return L.latLng(o.lat0 + p.y / o.ky, o.lon0 + p.x / o.kx); }
+  var msSnapOn = true;   // mode de la mesure linéaire : accrochage au référentiel (true) ou libre (false)
+  try { msSnapOn = localStorage.getItem("vhmaps-ms-mode") !== "free"; } catch (e) {}
+  function msWanted() { return msSnapOn; }
+  // Point du référentiel le plus proche de ll (tolérance en pixels), avec préférence pour la route déjà suivie (hint)
+  function msSnapAt(ll, hint) {
+    if (!qIdxVal) { qIndex().catch(function () {}); return null; }
+    var mpp = 156543.03 * Math.cos(ll.lat * Math.PI / 180) / Math.pow(2, map.getZoom());
+    var tol = Math.max(6, Math.min(60, (L.Browser.touch ? 30 : 20) * mpp));
+    var padLat = tol / 100000, padLng = tol / (100000 * Math.max(0.2, Math.cos(ll.lat * Math.PI / 180))), best = null;
+    qIdxVal.forEach(function (e) {
+      var b = e.b;
+      if (!(ll.lat >= b.getSouth() - padLat && ll.lat <= b.getNorth() + padLat && ll.lng >= b.getWest() - padLng && ll.lng <= b.getEast() + padLng)) return;
+      var c = msEntry(e), p = msXY(c.o, ll);
+      c.chains.forEach(function (ch, ci) {
+        var pj = projectOn(ch, p);
+        if (pj.d > tol) return;
+        var w = pj.d * (hint && hint.axe === e.axe && hint.ci === ci ? 0.5 : 1);
+        if (!best || w < best.w) best = { w: w, d: pj.d, c: c, ci: ci, s: pj.s, axe: e.axe };
+      });
+    });
+    if (!best) return null;
+    best.ll = msLL(best.c.o, pointAt(best.c.chains[best.ci], best.s));
+    return best;
+  }
+  function msVertex(sn) { var p = L.latLng(sn.ll.lat, sn.ll.lng); p.snap = { axe: sn.axe, ci: sn.ci, s: sn.s }; return p; }
+  // Sommet à poser/déplacer en ll : accroché au référentiel si la case est cochée et qu'une route est assez proche
+  function msResnap(ll, hint) {
+    if (!msWanted()) return ll;
+    var sn = msSnapAt(ll, hint); return sn ? msVertex(sn) : ll;
+  }
+  function msPr(c, ci, s) {   // PR + abscisse à la position curviligne s de la chaîne (même règle que l'outil PR)
+    var o = c.o, ch = c.chains[ci], list = c.prl[ci];
+    if (!list) {
+      list = [];
+      c.e.prs.forEach(function (q) {
+        if (!/^\d+$/.test(String(q[3]))) return;
+        var pj = projectOn(ch, { x: (q[0] - o.lon0) * o.kx, y: (q[1] - o.lat0) * o.ky });
+        if (pj.d < 200) list.push({ n: parseInt(q[3], 10), s: pj.s, q: q });
+      });
+      list.sort(function (a, b) { return a.n - b.n; });
+      c.prl[ci] = list;
+    }
+    if (!list.length) return null;
+    var sum = 0; for (var i = 1; i < list.length; i++) sum += Math.sign(list[i].s - list[i - 1].s);
+    var dir = sum < 0 ? -1 : 1, before = list.filter(function (r) { return dir > 0 ? r.s <= s + 5 : r.s >= s - 5; });
+    var ref = before.length ? before.reduce(function (a, b) { return dir > 0 ? (b.s > a.s ? b : a) : (b.s < a.s ? b : a); })
+                            : list.reduce(function (a, b) { return Math.abs(b.s - s) < Math.abs(a.s - s) ? b : a; });
+    var m = Math.round(dir > 0 ? s - ref.s : ref.s - s); if (before.length && m < 0) m = 0;
+    return { pr: ref.q[3], m: m, approx: list.length < 2 };
+  }
+  function msPrTxt(r) {
+    if (!r) return "PR indisponible";
+    return r.m >= 0 ? "PR " + esc(r.pr) + "+" + r.m + (r.approx ? " <small>(estimé)</small>" : "") : "~" + (-r.m) + " m avant PR " + esc(r.pr);
+  }
+  function msSub(c, ci, s1, s2) {   // points du référentiel entre deux positions curvilignes (dans le sens s1 → s2)
+    var ch = c.chains[ci], lo = Math.min(s1, s2), hi = Math.max(s1, s2), acc = 0, pts = [pointAt(ch, lo)];
+    for (var i = 0; i < ch.length - 1; i++) { acc += d2(ch[i], ch[i + 1]); if (acc > lo && acc < hi) pts.push(ch[i + 1]); }
+    pts.push(pointAt(ch, hi));
+    var ll = pts.map(function (p) { return msLL(c.o, p); });
+    return s1 <= s2 ? ll : ll.reverse();
+  }
+  // Trajet suivant le référentiel entre deux sommets accrochés à la même route (sinon null : segment droit)
+  function msPair(a, b) {
+    var sa = a && a.snap, sb = b && b.snap;
+    if (!sa || !sb || sa.axe !== sb.axe || sa.ci !== sb.ci) return null;
+    var k = a.lat + "," + a.lng + "|" + b.lat + "," + b.lng, hit = msPairCache[k];
+    if (hit !== undefined) return hit;
+    var c = msCache[sa.axe]; if (!c) return null;
+    var path = msSub(c, sa.ci, sa.s, sb.s);
+    path[0] = L.latLng(a.lat, a.lng); path[path.length - 1] = L.latLng(b.lat, b.lng);
+    return (msPairCache[k] = path);
+  }
+  function msPathLen(pts) { var d = 0; for (var i = 1; i < pts.length; i++) d += pts[i - 1].distanceTo(pts[i]); return d; }
+  // Ligne affichée d'une mesure linéaire : suit le référentiel entre sommets accrochés
+  function measureGeom(points) {
+    var out = [];
+    for (var i = 0; i < points.length; i++) {
+      if (!i) { out.push(points[0]); continue; }
+      var pp = msPair(points[i - 1], points[i]);
+      if (pp) for (var j = 1; j < pp.length; j++) out.push(pp[j]); else out.push(points[i]);
+    }
+    return out;
+  }
+  // Info-bulle qui suit le curseur (réutilise le style de l'info-bulle PR)
+  function tipPut(el, cp, html) {
+    el.innerHTML = html; el.style.display = "block";
+    var sz = map.getSize(), w = el.offsetWidth, h = el.offsetHeight, x = cp.x + 16, y = cp.y + 18;
+    if (x + w > sz.x - 4) x = Math.max(4, cp.x - w - 12);
+    if (y + h > sz.y - 4) y = Math.max(4, cp.y - h - 12);
+    el.style.left = x + "px"; el.style.top = y + "px";
+  }
+  function tipNew() { var el = document.createElement("div"); el.className = "pk-tip"; el.style.display = "none"; map.getContainer().appendChild(el); return el; }
+
   // ---------- Mesures cartographiques éditables ----------
   var MEASURE_COLOR = "#d90429";   // rouge : distinct de l'orange des parcelles cadastrales
   var measureMode=null, measureType=null, measurePoints=[], measureLayer=L.layerGroup().addTo(map),
@@ -1711,7 +2102,7 @@
   function fmtDistance(m){return m>=1000?(m/1000).toFixed(2).replace(".",",")+" km":Math.round(m)+" m";}
   function fmtArea(a){return a>=10000?(a/10000).toFixed(2).replace(".",",")+" ha":Math.round(a)+" m²";}
   function areaMeters(points){var radius=6378137,sum=0;for(var i=0;i<points.length;i++){var a=points[i],b=points[(i+1)%points.length];sum+=(b.lng-a.lng)*Math.PI/180*(2+Math.sin(a.lat*Math.PI/180)+Math.sin(b.lat*Math.PI/180));}return Math.abs(sum*radius*radius/2);}
-  function measureLength(points){var d=0;for(var i=1;i<points.length;i++)d+=points[i-1].distanceTo(points[i]);return d;}
+  function measureLength(points){var d=0;for(var i=1;i<points.length;i++){var pp=msPair(points[i-1],points[i]);d+=pp?msPathLen(pp):points[i-1].distanceTo(points[i]);}return d;}
   function updateMeasureValue(){
     var v="Ajoutez au moins "+(measureType==="area"?3:2)+" points.";
     if(measureType==="line"&&measurePoints.length>=2)v="Distance : "+fmtDistance(measureLength(measurePoints));
@@ -1758,7 +2149,7 @@
     measureDone.forEach(function(m,i){
       var isArea=m.type==="area",n=isArea?++na:++nl,txt=measureFmt(m.type,measureVal(m.type,m.points)),name=(isArea?"Surface ":"Distance ")+n;
       var shape=(isArea?L.polygon(m.points,{color:MEASURE_COLOR,weight:3,fillColor:MEASURE_COLOR,fillOpacity:.12,interactive:false})
-                       :L.polyline(m.points,{color:MEASURE_COLOR,weight:3,interactive:false})).addTo(measureDoneLayer);
+                       :L.polyline(measureGeom(m.points),{color:MEASURE_COLOR,weight:3,interactive:false})).addTo(measureDoneLayer);
       shape.bindTooltip(name+" : "+txt,{permanent:true,direction:"center",className:"measure-label"});
       var li=document.createElement("li");
       var go=document.createElement("button");go.className="ghost ml-go";go.textContent=(isArea?"□ ":"↔ ")+name+" · "+txt;go.setAttribute("data-i",i);go.title="Zoomer sur ce tracé";
@@ -1774,15 +2165,21 @@
 
   function insertMeasurePoint(e){
     if(measurePoints.length<2)return false;
-    var click=map.latLngToLayerPoint(e.latlng),best=Infinity,bestIndex=-1,bestPoint=null;
+    var click=map.latLngToLayerPoint(e.latlng),best=Infinity,bestIndex=-1,bestPoint=null,bestOnRoad=false;
     var segments=measurePoints.length-1+(measureType==="area"&&measurePoints.length>=3?1:0);
     for(var i=0;i<segments;i++){
-      var j=(i+1)%measurePoints.length;
-      var a=map.latLngToLayerPoint(measurePoints[i]),b=map.latLngToLayerPoint(measurePoints[j]);
-      var cp=L.LineUtil.closestPointOnSegment(click,a,b),d=click.distanceTo(cp);
-      if(d<best){best=d;bestIndex=i;bestPoint=map.layerPointToLatLng(cp);}
+      var j=(i+1)%measurePoints.length,pp=measureType==="line"?msPair(measurePoints[i],measurePoints[j]):null,seg=pp||[measurePoints[i],measurePoints[j]];
+      for(var k=1;k<seg.length;k++){
+        var a=map.latLngToLayerPoint(seg[k-1]),b=map.latLngToLayerPoint(seg[k]);
+        var cp=L.LineUtil.closestPointOnSegment(click,a,b),d=click.distanceTo(cp);
+        if(d<best){best=d;bestIndex=i;bestPoint=map.layerPointToLatLng(cp);bestOnRoad=!!pp;}
+      }
     }
     if(bestIndex<0||best>(L.Browser.touch?34:24))return false;
+    if(measureType==="line"){
+      var onRoad=bestOnRoad?msSnapAt(bestPoint,measurePoints[bestIndex].snap):null;
+      bestPoint=onRoad?msVertex(onRoad):msResnap(bestPoint,measurePoints[bestIndex].snap);
+    }
     measurePoints.splice(bestIndex+1,0,bestPoint);measureSelected=bestIndex+1;drawMeasure();
     return true;
   }
@@ -1790,14 +2187,14 @@
     measureLayer.clearLayers();measureShape=null;measureMarkers=[];
     var validArea=measureType==="area"&&measurePoints.length>=3;
     if(measurePoints.length>1){
-      measureShape=(validArea?L.polygon(measurePoints,{color:MEASURE_COLOR,weight:3,fillColor:MEASURE_COLOR,fillOpacity:.16}):L.polyline(measurePoints,{color:MEASURE_COLOR,weight:4,dashArray:"7 5"})).addTo(measureLayer);
+      measureShape=(validArea?L.polygon(measurePoints,{color:MEASURE_COLOR,weight:3,fillColor:MEASURE_COLOR,fillOpacity:.16}):L.polyline(measureGeom(measurePoints),{color:MEASURE_COLOR,weight:4,dashArray:"7 5"})).addTo(measureLayer);
     }
     measurePoints.forEach(function(p,i){
       var marker=L.marker(p,{draggable:true,icon:measureVertexIcon(i===measureSelected),keyboard:true,title:"Déplacer le sommet "+(i+1)}).addTo(measureLayer);
       marker.bindTooltip(String(i+1),{direction:"top",offset:[0,-8]});
       marker.on("click",function(e){if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);measureSelected=i;drawMeasure();});
-      marker.on("drag",function(e){measurePoints[i]=e.target.getLatLng();if(measureShape)measureShape.setLatLngs(measurePoints);updateMeasureValue();});
-      marker.on("dragend",function(e){measurePoints[i]=e.target.getLatLng();drawMeasure();});
+      marker.on("drag",function(e){measurePoints[i]=e.target.getLatLng();if(measureShape)measureShape.setLatLngs(validArea?measurePoints:measureGeom(measurePoints));updateMeasureValue();});
+      marker.on("dragend",function(e){var ll=e.target.getLatLng();if(measureType==="line")ll=msResnap(ll);measurePoints[i]=ll;drawMeasure();});
       measureMarkers.push(marker);
     });
     updateMeasureValue();
@@ -1809,6 +2206,8 @@
       measureMode=mode;
     } else measureMode=null;
     map.getContainer().classList.toggle("measuring",!!measureMode);
+    $("measureSnapRow").hidden=measureType!=="line";
+    if(!measureMode){if(typeof msRubHide==="function")msRubHide();}else if(measureType==="line")qIndex().catch(function(){});
     $("measurePanel").hidden=!mode&&!measurePoints.length&&!measureDone.length;
     $("measureTitle").textContent=measureType==="line"?"Mesure linéaire":"Mesure surfacique";
     $("measureLine").classList.toggle("live",measureMode==="line");$("measureArea").classList.toggle("live",measureMode==="area");
@@ -1819,8 +2218,62 @@
   map.on("click",function(e){
     if(!measureMode)return;
     if(insertMeasurePoint(e))return;
-    measurePoints.push(e.latlng);measureSelected=-1;drawMeasure();
+    var last=measurePoints.length?measurePoints[measurePoints.length-1]:null;
+    measurePoints.push(measureType==="line"?msResnap(e.latlng,last&&last.snap):e.latlng);measureSelected=-1;drawMeasure();
+    if(msLast)msUpdate(msLast.ll,msLast.cp);
   });
+  // --- Ligne élastique : dernier point cliqué → curseur (mesures linéaire et surfacique), accrochée au référentiel en mesure linéaire ---
+  var msRub = L.layerGroup().addTo(map), msLine = L.polyline([], { color: MEASURE_COLOR, weight: 3, opacity: .85, dashArray: "2 7", lineCap: "round", interactive: false }),
+      msClose = L.polyline([], { color: MEASURE_COLOR, weight: 2, opacity: .45, dashArray: "2 7", interactive: false }),
+      msDot = L.circleMarker([0, 0], { radius: 6, color: "#fff", weight: 2, fillColor: MEASURE_COLOR, fillOpacity: 1, interactive: false }),
+      msTipEl = null, msLast = null, msRaf = 0;
+  function msRubHide() {
+    msRub.clearLayers(); if (msTipEl) msTipEl.style.display = "none"; msLast = null;
+  }
+  function msUpdate(ll, cp) {
+    if (!measureMode) { msRubHide(); return; }
+    var last = measurePoints.length ? measurePoints[measurePoints.length - 1] : null;
+    var sn = (measureType === "line" && msWanted()) ? msSnapAt(ll, last && last.snap) : null, tgt = sn ? sn.ll : ll, pts = null, html = "";
+    msRub.clearLayers();
+    if (last) {
+      var path = sn && last.snap && last.snap.axe === sn.axe && last.snap.ci === sn.ci ? msSub(sn.c, sn.ci, last.snap.s, sn.s) : null;
+      pts = path ? [last].concat(path.slice(1)) : [last, tgt];
+      msLine.setLatLngs(pts); msRub.addLayer(msLine);
+    }
+    if (measureType === "area" && measurePoints.length >= 2) { msClose.setLatLngs([tgt, measurePoints[0]]); msRub.addLayer(msClose); }
+    if (sn) { msDot.setLatLng(sn.ll); msRub.addLayer(msDot); html += "<b>" + esc(shortRoute(sn.axe)) + "</b> · " + msPrTxt(msPr(sn.c, sn.ci, sn.s)) + "<br>"; }
+    if (last) {
+      var seg = msPathLen(pts);
+      html += "+ " + fmtDistance(seg);
+      if (measureType === "line") html += " · total " + fmtDistance(measureLength(measurePoints) + seg);
+      else if (measurePoints.length >= 2) html += " · surface " + fmtArea(areaMeters(measurePoints.concat([tgt])));
+    } else if (!sn) html = "<small>Cliquez pour poser le premier point</small>";
+    if (!msTipEl) msTipEl = tipNew();
+    tipPut(msTipEl, cp || map.latLngToContainerPoint(ll), html);
+  }
+  map.getContainer().addEventListener("mousemove", function (ev) {
+    if (!measureMode) return;
+    var t = ev.target, over = t === map.getContainer() || (t.closest && t.closest(".leaflet-map-pane"));
+    if ((ev.buttons & 1) || !over || (t.closest && t.closest(".leaflet-marker-icon"))) { msRubHide(); return; }
+    var cp = map.mouseEventToContainerPoint(ev), ll = map.mouseEventToLatLng(ev);
+    msLast = { ll: ll, cp: cp };
+    if (!msRaf) msRaf = requestAnimationFrame(function () { msRaf = 0; if (msLast) msUpdate(msLast.ll, msLast.cp); });
+  });
+  map.getContainer().addEventListener("mouseleave", msRubHide);
+  map.on("movestart zoomstart", msRubHide);
+  function msMode(on, silent) {   // choix du mode : s'applique aux prochains clics ; les sommets déjà posés gardent leur état
+    msSnapOn = on;
+    $("measureModeSnap").setAttribute("aria-pressed", on ? "true" : "false");
+    $("measureModeFree").setAttribute("aria-pressed", on ? "false" : "true");
+    try { localStorage.setItem("vhmaps-ms-mode", on ? "snap" : "free"); } catch (e) {}
+    if (on && measureMode === "line") qIndex().catch(function () {});
+    if (!silent) say(on ? "Mode accrochage : les points se posent sur le référentiel (RD) et la mesure suit la route." : "Mode libre : points posés sans accrochage, segments droits.");
+    if (msLast) msUpdate(msLast.ll, msLast.cp);
+  }
+  $("measureModeSnap").onclick = function () { msMode(true); };
+  $("measureModeFree").onclick = function () { msMode(false); };
+  msMode(msSnapOn, true);
+
   // Réduire / rouvrir la fenêtre sans toucher aux tracés
   function foldMeasure(fold){
     var pnl=$("measurePanel"),b=$("measureFold");
@@ -2228,6 +2681,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
+  $("appVer").textContent = "VHMaps — version 34";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
