@@ -2115,6 +2115,24 @@
     $("measureAdd").textContent=measureEditIdx>=0?"✓ Valider la modification":"+ Nouveau tracé";
     updateMeasureTotals();
   }
+  // Polygone simple : aucune paire d'arêtes non adjacentes ne doit se croiser ni se toucher
+  function polyCrosses(pts){
+    var n=pts.length;if(n<4)return false;
+    var k=Math.cos(pts[0].lat*Math.PI/180);
+    var P=pts.map(function(p){return {x:p.lng*k,y:p.lat};});
+    function o(a,b,c){var v=(b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);return v>0?1:v<0?-1:0;}
+    function on(a,b,c){return Math.min(a.x,b.x)<=c.x&&c.x<=Math.max(a.x,b.x)&&Math.min(a.y,b.y)<=c.y&&c.y<=Math.max(a.y,b.y);}
+    function inter(a,b,c,d){
+      var o1=o(a,b,c),o2=o(a,b,d),o3=o(c,d,a),o4=o(c,d,b);
+      if(o1!==o2&&o3!==o4)return true;
+      return (o1===0&&on(a,b,c))||(o2===0&&on(a,b,d))||(o3===0&&on(c,d,a))||(o4===0&&on(c,d,b));
+    }
+    for(var i=0;i<n;i++)for(var j=i+2;j<n;j++){
+      if(i===0&&j===n-1)continue;
+      if(inter(P[i],P[(i+1)%n],P[j],P[(j+1)%n]))return true;
+    }
+    return false;
+  }
   function measureValid(t,pts){return !!t&&pts.length>=(t==="area"?3:2);}
   function measureVal(t,pts){return t==="area"?areaMeters(pts):measureLength(pts);}
   function measureFmt(t,v){return t==="area"?fmtArea(v):fmtDistance(v);}
@@ -2193,8 +2211,16 @@
       var marker=L.marker(p,{draggable:true,icon:measureVertexIcon(i===measureSelected),keyboard:true,title:"Déplacer le sommet "+(i+1)}).addTo(measureLayer);
       marker.bindTooltip(String(i+1),{direction:"top",offset:[0,-8]});
       marker.on("click",function(e){if(e.originalEvent)L.DomEvent.stopPropagation(e.originalEvent);measureSelected=i;drawMeasure();});
-      marker.on("drag",function(e){measurePoints[i]=e.target.getLatLng();if(measureShape)measureShape.setLatLngs(validArea?measurePoints:measureGeom(measurePoints));updateMeasureValue();});
-      marker.on("dragend",function(e){var ll=e.target.getLatLng();if(measureType==="line")ll=msResnap(ll);measurePoints[i]=ll;drawMeasure();});
+      var lastOk=p;
+      marker.on("drag",function(e){
+        var ll=e.target.getLatLng();
+        if(measureType==="area"){
+          var cand=measurePoints.slice();cand[i]=ll;
+          if(polyCrosses(cand)){e.target.setLatLng(lastOk);return;}
+          lastOk=ll;
+        }
+        measurePoints[i]=e.target.getLatLng();if(measureShape)measureShape.setLatLngs(validArea?measurePoints:measureGeom(measurePoints));updateMeasureValue();});
+      marker.on("dragend",function(e){var ll=e.target.getLatLng();if(measureType==="area"&&polyCrosses(measurePoints.map(function(q,k){return k===i?ll:q;})))ll=lastOk;if(measureType==="line")ll=msResnap(ll);measurePoints[i]=ll;drawMeasure();});
       measureMarkers.push(marker);
     });
     updateMeasureValue();
@@ -2219,12 +2245,13 @@
     if(!measureMode)return;
     if(insertMeasurePoint(e))return;
     var last=measurePoints.length?measurePoints[measurePoints.length-1]:null;
+    if(measureType==="area"&&polyCrosses(measurePoints.concat([e.latlng]))){say("Point refusé : le polygone ne doit pas se croiser.",true);return;}
     measurePoints.push(measureType==="line"?msResnap(e.latlng,last&&last.snap):e.latlng);measureSelected=-1;drawMeasure();
     if(msLast)msUpdate(msLast.ll,msLast.cp);
   });
   // --- Ligne élastique : dernier point cliqué → curseur (mesures linéaire et surfacique), accrochée au référentiel en mesure linéaire ---
   var msRub = L.layerGroup().addTo(map), msLine = L.polyline([], { color: MEASURE_COLOR, weight: 3, opacity: .85, dashArray: "2 7", lineCap: "round", interactive: false }),
-      msClose = L.polyline([], { color: MEASURE_COLOR, weight: 2, opacity: .45, dashArray: "2 7", interactive: false }),
+      msClose = L.polyline([], { color: MEASURE_COLOR, weight: 3, opacity: .85, dashArray: "2 7", lineCap: "round", interactive: false }),
       msDot = L.circleMarker([0, 0], { radius: 6, color: "#fff", weight: 2, fillColor: MEASURE_COLOR, fillOpacity: 1, interactive: false }),
       msTipEl = null, msLast = null, msRaf = 0;
   function msRubHide() {
@@ -2246,7 +2273,10 @@
       var seg = msPathLen(pts);
       html += "+ " + fmtDistance(seg);
       if (measureType === "line") html += " · total " + fmtDistance(measureLength(measurePoints) + seg);
-      else if (measurePoints.length >= 2) html += " · surface " + fmtArea(areaMeters(measurePoints.concat([tgt])));
+      else if (measurePoints.length >= 2) {
+        var cand = measurePoints.concat([tgt]);
+        html += polyCrosses(cand) ? " · <b>⚠ croisement interdit</b>" : " · surface " + fmtArea(areaMeters(cand));
+      }
     } else if (!sn) html = "<small>Cliquez pour poser le premier point</small>";
     if (!msTipEl) msTipEl = tipNew();
     tipPut(msTipEl, cp || map.latLngToContainerPoint(ll), html);
@@ -2286,9 +2316,10 @@
   $("measureFold").onclick=function(){foldMeasure(!$("measurePanel").classList.contains("folded"));};
   $("measureLine").onclick=function(){setMeasure(measureMode==="line"?null:"line");};
   $("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
-  $("measureUndo").onclick=function(){if(measurePoints.length){measurePoints.pop();measureSelected=-1;drawMeasure();}};
+  $("measureUndo").onclick=function(){if(measurePoints.length){if(measureType==="area"&&polyCrosses(measurePoints.slice(0,-1))){say("Annulation refusée : le polygone se croiserait.",true);return;}measurePoints.pop();measureSelected=-1;drawMeasure();}};
   function deleteMeasureVertex(){
     if(measureSelected<0||!measurePoints[measureSelected])return;
+    if(measureType==="area"){var c=measurePoints.slice();c.splice(measureSelected,1);if(polyCrosses(c)){say("Suppression refusée : le polygone se croiserait.",true);return;}}
     measurePoints.splice(measureSelected,1);measureSelected=-1;drawMeasure();
   }
   $("measureDelete").onclick=deleteMeasureVertex;
