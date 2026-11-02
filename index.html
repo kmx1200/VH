@@ -213,6 +213,7 @@
 <div class="tools">
   <button id="search" class="tool" data-help="Cherchez une adresse, un lieu ou des coordonnées, puis centrez la carte dessus." aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
   <button id="locate" class="tool" data-help="Affiche votre position et votre direction sans enregistrer de tracé. Touchez de nouveau pour désactiver." aria-pressed="false" aria-label="Activer ma position"></button>
+  <button id="trace" class="tool" data-help="Enregistre et affiche le chemin que vous parcourez à partir de votre position, sans suivre de circuit. Touchez de nouveau pour arrêter." aria-pressed="false" aria-label="Tracer mon parcours"></button>
   <button id="fs" class="tool" data-help="Masque la barre du navigateur pour agrandir la carte." aria-pressed="false" aria-label="Plein écran"></button>
   <button id="sv" class="tool" data-help="Touchez ensuite un point de la carte pour ouvrir Google Street View à cet endroit." aria-pressed="false" aria-label="Street View : choisir un point"></button>
   <button id="pk" class="tool" data-help="Touchez ensuite un point proche d’une route du référentiel pour obtenir la route, le PR et l’abscisse." aria-pressed="false" aria-label="Localiser un PR : choisir un point"></button>
@@ -426,6 +427,7 @@
   var wasRecording = false;
   var elapsed = 0;
   var startedAt = null;
+  var traceShown = false;   // garde le panneau de suivi visible tant qu'un parcours libre est affiché
   var watchId = null, wakeLock = null, timer = null;
   var locating = false, following = true, firstCenter = false, lastFix = null, prevFix = null;
 
@@ -582,6 +584,7 @@
     timer = setInterval(render, 1000);
     $("toggle").textContent = "Arrêter"; $("toggle").className = "on";
     say(lastFix ? "Suivi en cours." : "Recherche du signal GPS…");
+    traceShown = true; syncTrace();
   }
 
   function stop() {
@@ -592,6 +595,7 @@
     save(); render();
     $("toggle").textContent = points.length ? "Reprendre" : "Démarrer"; $("toggle").className = "";
     say("Suivi arrêté. Exportez le tracé si besoin.");
+    syncTrace();
   }
 
   $("toggle").onclick = function () { startedAt === null ? start() : stop(); };
@@ -602,6 +606,7 @@
     points = []; elapsed = 0; line.setLatLngs([]); resetHeading();
     try { localStorage.removeItem(KEY); } catch (e) {}
     $("toggle").textContent = "Démarrer"; render(); say("Itinéraire effacé.");
+    traceShown = false; applyRoute(false);
   };
 
   $("gpx").onclick = function () {
@@ -768,7 +773,7 @@
   function applyRoute(fit) {
     var r = currentRoute();
     // Panneau du bas : visible seulement avec un circuit sélectionné (ou si un enregistrement est en cours)
-    $("sheet").hidden = !r && startedAt === null;
+    $("sheet").hidden = !r && startedAt === null && !traceShown;
     if (typeof syncSheet === "function") syncSheet();
     $("del").hidden = !r || !!r.file;
     if (r && r.file && !r.segs && !r.pts) {
@@ -1207,6 +1212,36 @@
       .catch(function () { shotToast("Capture impossible (couche de carte non exportable)."); })
       .then(function () { shotBtn.disabled = false; });
   };
+
+  // ---------- Tracer mon parcours (enregistrement libre, sans circuit) ----------
+  var traceBtn = $("trace");
+  traceBtn.innerHTML = ICON("M5 19a2 2 0 1 0 4 0a2 2 0 1 0-4 0M15 5a2 2 0 1 0 4 0a2 2 0 1 0-4 0M7 17c0-6 10-2 10-10");
+  function syncTrace() {
+    if (!traceBtn) return;
+    var on = startedAt !== null;
+    traceBtn.setAttribute("aria-pressed", on ? "true" : "false");
+    traceBtn.setAttribute("aria-label", on ? "Arrêter le tracé de mon parcours" : "Tracer mon parcours");
+  }
+  traceBtn.onclick = function () {
+    if (startedAt !== null) {
+      stop();
+      if (!locating) { if (marker) { map.removeLayer(marker); marker = null; } resetHeading(); }
+      syncTrace(); return;
+    }
+    if (points.length) {
+      if (!confirm("Un tracé enregistré existe déjà. Le remplacer par un nouveau parcours ?\n(Annuler : le conserver et afficher ses commandes.)")) {
+        traceShown = true; applyRoute(false); say("Tracé précédent conservé : Reprendre, Exporter ou Effacer."); return;
+      }
+      points = []; elapsed = 0; line.setLatLngs([]); resetHeading();
+      try { localStorage.removeItem(KEY); } catch (e) {}
+      $("toggle").textContent = "Démarrer"; render();
+    }
+    if (!lastFix) firstCenter = true;
+    start();
+    if (startedAt === null) return;
+    applyRoute(false); syncTrace();
+  };
+  syncTrace();
 
   // ---------- Street View ----------
   var svArmed = false, svPin = null;
