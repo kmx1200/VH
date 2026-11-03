@@ -73,6 +73,7 @@
   .compass span { font-size: .8rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .legends { position: absolute; z-index: 1000; left: 10px; top: calc(160px + env(safe-area-inset-top, 0px));
     display: grid; gap: 8px; max-width: min(60vw, 240px); }
+  .legends.no-compass { top: calc(66px + env(safe-area-inset-top, 0px)); }
   .legend { max-height: 26vh; overflow: auto; padding: 6px 8px; font-size: .78rem;
     background: var(--surface-a); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 2px 8px rgba(20,52,47,.18); }
   .legend div { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
@@ -198,6 +199,12 @@
   .measure-vertex.selected { width:27px; height:27px; margin:-2.5px; border-width:3px; background:#1976d2; }
   @media(max-width:520px){ .tools { top:calc(116px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
   @media (max-height: 520px) { .tools { grid-auto-flow: column; } }
+  /* Smartphone : la fenêtre du recensement laisse libre la colonne de boutons de droite (46 px + marges) */
+  @media (max-width: 520px) { .recens, .measure-panel, .guide { right: 66px; } .recens .row { gap: 4px; } }
+  /* Smartphone : boutons repliables (poignée toujours visible) pour libérer la carte */
+  .tools.collapsed > .tool:not(#toolsToggle) { display: none; }
+  .tools.collapsed #toolsToggle { opacity: .8; }
+  body.tools-off .recens, body.tools-off .measure-panel, body.tools-off .guide { right: 10px; }
 </style>
 </head>
 <body>
@@ -232,7 +239,8 @@
   <ul id="qres" aria-live="polite"></ul>
 </div>
 
-<div class="tools">
+<div class="tools" id="tools">
+  <button id="toolsToggle" class="tool" data-help="Affiche ou masque les boutons pour libérer la carte. Ils se masquent seuls après quelques secondes." aria-expanded="true" aria-label="Boutons" hidden></button>
   <button id="search" class="tool" data-help="Cherchez une adresse, un lieu ou des coordonnées, puis centrez la carte dessus." aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
   <button id="locate" class="tool" data-help="Affiche votre position et votre direction sans enregistrer de tracé. Touchez de nouveau pour désactiver." aria-pressed="false" aria-label="Activer ma position"></button>
   <button id="trace" class="tool" data-help="Enregistre et affiche le chemin que vous parcourez à partir de votre position, sans suivre de circuit. Touchez de nouveau pour arrêter." aria-pressed="false" aria-label="Tracer mon parcours"></button>
@@ -3064,10 +3072,36 @@
   syncSheet();
   window.addEventListener("resize", syncSheet);
   if (window.ResizeObserver) new ResizeObserver(syncSheet).observe(document.querySelector(".sheet"));
+  // Boutons de droite repliables sur smartphone : poignée + masquage automatique après inactivité
+  (function () {
+    var tools = $("tools"), tg = $("toolsToggle"), mq = window.matchMedia("(max-width: 520px)"), timer = null, DELAY = 8000;
+    var ICO_OPEN = ICON("M6 6l12 12M18 6L6 18"), ICO_CLOSED = ICON("M4 6h16M4 12h16M4 18h16");
+    function set(collapsed) {
+      tools.classList.toggle("collapsed", collapsed);
+      document.body.classList.toggle("tools-off", collapsed && mq.matches);
+      tg.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      tg.innerHTML = collapsed ? ICO_CLOSED : ICO_OPEN;
+      arm();
+    }
+    function arm() {
+      clearTimeout(timer);
+      if (mq.matches && !tools.classList.contains("collapsed")) timer = setTimeout(function () { set(true); }, DELAY);
+    }
+    function apply() {
+      tg.hidden = !mq.matches;
+      if (!mq.matches) { tools.classList.remove("collapsed"); document.body.classList.remove("tools-off"); clearTimeout(timer); }
+      else set(false);
+    }
+    tg.onclick = function () { set(!tools.classList.contains("collapsed")); };
+    ["pointerdown", "touchstart", "keydown"].forEach(function (ev) { tools.addEventListener(ev, arm, { passive: true }); });
+    if (mq.addEventListener) mq.addEventListener("change", apply); else if (mq.addListener) mq.addListener(apply);
+    apply();
+  })();
+
   // Boussole : visible uniquement quand la fenêtre de suivi l'est (itinéraire choisi ou enregistrement en cours)
   (function () {
     var sh = document.querySelector(".sheet"), cp = $("compass");
-    function syncCompass() { cp.hidden = sh.hidden; }
+    function syncCompass() { cp.hidden = sh.hidden; document.querySelector(".legends").classList.toggle("no-compass", cp.hidden); }
     syncCompass();
     new MutationObserver(syncCompass).observe(sh, { attributes: true, attributeFilter: ["hidden"] });
   })();
