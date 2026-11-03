@@ -206,6 +206,12 @@
   .tools.collapsed > .tool:not(#toolsToggle) { display: none; }
   .tools.collapsed #toolsToggle { opacity: .8; }
   body.tools-off .recens, body.tools-off .measure-panel, body.tools-off .guide { right: 10px; }
+  /* Fenêtre de mesure réduite : right:auto la rend ajustée à son contenu, mais elle doit rester bornée pour ne pas passer sous les boutons de droite */
+  .measure-panel.folded { max-width: min(460px, calc(100vw - 20px)); }
+  @media (max-width: 520px) {
+    .measure-panel.folded { max-width: calc(100vw - 76px); }
+    body.tools-off .measure-panel.folded { max-width: calc(100vw - 20px); }
+  }
 </style>
 </head>
 <body>
@@ -260,7 +266,7 @@
   <div id="measureHead"><b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span><button id="measureFold" class="ghost" aria-expanded="true" aria-label="Réduire la fenêtre de mesure" title="Réduire pour mieux voir la carte (les tracés sont conservés)">▾</button></div>
   <div id="measureTotals" hidden></div>
   <ul id="measureList" hidden></ul>
-  <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx)" disabled>Export Excel</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
+  <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx) ; en accrochage RD, les PR et abscisses sont calculés" disabled>Export Excel</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
   <div class="ms-modes" id="measureSnapRow" role="group" aria-label="Mode de la mesure linéaire">
     <button id="measureModeSnap" class="ghost" aria-pressed="true" data-tip="Les points s’accrochent au référentiel (RD) et la mesure suit la route">Accrochage RD</button>
     <button id="measureModeFree" class="ghost" aria-pressed="false" data-tip="Points libres : aucune contrainte d’accrochage, segments droits">Libre</button>
@@ -2124,6 +2130,37 @@
     if (!r) return "PR indisponible";
     return r.m >= 0 ? "PR " + esc(r.pr) + "+" + r.m + (r.approx ? " <small>(estimé)</small>" : "") : "~" + (-r.m) + " m avant PR " + esc(r.pr);
   }
+  // PR + abscisse d'un sommet de mesure accroché au référentiel (null si le sommet est libre) — utilisé par l'export Excel
+  function msVertexPr(pt) {
+    var sn = pt && pt.snap; if (!sn) return null;
+    var c = msCache[sn.axe];
+    if (!c && qIdxVal) { var en = qIdxVal.filter(function (e) { return e.axe === sn.axe; })[0]; if (en) c = msEntry(en); }
+    if (!c) return null;
+    return { route: shortRoute(sn.axe), r: msPr(c, sn.ci, sn.s) };
+  }
+  function msVertexPrNote(v) {
+    if (!v) return "";
+    if (!v.r) return "PR indisponible";
+    return v.r.m < 0 ? "Avant le premier PR de la route" : (v.r.approx ? "PR estimé (un seul PR de référence)" : "");
+  }
+  // Cellules Excel d'un sommet : [Route, PR, Abscisse (m), Remarque]
+  function msVertexCells(pt) {
+    var v = msVertexPr(pt);
+    if (!v) return [null, null, null, null];
+    return [v.route, v.r ? Number(v.r.pr) : null, v.r ? v.r.m : null, msVertexPrNote(v)];
+  }
+  // Cellules Excel d'une mesure linéaire : [Route, PR début, Abscisse début (m), PR fin, Abscisse fin (m), Remarque]
+  function msLineCells(a, b) {
+    var A = msVertexPr(a), B = msVertexPr(b);
+    if (!A && !B) return [null, null, null, null, null, "Tracé libre (hors accrochage RD)"];
+    var route = (A && B && A.route !== B.route) ? A.route + " → " + B.route : (A || B).route, notes = [];
+    if (!A) notes.push("Début non accroché au référentiel"); else { var n1 = msVertexPrNote(A); if (n1) notes.push("Début : " + n1); }
+    if (!B) notes.push("Fin non accrochée au référentiel"); else { var n2 = msVertexPrNote(B); if (n2) notes.push("Fin : " + n2); }
+    return [route,
+      A && A.r ? Number(A.r.pr) : null, A && A.r ? A.r.m : null,
+      B && B.r ? Number(B.r.pr) : null, B && B.r ? B.r.m : null,
+      notes.join(" ; ")];
+  }
   function msSub(c, ci, s1, s2) {   // points du référentiel entre deux positions curvilignes (dans le sens s1 → s2)
     var ch = c.chains[ci], lo = Math.min(s1, s2), hi = Math.max(s1, s2), acc = 0, pts = [pointAt(ch, lo)];
     for (var i = 0; i < ch.length - 1; i++) { acc += d2(ch[i], ch[i + 1]); if (acc > lo && acc < hi) pts.push(ch[i + 1]); }
@@ -2560,22 +2597,22 @@
       sheets.push({name:"Surfacique",xml:xlSheet(rows,[6,16,16,16,16,13])});
     }
     {
-      var rl=[[H("N°"),H("Nom"),H("Distance (m)"),H("Distance (km)"),H("Nb points")]],td=0;
+      var rl=[[H("N°"),H("Nom"),H("Distance (m)"),H("Distance (km)"),H("Nb points"),H("Route"),H("PR début"),H("Abscisse début (m)"),H("PR fin"),H("Abscisse fin (m)"),H("Remarque")]],td=0;
       lines.forEach(function(m,i){
         var d=r2(measureLength(m.points)),n=i+2;td+=d;
-        rl.push([i+1,"Distance "+(i+1),{v:d,s:2},{f:"C"+n+"/1000",v:d/1000,s:2},m.points.length]);
+        rl.push([i+1,"Distance "+(i+1),{v:d,s:2},{f:"C"+n+"/1000",v:d/1000,s:2},m.points.length].concat(msLineCells(m.points[0],m.points[m.points.length-1])));
       });
       var ll=lines.length+1;
       if(lines.length)rl.push([null,{v:"Total",s:1},{f:"SUM(C2:C"+ll+")",v:r2(td),s:4},{f:"SUM(D2:D"+ll+")",v:td/1000,s:4},null]);
       else rl.push([null,"Aucune mesure linéaire"]);
-      sheets.push({name:"Linéaire",xml:xlSheet(rl,[6,16,16,16,13])});
+      sheets.push({name:"Linéaire",xml:xlSheet(rl,[6,16,16,16,13,18,10,18,10,18,44])});
     }
-    var rs=[[H("Mesure"),H("Type"),H("N° sommet"),H("Latitude (WGS84)"),H("Longitude (WGS84)"),H("X (Lambert 93)"),H("Y (Lambert 93)")]],na=0,nl=0;
+    var rs=[[H("Mesure"),H("Type"),H("N° sommet"),H("Latitude (WGS84)"),H("Longitude (WGS84)"),H("X (Lambert 93)"),H("Y (Lambert 93)"),H("Route"),H("PR"),H("Abscisse (m)"),H("Remarque")]],na=0,nl=0;
     all.forEach(function(m){
       var isA=m.type==="area",name=(isA?"Surface ":"Distance ")+(isA?++na:++nl);
-      m.points.forEach(function(pt,i){var L93=toLambert93(pt.lat,pt.lng);rs.push([name,isA?"Surface":"Distance",i+1,{v:pt.lat,s:3},{v:pt.lng,s:3},{v:r2(L93.x),s:2},{v:r2(L93.y),s:2}]);});
+      m.points.forEach(function(pt,i){var L93=toLambert93(pt.lat,pt.lng);rs.push([name,isA?"Surface":"Distance",i+1,{v:pt.lat,s:3},{v:pt.lng,s:3},{v:r2(L93.x),s:2},{v:r2(L93.y),s:2}].concat(isA?[null,null,null,null]:msVertexCells(pt)));});
     });
-    sheets.push({name:"Sommets",xml:xlSheet(rs,[16,12,12,18,18,18,18])});
+    sheets.push({name:"Sommets",xml:xlSheet(rs,[16,12,12,18,18,18,18,18,10,14,40])});
 
     var NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',R='http://schemas.openxmlformats.org/officeDocument/2006/relationships',X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
     var files=[
