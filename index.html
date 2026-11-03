@@ -898,6 +898,8 @@
     fetch(encodeURI(it.file), { cache: "no-cache" })
       .then(function (r) { if (!r.ok) { var e = new Error("HTTP " + r.status); e.kind = "http"; throw e; } return r.text(); })
       .then(function (t) {
+        // Cloudflare Pages (et d'autres hébergeurs) renvoie index.html en « 200 » pour un fichier absent : ce n'est pas un GPX
+        if (/^\s*<(!doctype\s+html|html)/i.test(t)) { var e0 = new Error("HTTP 404"); e0.kind = "http"; throw e0; }
         var g = parseGpx(t, it.name);
         if (!g) { var e = new Error("illisible"); e.kind = "parse"; throw e; }
         g.name = it.name;

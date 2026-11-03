@@ -9,7 +9,7 @@ Fonctionne hors ligne une fois installée (fonds de carte déjà consultés mis 
 index.html
 manifest.json
 sw.js                 ← service worker (hors ligne)
-itineraires.json      ← liste de repli (facultative)
+itineraires.json      ← liste des circuits (obligatoire hors GitHub Pages, ex. Cloudflare) ; générée par outils/generer_itineraires.py
 itineraires/          ← déposer ici les fichiers .gpx
 donnees/              ← dalle (fond de plan), référentiel routier, PR
 outils/               ← script de préparation des données (non publié obligatoirement)
@@ -28,6 +28,9 @@ icons/
 - Bouton plein écran : masque la barre du navigateur (Android, ordinateur, iPad).
 - Bouton installer : ajoute VHMaps à l'écran d'accueil (iPhone : Partager → Sur l'écran d'accueil).
 - Ajouter un itinéraire : déposer le `.gpx` dans `itineraires/`, puis « Importer GPX » dans l'appli.
+  - GitHub Pages : la liste est lue automatiquement via l'API GitHub.
+  - Cloudflare Pages (ou autre hébergeur) : relancer `python outils/generer_itineraires.py` pour mettre à jour `itineraires.json`, puis redéployer.
+    Avec un dépôt Git relié à Cloudflare, on peut l'automatiser : *Build command* `python3 outils/generer_itineraires.py`.
 
 ## Segments de couleurs dans un GPX
 

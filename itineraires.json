@@ -1,3 +1,26 @@
 [
-  { "name": "Exemple (à remplacer)", "file": "itineraires/exemple.gpx" }
+  {
+    "name": "Atd",
+    "file": "itineraires/Atd.gpx"
+  },
+  {
+    "name": "GC_6m3_BC1",
+    "file": "itineraires/GC_6m3_BC1.gpx"
+  },
+  {
+    "name": "LG_6m3_BC1",
+    "file": "itineraires/LG_6m3_BC1.gpx"
+  },
+  {
+    "name": "MU_6m3_Ouest_BC1",
+    "file": "itineraires/MU_6m3_Ouest_BC1.gpx"
+  },
+  {
+    "name": "QT_5m3_BC1",
+    "file": "itineraires/QT_5m3_BC1.gpx"
+  },
+  {
+    "name": "VA_4m3_BC1",
+    "file": "itineraires/VA_4m3_BC1.gpx"
+  }
 ]
