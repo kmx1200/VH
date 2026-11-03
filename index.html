@@ -197,7 +197,7 @@
   .measure-vertex { width:22px; height:22px; box-sizing:border-box; border:3px solid #fff; border-radius:50%;
     background:var(--measure); box-shadow:0 1px 5px rgba(0,0,0,.55); cursor:move; touch-action:none; }
   .measure-vertex.selected { width:27px; height:27px; margin:-2.5px; border-width:3px; background:#1976d2; }
-  @media(max-width:520px){ .tools { top:calc(116px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
+  @media(max-width:520px){ .tools { top:calc(66px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
   @media (max-height: 520px) { .tools { grid-auto-flow: column; } }
   /* Smartphone : la fenêtre du recensement laisse libre la colonne de boutons de droite (46 px + marges) */
   @media (max-width: 520px) { .recens, .measure-panel, .guide { right: 66px; } .recens .row { gap: 4px; } }
@@ -252,8 +252,8 @@
   <button id="offline" class="tool" data-help="Fond de carte, couches (référentiel, PR, PCRS, parcelles) et cartes hors ligne." aria-label="Cartes et hors ligne"></button>
   <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
   <button id="shot" class="tool" data-help="Enregistre une image de la carte seule, sans les boutons. Les mesures affichées et leurs valeurs y sont ajoutées." aria-label="Copie d'écran de la carte"></button>
-  <button id="measureLine" class="tool" data-help="Posez des points pour mesurer une distance. Les poignées permettent d’ajuster le tracé." aria-label="Mesurer une distance">↔</button>
-  <button id="measureArea" class="tool" data-help="Posez au moins 3 points pour mesurer une surface." aria-label="Mesurer une surface">□</button>
+  <button id="measureLine" class="tool" data-help="Posez des points pour mesurer une distance. Les poignées permettent d’ajuster le tracé." aria-label="Mesurer une distance"></button>
+  <button id="measureArea" class="tool" data-help="Posez au moins 3 points pour mesurer une surface." aria-label="Mesurer une surface"></button>
 </div>
 <div id="measurePanel" class="measure-panel" hidden>
   <div id="measureHead"><b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span><button id="measureFold" class="ghost" aria-expanded="true" aria-label="Réduire la fenêtre de mesure" title="Réduire pour mieux voir la carte (les tracés sont conservés)">▾</button></div>
@@ -2336,6 +2336,8 @@
     b.title=fold?"Rouvrir la fenêtre de mesure":"Réduire pour mieux voir la carte (les tracés sont conservés)";
   }
   $("measureFold").onclick=function(){foldMeasure(!$("measurePanel").classList.contains("folded"));};
+  $("measureLine").innerHTML = ICON("M3 12h18M3 7v10M21 7v10M8 12v3M12 12v2M16 12v3");
+  $("measureArea").innerHTML = ICON("M4 8l9-4 7 6-3 9-12-1zM4 8h.01M13 4h.01M20 10h.01M17 19h.01M5 18h.01");
   $("measureLine").onclick=function(){setMeasure(measureMode==="line"?null:"line");};
   $("measureArea").onclick=function(){setMeasure(measureMode==="area"?null:"area");};
   $("measureUndo").onclick=function(){if(measurePoints.length){if(measureType==="area"&&polyCrosses(measurePoints.slice(0,-1))){say("Annulation refusée : le polygone se croiserait.",true);return;}measurePoints.pop();measureSelected=-1;drawMeasure();}};
