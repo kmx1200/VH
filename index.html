@@ -876,6 +876,8 @@
     var repo = location.pathname.split("/")[1];
     return m && repo && !/\.html?$/i.test(repo) ? { owner: m[1], repo: repo } : null;
   }
+  // Liste des circuits du serveur : API GitHub sur github.io, sinon itineraires.json (Cloudflare Pages, etc.).
+  // Résout { list: [...], why: "" } ; « why » explique l'absence de résultat pour l'afficher dans la fenêtre.
   function listServer() {
     var gh = serverRepo();
     var viaApi = gh
@@ -886,11 +888,25 @@
               .map(function (i) { return { name: i.name.replace(/\.gpx$/i, ""), file: "itineraires/" + i.name }; });
           })
       : Promise.reject();
-    return viaApi.catch(function () {
-      return fetch("itineraires.json", { cache: "no-cache" })
-        .then(function (r) { return r.ok ? r.json() : []; })
-        .then(function (l) { return l.filter(function (x) { return x && x.file; }); })
-        .catch(function () { return []; });
+    return viaApi.then(function (l) { return { list: l, why: "" }; }, function () {
+      var url = new URL("itineraires.json", location.href).href;
+      return fetch(url + "?t=" + Date.now(), { cache: "no-store" })
+        .then(function (r) {
+          if (!r.ok) return { list: [], why: "itineraires.json introuvable sur le serveur (HTTP " + r.status + ") : " + url };
+          return r.text().then(function (t) {
+            var data;
+            try { data = JSON.parse(t.replace(/^\uFEFF/, "")); }
+            catch (e) { return { list: [], why: "itineraires.json n'est pas déployé ou est invalide : le serveur renvoie autre chose que du JSON (" + url + ")" }; }
+            if (data && !Array.isArray(data) && Array.isArray(data.itineraires)) data = data.itineraires;
+            if (!Array.isArray(data)) return { list: [], why: "itineraires.json : format inattendu (une liste est attendue)" };
+            var list = data.map(function (x) {
+              if (typeof x === "string") return { name: x.replace(/^.*\//, "").replace(/\.gpx$/i, ""), file: /\//.test(x) ? x : "itineraires/" + x };
+              return x;
+            }).filter(function (x) { return x && x.file; });
+            return { list: list, why: list.length ? "" : "itineraires.json est vide : lancer outils/generer_itineraires.py puis redéployer" };
+          });
+        })
+        .catch(function () { return { list: [], why: "réseau indisponible (liste des circuits non lue)" }; });
     });
   }
   function importFromServer(it) {
@@ -923,9 +939,10 @@
     var ul = $("srvlist");
     ul.innerHTML = "<li>Recherche des fichiers…</li>";
     $("srv").showModal();
-    listServer().then(function (list) {
+    listServer().then(function (res) {
+      var list = res.list;
       ul.innerHTML = "";
-      if (!list.length) { ul.innerHTML = "<li>Aucun fichier GPX trouvé sur le serveur.</li>"; return; }
+      if (!list.length) { ul.innerHTML = "<li>Aucun fichier GPX trouvé sur le serveur." + (res.why ? "<br><small>" + esc(res.why) + "</small>" : "") + "</li>"; return; }
       list.forEach(function (it) {
         var li = document.createElement("li"), b = document.createElement("button");
         b.className = "ghost"; b.textContent = it.name;
