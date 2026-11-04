@@ -144,6 +144,8 @@
   .sheet [data-tip]::after, .measure-panel [data-tip]::after { bottom: calc(100% + 8px); left: 0; }
   .sheet .row [data-tip]:last-child::after, .measure-panel .row [data-tip]:last-child::after { left: auto; right: 0; }
   .routebar [data-tip]::after, .searchbar [data-tip]::after { top: calc(100% + 8px); right: 0; }
+  /* Plein écran sans circuit VH chargé : on masque le sélecteur (« Tracé libre ») et le bouton Importer GPX */
+  body.fs-on.no-vh .routebar { display: none; }
   .tool:focus-visible::after, [data-tip]:focus-visible::after, .tool.tip-on::after, [data-tip].tip-on::after { opacity: 1; }
   @media (hover: hover) { .tool:hover::after, [data-tip]:hover::after { opacity: 1; transition-delay: .3s; } }
   .shot-toast { position: fixed; z-index: 1400; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-width: min(90vw, 460px);
@@ -257,10 +259,10 @@
   <button id="pk" class="tool" data-help="Touchez ensuite un point proche d’une route du référentiel pour obtenir la route, le PR et l’abscisse." aria-pressed="false" aria-label="Localiser un PR : choisir un point"></button>
   <button id="theme" class="tool" data-help="Bascule entre le thème clair et le thème sombre." aria-label="Mode sombre"></button>
   <button id="offline" class="tool" data-help="Fond de carte, couches (référentiel, PR, PCRS, parcelles) et cartes hors ligne." aria-label="Cartes et hors ligne"></button>
-  <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
   <button id="shot" class="tool" data-help="Enregistre une image de la carte seule, sans les boutons. Les mesures affichées et leurs valeurs y sont ajoutées." aria-label="Copie d'écran de la carte"></button>
   <button id="measureLine" class="tool" data-help="Posez des points pour mesurer une distance. Les poignées permettent d’ajuster le tracé." aria-label="Mesurer une distance"></button>
   <button id="measureArea" class="tool" data-help="Posez au moins 3 points pour mesurer une surface." aria-label="Mesurer une surface"></button>
+  <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
 </div>
 <div id="measurePanel" class="measure-panel" hidden>
   <div id="measureHead"><b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span><button id="measureFold" class="ghost" aria-expanded="true" aria-label="Réduire la fenêtre de mesure" title="Réduire pour mieux voir la carte (les tracés sont conservés)">▾</button></div>
@@ -838,6 +840,7 @@
   }
   function applyRoute(fit) {
     var r = currentRoute();
+    updateRouteBar();
     // Panneau du bas : visible seulement avec un circuit sélectionné (ou si un enregistrement est en cours)
     $("sheet").hidden = !r && startedAt === null && !traceShown;
     if (typeof syncSheet === "function") syncSheet();
@@ -1029,8 +1032,14 @@
   var fsBtn = $("fs");
   var canFs = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
   function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  // Barre du haut (sélecteur d'itinéraire + Importer GPX) : masquée en plein écran tant qu'aucun circuit VH n'est chargé
+  function updateRouteBar() {
+    document.body.classList.toggle("fs-on", isFs());
+    document.body.classList.toggle("no-vh", !currentRoute());
+  }
   function syncFs() {
     var on = isFs();
+    updateRouteBar();
     fsBtn.setAttribute("aria-pressed", on ? "true" : "false");
     fsBtn.setAttribute("aria-label", on ? "Quitter le plein écran" : "Plein écran");
     fsBtn.innerHTML = on ? I_EXIT : I_ENTER;
