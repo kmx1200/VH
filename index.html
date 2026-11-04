@@ -328,6 +328,8 @@
     <select id="offBase">
       <option value="ign">Plan IGN</option>
       <option value="ortho">Photographies aériennes IGN</option>
+      <option value="ortho6580">Photographie aérienne 1965-1980 (IGN)</option>
+      <option value="ortho8095">Photographie aérienne 1980-1995 (IGN)</option>
       <option value="atd">Carte du Morbihan (dalle ATD 2019)</option>
       <option value="osm">OpenStreetMap (en ligne uniquement)</option>
     </select>
@@ -406,6 +408,10 @@
              native: 18, kb: 16, offline: true, cls: "vh-invert", attr: "Plan IGN &copy; IGN / G&eacute;oplateforme" },
     ortho: { url: IGN + "ORTHOIMAGERY.ORTHOPHOTOS&FORMAT=image/jpeg&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
              native: 19, kb: 30, offline: true, cls: "", attr: "Photographies a&eacute;riennes &copy; IGN / G&eacute;oplateforme" },
+    ortho6580: { url: IGN + "ORTHOIMAGERY.ORTHOPHOTOS.1965-1980&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+             native: 18, kb: 25, offline: true, cls: "", attr: "Photographies a&eacute;riennes 1965-1980 &copy; IGN / G&eacute;oplateforme" },
+    ortho8095: { url: IGN + "ORTHOIMAGERY.ORTHOPHOTOS.1980-1995&FORMAT=image/png&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+             native: 18, kb: 25, offline: true, cls: "", attr: "Photographies a&eacute;riennes 1980-1995 &copy; IGN / G&eacute;oplateforme" },
     osm:   { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
              native: 19, kb: 20, offline: false, cls: "vh-invert", attr: "&copy; OpenStreetMap" },
     atd:   { pack: "donnees/dalle-morbihan.pack", native: 13, kb: 0, offline: false, local: true, cls: "vh-dim",
@@ -2929,7 +2935,7 @@
       go.disabled = true; return;
     }
     if (!b.offline) {
-      est.textContent = "Le téléchargement n'est pas autorisé sur les serveurs d'OpenStreetMap : choisissez Plan IGN ou Photographies aériennes IGN.";
+      est.textContent = "Le téléchargement n'est pas autorisé sur les serveurs d'OpenStreetMap : choisissez un fond IGN (plan ou photographies aériennes).";
       go.disabled = true; return;
     }
     var p = plan();

@@ -49,7 +49,7 @@ et le message de suivi indique le segment sur lequel on se trouve. Voir `itinera
 
 ## Cartes hors ligne (mode avion)
 
-Bouton « carte » (colonne de boutons à droite) : choisir le fond (Plan IGN ou photographies aériennes IGN),
+Bouton « carte » (colonne de boutons à droite) : choisir le fond (Plan IGN, photographies aériennes IGN actuelles, ou photographies aériennes anciennes 1965-1980 et 1980-1995),
 la zone (autour de l'itinéraire ou zone affichée) et le niveau de détail, puis « Télécharger ».
 Les tuiles sont enregistrées dans le téléphone (Cache API) et servies par `sw.js` sans réseau.
 
