@@ -338,6 +338,8 @@
   <label>Niveaux de gris du fond <input type="range" id="baseGray" min="0" max="100" step="5" value="0"></label>
   <details id="ovSec" open>
   <summary>Superpositions</summary>
+  <label class="chk"><input type="checkbox" id="ovScan"> <span id="ovScanName">Carte IGN SCAN 25 (dalles)</span></label>
+  <label>Opacité du SCAN 25 <input type="range" id="ovScanOp" min="20" max="100" step="10" value="100"></label>
   <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
   <label class="chk"><input type="checkbox" id="ovPr"> PR (points et numéros)</label>
   <label class="chk"><input type="checkbox" id="ovCadastre"> Parcelles cadastrales (IGN)</label>
@@ -364,6 +366,7 @@
       <option value="18">Maximal (zoom 18)</option>
     </select>
   </label>
+  <label class="chk" id="offScanRow" hidden><input type="checkbox" id="offScan" checked> Inclure la carte SCAN 25 (secteurs de la zone)</label>
   <p id="offEst" role="status"></p>
   <progress id="offBar" hidden></progress>
   <p id="offInfo"></p>
@@ -1237,8 +1240,10 @@
     var items = [], failed = 0;
     var panes = [].slice.call(map.getPane("mapPane").children).filter(function (p) { return p.classList.contains("leaflet-pane") && !/popup|shadow/.test(p.className); });
     panes.sort(function (a, b) { return (parseInt(getComputedStyle(a).zIndex, 10) || 0) - (parseInt(getComputedStyle(b).zIndex, 10) || 0); });
+    function layerZ(img) { var l = img.closest(".leaflet-layer"); return l ? parseInt(l.style.zIndex, 10) || 0 : 0; }
     panes.forEach(function (pane) {
-      [].slice.call(pane.querySelectorAll("img.leaflet-tile")).forEach(function (img) {
+      // Tuiles dessinées dans l'ordre d'empilement des couches (fond, SCAN 25, PCRS), pas dans l'ordre d'ajout
+      [].slice.call(pane.querySelectorAll("img.leaflet-tile")).sort(function (a, b) { return layerZ(a) - layerZ(b); }).forEach(function (img) {
         if (getComputedStyle(img).visibility === "hidden") return;
         var r = img.getBoundingClientRect(), layer = img.closest(".leaflet-layer"), al = shotOpacity(img, pane);
         var flt = layer ? getComputedStyle(layer).filter : "none";
@@ -2869,7 +2874,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 34";
+  $("appVer").textContent = "VHMaps — version 35";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
@@ -2917,39 +2922,48 @@
     return { tiles: out, count: out.length, tooMany: false };
   }
   function plan() {
-    var base = BASES[$("offBase").value], z1 = parseInt($("offZoom").value, 10), p;
+    var base = BASES[$("offBase").value], z1 = parseInt($("offZoom").value, 10), p, segs = null;
     if ($("offArea").value === "route") {
       var r = currentRoute();
       if (!r || !segsOf(r).length) return { error: "Aucun itinéraire sélectionné : choisissez-en un, ou prenez « zone affichée »." };
-      p = routeTiles(segsOf(r), Math.min(10, z1), z1);
+      segs = segsOf(r);
+      p = routeTiles(segs, Math.min(10, z1), z1);
     } else {
       p = viewTiles(Math.max(6, Math.min(Math.floor(map.getZoom()) - 2, z1)), z1);
     }
     p.base = base;
+    p.scan = scanPlan(segs);   // secteurs de la carte SCAN 25 (null si non demandée)
     return p;
   }
   function updateEst() {
     if (offBusy) return;
     var b = BASES[$("offBase").value], est = $("offEst"), go = $("offGo");
-    if (b.local) {
-      est.textContent = "La dalle (≈ 9 Mo) est enregistrée dans le téléphone dès son premier chargement : elle fonctionne ensuite hors ligne.";
-      go.disabled = true; return;
+    var p = plan(), txt = [], ok = false;
+    if (p.error) {
+      var wantScan = scanIdx && !$("offScanRow").hidden && $("offScan").checked;
+      est.textContent = (b.local || !b.offline) && !wantScan ? "" : p.error; go.disabled = true;
+      if (est.textContent) return;
+      p = { tiles: [], count: 0, scan: null };   // fond non téléchargeable : on affiche seulement son message
     }
-    if (!b.offline) {
-      est.textContent = "Le téléchargement n'est pas autorisé sur les serveurs d'OpenStreetMap : choisissez un fond IGN (plan ou photographies aériennes).";
-      go.disabled = true; return;
+    if (b.local) txt.push("La dalle (≈ 9 Mo) est enregistrée dans le téléphone dès son premier chargement : elle fonctionne ensuite hors ligne.");
+    else if (!b.offline) txt.push("Le téléchargement n'est pas autorisé sur les serveurs d'OpenStreetMap : choisissez un fond IGN (plan ou photographies aériennes).");
+    else if (p.tooMany) txt.push(p.scan ? "Fond de carte : zone trop étendue (plus de " + MAX_TILES + " tuiles), il ne sera pas téléchargé ; réduisez le niveau de détail ou la zone pour l'inclure."
+      : "Zone trop étendue (plus de " + MAX_TILES + " tuiles) : réduisez le niveau de détail ou la zone.");
+    else { txt.push((p.scan ? "Fond de carte : ≈ " : "≈ ") + p.count + " tuiles, environ " + Math.max(1, Math.round(p.count * b.kb / 1024)) + " Mo."); ok = true; }
+    if (p.scan) {
+      var n = p.scan.items.length;
+      if (n) { txt.push("Carte SCAN 25 : " + n + " secteur" + (n > 1 ? "s" : "") + ", environ " + Math.max(1, Math.round(p.scan.bytes / 1048576)) + " Mo."); ok = true; }
+      else txt.push("Carte SCAN 25 : aucune dalle dans cette zone.");
     }
-    var p = plan();
-    if (p.error) { est.textContent = p.error; go.disabled = true; return; }
-    if (p.tooMany) { est.textContent = "Zone trop étendue (plus de " + MAX_TILES + " tuiles) : réduisez le niveau de détail ou la zone."; go.disabled = true; return; }
-    est.textContent = "≈ " + p.count + " tuiles, environ " + Math.max(1, Math.round(p.count * b.kb / 1024)) + " Mo.";
-    go.disabled = false;
+    est.textContent = txt.join(" ");
+    go.disabled = !ok;
   }
   function updateStorage() {
     var info = $("offInfo");
     if (!window.caches) { info.textContent = "Stockage hors ligne indisponible sur ce navigateur."; return; }
-    caches.open(OFFLINE).then(function (c) { return c.keys(); }).then(function (k) {
-      var txt = k.length + " tuile(s) enregistrée(s) hors ligne";
+    Promise.all([caches.open(OFFLINE).then(function (c) { return c.keys(); }), scanCachedPacks()]).then(function (r) {
+      var k = r[0], txt = k.length + " tuile(s) enregistrée(s) hors ligne";
+      if (r[1].length) txt += " · carte SCAN 25 : " + r[1].length + " secteur(s)";
       if (navigator.storage && navigator.storage.estimate) {
         return navigator.storage.estimate().then(function (e) {
           info.textContent = txt + " · espace utilisé par VHMaps : " + Math.round((e.usage || 0) / 1048576) + " Mo";
@@ -2959,35 +2973,44 @@
     }).catch(function () { info.textContent = ""; });
   }
   function download() {
-    var p = plan();
-    if (offBusy || p.error || p.tooMany || !window.caches) return;
+    var p = plan(), b = p.base;
+    if (offBusy || p.error || !window.caches) return;
+    function urlOf(t) { return b.url.replace("{z}", t.z).replace("{x}", t.x).replace("{y}", t.y); }
+    // Éléments à télécharger : tuiles du fond (cache des cartes hors ligne) + secteurs SCAN 25 (cache des données)
+    var queue = [];
+    if (b.offline && !p.tooMany) p.tiles.forEach(function (t) { queue.push({ u: urlOf(t), c: OFFLINE, w: b.kb * 1024 }); });
+    if (p.scan) p.scan.items.forEach(function (s) { queue.push({ u: s.u, c: DONNEES_CACHE, w: s.w, pack: true }); });
+    if (!queue.length) return;
     offBusy = true; offAbort = new AbortController();
-    var bar = $("offBar"), est = $("offEst");
-    bar.hidden = false; bar.max = p.count; bar.value = 0;
+    var bar = $("offBar"), est = $("offEst"), n = queue.length, total = 0, doneW = 0;
+    queue.forEach(function (it) { total += it.w; });
+    bar.hidden = false; bar.max = total; bar.value = 0;
     $("offGo").hidden = true; $("offStop").hidden = false;
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
-    var queue = p.tiles.slice(), done = 0, ok = 0, skipped = 0, fail = 0, streak = 0;
-    function urlOf(t) { return p.base.url.replace("{z}", t.z).replace("{x}", t.x).replace("{y}", t.y); }
+    var done = 0, ok = 0, okPack = 0, skipped = 0, fail = 0, streak = 0;
+    function what() { return ok + " tuile(s)" + (okPack ? " et " + okPack + " secteur(s) SCAN 25" : ""); }
     function finish() {
       var stopped = offAbort.signal.aborted, msg;
       offBusy = false; bar.hidden = true; $("offGo").hidden = false; $("offStop").hidden = true;
-      if (stopped) msg = "Téléchargement interrompu : " + ok + " tuile(s) enregistrée(s).";
-      else if (streak >= 25 || (ok === 0 && skipped === 0 && fail > 0)) msg = "Échec : le serveur de cartes ne répond pas ou refuse le téléchargement (" + fail + " erreurs). Vérifiez la connexion.";
-      else msg = "Terminé : " + ok + " tuile(s) téléchargée(s)" + (skipped ? ", " + skipped + " déjà présente(s)" : "") + (fail ? ", " + fail + " en échec" : "") + ".";
+      if (stopped) msg = "Téléchargement interrompu : " + what() + " enregistré(s).";
+      else if (streak >= 25 || (ok + okPack === 0 && skipped === 0 && fail > 0)) msg = "Échec : le serveur de cartes ne répond pas ou refuse le téléchargement (" + fail + " erreurs). Vérifiez la connexion.";
+      else msg = "Terminé : " + what() + " téléchargé(s)" + (skipped ? ", " + skipped + " déjà présent(s)" : "") + (fail ? ", " + fail + " en échec" : "") + ".";
       est.textContent = msg; updateStorage();
     }
-    caches.open(OFFLINE).then(function (cache) {
+    Promise.all([caches.open(OFFLINE), caches.open(DONNEES_CACHE)]).then(function (cs) {
+      var cache = {}; cache[OFFLINE] = cs[0]; cache[DONNEES_CACHE] = cs[1];
       function worker() {
         if (!queue.length || offAbort.signal.aborted || streak >= 25) return Promise.resolve();
-        var u = urlOf(queue.shift());
-        return cache.match(u).then(function (hit) {
+        var it = queue.shift(), c = cache[it.c];
+        return c.match(it.u).then(function (hit) {
           if (hit) { skipped++; return; }
-          return fetch(u, { mode: "cors", credentials: "omit", signal: offAbort.signal })
-            .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return cache.put(u, res); })
-            .then(function () { ok++; streak = 0; })
+          return fetch(it.u, it.pack ? { signal: offAbort.signal } : { mode: "cors", credentials: "omit", signal: offAbort.signal })
+            .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return c.put(it.u, res); })
+            .then(function () { if (it.pack) okPack++; else ok++; streak = 0; })
             .catch(function () { if (!offAbort.signal.aborted) { fail++; streak++; } });
         }).then(function () {
-          done++; bar.value = done; est.textContent = done + " / " + p.count + " tuiles…";
+          done++; doneW += it.w; bar.value = doneW;
+          est.textContent = done + " / " + n + (p.scan && p.scan.items.length ? " fichiers… (" + Math.floor(100 * doneW / total) + " %)" : " tuiles…");
           return worker();
         });
       }
@@ -3179,13 +3202,182 @@
     $("ovOld").checked = oldOn; $("ovOldOp").value = Math.round(oldOpacity * 100);
   } catch (e) {}
 
-  syncOverlays(); syncRef(); syncPr(); syncOld();
+  // ---------- Carte SCAN 25 (dalles IGN converties par outils/preparer_scan25.py → donnees/scan25/) ----------
+  // Les tuiles sont regroupées en « secteurs » (.pack, même format que la dalle ATD) d'environ 13 × 13 km :
+  // seuls les secteurs affichés sont téléchargés, puis gardés dans le téléphone (cache vhmaps-donnees du
+  // service worker), ce qui rend la carte disponible hors ligne. Les petits zooms sont dans apercu.pack.
+  var SCAN_DIR = "donnees/scan25/", DONNEES_CACHE = "vhmaps-donnees", SCAN_KEEP = 8;
+  var scanOn = false, scanOpacity = 1, scanLayer = null, scanIdx = null, scanWanted = 0, scanErr = false;
+  var scanPacks = {}, scanLru = [];
+  var SCAN_RE = /\/donnees\/scan25\/([^/?#]+\.pack)$/;
+  function scanIndex() {
+    return loadJson(SCAN_DIR + "index.json").then(function (idx) {
+      if (!scanIdx || scanIdx.version !== idx.version) { scanIdx = idx; scanPacks = {}; scanLru = []; scanClean(idx); }
+      $("ovScanName").textContent = idx.nom + " (" + idx.dalles + " dalle" + (idx.dalles > 1 ? "s" : "") + ")";
+      return idx;
+    });
+  }
+  // Secteur contenant la tuile z/x/y (null si aucune dalle à cet endroit)
+  function scanSector(z, x, y) {
+    var g = scanIdx.groupZoom;
+    if (z < g) return scanIdx.apercu ? "apercu" : null;
+    var d = Math.pow(2, z - g), k = Math.floor(x / d) + "/" + Math.floor(y / d);
+    return scanIdx.packs[k] ? k : null;
+  }
+  function scanUrl(name) { return SCAN_DIR + (name === "apercu" ? "apercu" : scanIdx.groupZoom + "-" + name.replace("/", "-")) + ".pack"; }
+  // Secteur chargé en Blob (lu morceau par morceau : peu de mémoire), quelques secteurs gardés sous la main
+  function scanPack(url) {
+    var p = scanPacks[url];
+    if (!p) {
+      p = scanPacks[url] = fetch(url).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
+        .then(function (blob) {
+          return blob.slice(0, 8).arrayBuffer().then(function (h) {
+            var dv = new DataView(h);
+            if (dv.getUint8(0) !== 86 || dv.getUint8(1) !== 72 || dv.getUint8(2) !== 80) throw new Error("secteur illisible");
+            var n = dv.getUint32(4, true);
+            return blob.slice(8, 8 + n).text().then(function (t) { return { blob: blob, base: 8 + n, idx: JSON.parse(t) }; });
+          });
+        });
+      p.catch(function () { if (scanPacks[url] === p) delete scanPacks[url]; });
+    }
+    var i = scanLru.indexOf(url);
+    if (i >= 0) scanLru.splice(i, 1);
+    scanLru.push(url);
+    while (scanLru.length > SCAN_KEEP) delete scanPacks[scanLru.shift()];
+    return p;
+  }
+  var ScanLayer = L.GridLayer.extend({
+    _isValidTile: function (c) {   // pas de requête là où il n'y a pas de dalle
+      return L.GridLayer.prototype._isValidTile.call(this, c) && !!scanIdx && !!scanSector(c.z, c.x, c.y);
+    },
+    createTile: function (c, done) {
+      var tile = document.createElement("img");
+      tile.alt = ""; tile.style.visibility = "hidden";
+      scanPack(scanUrl(scanSector(c.z, c.x, c.y))).then(function (p) {
+        var e = p.idx.tiles[c.z + "/" + c.x + "/" + c.y];
+        if (!e) { done(null, tile); return; }
+        var url = URL.createObjectURL(p.blob.slice(p.base + e[0], p.base + e[0] + e[1], p.idx.mime));
+        tile.onload = function () { URL.revokeObjectURL(url); tile.style.visibility = ""; done(null, tile); };
+        tile.onerror = function () { URL.revokeObjectURL(url); done(new Error("tuile illisible"), tile); };
+        tile.src = url;
+      }).catch(function (err) { done(err, tile); });
+      return tile;
+    }
+  });
+  function syncScan(fit) {
+    var token = ++scanWanted;
+    if (!scanOn) { if (scanLayer) map.removeLayer(scanLayer); return; }
+    scanIndex().then(function (idx) {
+      if (token !== scanWanted || !scanOn) return;
+      var bb = idx.bounds, box = L.latLngBounds([bb[1], bb[0]], [bb[3], bb[2]]);
+      if (!scanLayer || scanLayer.options.version !== idx.version) {
+        if (scanLayer) map.removeLayer(scanLayer);
+        scanLayer = new ScanLayer({ version: idx.version, minNativeZoom: idx.minZoom, maxNativeZoom: idx.maxZoom, maxZoom: 21,
+          bounds: box, zIndex: 3, opacity: scanOpacity, attribution: idx.attr });
+        scanLayer.on("tileerror", function () {
+          if (scanErr) return;
+          scanErr = true;
+          say("Carte SCAN 25 : secteur non disponible (une connexion est nécessaire à la première consultation de la zone).", true);
+        });
+      }
+      scanLayer.setOpacity(scanOpacity);
+      if (!map.hasLayer(scanLayer)) scanLayer.addTo(map);
+      if (fit) {
+        if (!box.intersects(map.getBounds()) || map.getZoom() < idx.minZoom) map.fitBounds(box);
+        say(idx.nom + " affichée : les zones consultées restent disponibles hors ligne.");
+      }
+    }).catch(function () {
+      if (token === scanWanted) say("Carte SCAN 25 indisponible : dossier donnees/scan25 absent du serveur, ou connexion nécessaire au premier chargement.", true);
+    });
+  }
+  // Secteurs à télécharger pour le hors ligne : autour de l'itinéraire (≈ 1 km de part et d'autre) ou zone affichée
+  function scanPlan(segs) {
+    if (!scanIdx || $("offScanRow").hidden || !$("offScan").checked) return null;
+    var g = scanIdx.groupZoom, seen = {}, items = [], bytes = 0, sb = scanIdx.bounds;
+    function add(name) {
+      if (!name || seen[name]) return;
+      seen[name] = 1;
+      var size = name === "apercu" ? scanIdx.apercu : scanIdx.packs[name];
+      if (size) { items.push({ u: scanUrl(name), w: size }); bytes += size; }
+    }
+    function addAround(lat, lon) {
+      for (var a = -1; a <= 1; a += 2) for (var b = -1; b <= 1; b += 2) {
+        var la = lat + a * 0.009, lo = lon + b * 0.0135;
+        if (la >= sb[1] && la <= sb[3] && lo >= sb[0] && lo <= sb[2]) add(scanSector(g, lon2x(lo, g), lat2y(la, g)));
+      }
+    }
+    if (segs) {
+      segs.forEach(function (s) {
+        var prev = null;
+        s.pts.forEach(function (q) {
+          if (prev) {
+            var d = haversine({ lat: prev[0], lon: prev[1] }, { lat: q[0], lon: q[1] }), k = Math.max(1, Math.ceil(d / 500));
+            for (var i = 1; i <= k; i++) addAround(prev[0] + (q[0] - prev[0]) * i / k, prev[1] + (q[1] - prev[1]) * i / k);
+          } else addAround(q[0], q[1]);
+          prev = q;
+        });
+      });
+    } else {
+      var b = map.getBounds(), w = Math.max(b.getWest(), sb[0]), e = Math.min(b.getEast(), sb[2]);
+      var s = Math.max(b.getSouth(), sb[1]), n = Math.min(b.getNorth(), sb[3]);
+      if (w <= e && s <= n) {
+        for (var x = lon2x(w, g); x <= lon2x(e, g); x++) for (var y = lat2y(n, g); y <= lat2y(s, g); y++) add(scanSector(g, x, y));
+      }
+    }
+    if (items.length) add("apercu");
+    return { items: items, bytes: bytes };
+  }
+  function scanCachedPacks() {
+    if (!window.caches) return Promise.resolve([]);
+    return caches.open(DONNEES_CACHE).then(function (c) {
+      return c.keys().then(function (ks) { return ks.filter(function (r) { return SCAN_RE.test(new URL(r.url).pathname); }); });
+    }).catch(function () { return []; });
+  }
+  // Après une régénération des dalles : on retire du téléphone les secteurs qui n'existent plus
+  function scanClean(idx) {
+    var keep = { "apercu.pack": 1 };
+    Object.keys(idx.packs).forEach(function (k) { keep[idx.groupZoom + "-" + k.replace("/", "-") + ".pack"] = 1; });
+    scanCachedPacks().then(function (ks) {
+      if (!ks.length) return;
+      return caches.open(DONNEES_CACHE).then(function (c) {
+        return Promise.all(ks.filter(function (r) { return !keep[SCAN_RE.exec(new URL(r.url).pathname)[1]]; }).map(function (r) { return c.delete(r); }));
+      });
+    }).catch(function () {});
+  }
+  function scanForget() {
+    scanPacks = {}; scanLru = [];
+    return scanCachedPacks().then(function (ks) {
+      return caches.open(DONNEES_CACHE).then(function (c) { return Promise.all(ks.map(function (r) { return c.delete(r); })); });
+    }).catch(function () {});
+  }
+  $("ovScan").onchange = function () {
+    scanOn = this.checked; scanErr = false; syncScan(true);
+    try { localStorage.setItem("vhmaps-scan25", scanOn ? "1" : "0"); } catch (e) {}
+  };
+  $("ovScanOp").oninput = function () {
+    scanOpacity = Number(this.value) / 100;
+    if (scanLayer) scanLayer.setOpacity(scanOpacity);
+    try { localStorage.setItem("vhmaps-scan25-op", this.value); } catch (e) {}
+  };
+  $("offScan").onchange = function () { updateEst(); try { localStorage.setItem("vhmaps-off-scan", this.checked ? "1" : "0"); } catch (e) {} };
+  try {
+    scanOn = localStorage.getItem("vhmaps-scan25") === "1";
+    var so25 = Number(localStorage.getItem("vhmaps-scan25-op"));
+    if (so25 >= 20 && so25 <= 100) scanOpacity = so25 / 100;
+    $("ovScan").checked = scanOn; $("ovScanOp").value = Math.round(scanOpacity * 100);
+    $("offScan").checked = localStorage.getItem("vhmaps-off-scan") !== "0";
+  } catch (e) {}
+
+  syncOverlays(); syncRef(); syncPr(); syncOld(); syncScan(false);
 
   $("offline").onclick = function () {
     $("offBase").value = baseKey; updateEst(); updateStorage();
     $("ovPcrs").checked = ov.pcrs; $("ovOp").value = ov.op;
     $("ovOld").checked = oldOn; $("ovOldOp").value = Math.round(oldOpacity * 100);
     $("ovRef").checked = ov.ref; $("ovPr").checked = ov.pr;
+    $("ovScan").checked = scanOn; $("ovScanOp").value = Math.round(scanOpacity * 100);
+    scanIndex().then(function () { $("offScanRow").hidden = false; updateEst(); updateStorage(); })
+      .catch(function () { $("offScanRow").hidden = true; });
     $("offSec").open = false;
     $("off").showModal();
   };
@@ -3196,7 +3388,7 @@
   $("offStop").onclick = function () { if (offAbort) offAbort.abort(); };
   $("offDel").onclick = function () {
     if (!window.caches || !confirm("Supprimer toutes les cartes hors ligne enregistrées ?")) return;
-    caches.delete(OFFLINE).then(function () { updateStorage(); $("offEst").textContent = "Cartes hors ligne supprimées."; });
+    Promise.all([caches.delete(OFFLINE), scanForget()]).then(function () { updateStorage(); $("offEst").textContent = "Cartes hors ligne supprimées."; });
   };
   $("offClose").onclick = function () { $("off").close(); };
 

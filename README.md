@@ -11,7 +11,7 @@ manifest.json
 sw.js                 ← service worker (hors ligne)
 itineraires.json      ← liste des circuits (obligatoire hors GitHub Pages, ex. Cloudflare) ; générée par outils/generer_itineraires.py
 itineraires/          ← déposer ici les fichiers .gpx
-donnees/              ← dalle (fond de plan), référentiel routier, PR
+donnees/              ← dalle (fond de plan), référentiel routier, PR, carte SCAN 25 (donnees/scan25/)
 outils/               ← script de préparation des données (non publié obligatoirement)
 icons/
 .nojekyll
@@ -79,6 +79,40 @@ Fonctionne hors ligne (données enregistrées dans le téléphone après le prem
 ```
 python outils/preparer_old.py old.gpkg donnees/old.json
 ```
+
+## Superposition : carte IGN SCAN 25 (dalles)
+
+Dans le dialogue « Cartes » : cocher « Carte IGN SCAN 25 » (avec un curseur d'opacité). La carte se pose
+au-dessus du fond choisi (Plan IGN, photos…) : là où il n'y a pas de dalle, le fond reste visible.
+Le PCRS, le référentiel, les PR et les OLD restent par-dessus.
+
+Les dalles GeoTIFF (ex. `SC25_TOUR_0250_6730_L93.tif`, Lambert-93) sont converties une fois pour toutes :
+
+```
+pip install rasterio numpy pillow
+python outils/preparer_scan25.py "C:\chemin\vers\dossier_des_dalles"
+```
+
+Le script lit toutes les `.tif` du dossier (sous-dossiers compris ; les `.aux.xml` sont inutiles), les assemble
+sans raccord, les reprojette et écrit `donnees/scan25/` :
+
+- `index.json` : description de la couche (emprise, zooms, liste des secteurs) ;
+- `apercu.pack` : la vue d'ensemble (petits zooms) ;
+- `11-XXXX-YYYY.pack` : un fichier par secteur d'environ 13 × 13 km, avec tous les zooms détaillés.
+
+Il suffit ensuite de publier le dossier `donnees/scan25/` avec le reste (quelques dizaines de fichiers de quelques Mo,
+compatibles avec l'envoi par glisser-déposer de GitHub et Cloudflare Pages, limités à 25 Mo par fichier).
+Compter quelques minutes de calcul pour 40 à 50 dalles.
+
+- **Hors ligne** : l'appli ne télécharge que les secteurs affichés, puis les garde dans le téléphone. Pour préparer
+  une tournée sans réseau : « Hors ligne » → cocher « Inclure la carte SCAN 25 » → « Télécharger » (autour de
+  l'itinéraire ou zone affichée). « Tout supprimer » efface aussi ces secteurs.
+- **Ajout ou remplacement de dalles** : relancer le script (le dossier `donnees/scan25/` est régénéré), puis republier.
+  Les téléphones mettent la carte à jour d'eux-mêmes ; les secteurs disparus sont retirés.
+- **Netteté** : par défaut, détail maximal au zoom 15 (≈ 3 m par pixel, jusqu'à ≈ 4 Mo par dalle de 10 × 10 km).
+  `--zmax 16` donne une carte aussi nette que les dalles d'origine en zoomant, mais environ 3 fois plus lourde.
+  Autres options : `--qualite 80` (WebP), `--processus N`, `--nom`, `--attribution` (`python outils/preparer_scan25.py -h`).
+- **Licence** : les dalles publiées sur un site public sont accessibles à tous ; vérifier que la licence IGN des SCAN 25 le permet.
 
 ## Bouton position (réticule)
 
