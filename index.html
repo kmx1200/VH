@@ -250,6 +250,7 @@
 
 <div class="tools" id="tools">
   <button id="toolsToggle" class="tool" data-help="Affiche ou masque les boutons pour libérer la carte. Ils se masquent seuls après quelques secondes." aria-expanded="true" aria-label="Boutons" hidden></button>
+  <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
   <button id="search" class="tool" data-help="Cherchez une adresse, un lieu ou des coordonnées, puis centrez la carte dessus." aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
   <button id="locate" class="tool" data-help="Affiche votre position et votre direction sans enregistrer de tracé. Touchez de nouveau pour désactiver." aria-pressed="false" aria-label="Activer ma position"></button>
   <button id="trace" class="tool" data-help="Enregistre et affiche le chemin que vous parcourez à partir de votre position, sans suivre de circuit. Touchez de nouveau pour arrêter." aria-pressed="false" aria-label="Tracer mon parcours"></button>
@@ -262,7 +263,6 @@
   <button id="shot" class="tool" data-help="Enregistre une image de la carte seule, sans les boutons. Les mesures affichées et leurs valeurs y sont ajoutées." aria-label="Copie d'écran de la carte"></button>
   <button id="measureLine" class="tool" data-help="Posez des points pour mesurer une distance. Les poignées permettent d’ajuster le tracé." aria-label="Mesurer une distance"></button>
   <button id="measureArea" class="tool" data-help="Posez au moins 3 points pour mesurer une surface." aria-label="Mesurer une surface"></button>
-  <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
 </div>
 <div id="measurePanel" class="measure-panel" hidden>
   <div id="measureHead"><b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span><button id="measureFold" class="ghost" aria-expanded="true" aria-label="Réduire la fenêtre de mesure" title="Réduire pour mieux voir la carte (les tracés sont conservés)">▾</button></div>
@@ -3209,7 +3209,7 @@
   if (window.ResizeObserver) new ResizeObserver(syncSheet).observe(document.querySelector(".sheet"));
   // Boutons de droite repliables sur smartphone : poignée + masquage automatique après inactivité
   (function () {
-    var tools = $("tools"), tg = $("toolsToggle"), mq = window.matchMedia("(max-width: 520px)"), timer = null, DELAY = 8000;
+    var tools = $("tools"), tg = $("toolsToggle"), mq = window.matchMedia("(max-width: 520px)"), timer = null, DELAY = 6000;
     var ICO_OPEN = ICON("M6 6l12 12M18 6L6 18"), ICO_CLOSED = ICON("M4 6h16M4 12h16M4 18h16");
     function set(collapsed) {
       tools.classList.toggle("collapsed", collapsed);

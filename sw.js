@@ -1,5 +1,5 @@
 /* VHMaps — service worker : fonctionnement hors ligne */
-const VERSION = "vhmaps-v39";
+const VERSION = "vhmaps-v41";
 const SHELL = VERSION + "-shell";
 const TILES = VERSION + "-tiles";      // tuiles vues en navigation (limité)
 const DATA = VERSION + "-data";
