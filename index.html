@@ -340,6 +340,7 @@
   <summary>Superpositions</summary>
   <label class="chk"><input type="checkbox" id="ovPr"> PR (points et numéros)</label>
   <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
+  <label class="chk"><input type="checkbox" id="ovAgglo"> Agglomérations (magenta)</label>
   <label class="chk"><input type="checkbox" id="ovCadastre"> Parcelles cadastrales (IGN)</label>
   <label>Opacité du cadastre <input type="range" id="ovCadastreOp" min="20" max="100" step="10" value="85"></label>
   <label class="chk"><input type="checkbox" id="ovOld"> OLD (obligations légales de débroussaillement)</label>
@@ -405,7 +406,7 @@
   var MIN_STEP = 5;
 
   var map = L.map("map", { zoomControl: false }).setView([46.6, 2.5], 6);
-  // Ordre d'empilement des superpositions (du bas vers le haut) : fond < PCRS < SCAN 25 < OLD < parcelles < référentiel + PR (volet « vec », 350)
+  // Ordre d'empilement des superpositions (du bas vers le haut) : fond < PCRS < SCAN 25 < OLD < parcelles < référentiel < agglomérations < PR (volet « vec », 350)
   [["pcrsPane", 210], ["scanPane", 220], ["oldPane", 230], ["cadPane", 240]].forEach(function (p) { map.createPane(p[0]).style.zIndex = p[1]; });
   var IGN = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&LAYER=";
   var IGNH = IGN.replace("STYLE=normal", "STYLE=BDORTHOHISTORIQUE");   // orthophotos historiques : style dédié
@@ -3022,10 +3023,10 @@
 
   // ---------- Superpositions (PCRS) ----------
   var PCRS_LAYER = "PCRS.LAMB93";
-  var OKEY = "vhmaps-overlays", ov = { pcrs: false, op: 100, ref: false, pr: false }, ovLayers = {};
+  var OKEY = "vhmaps-overlays", ov = { pcrs: false, op: 100, ref: false, agglo: false, pr: false }, ovLayers = {};
   try {
     var so = JSON.parse(localStorage.getItem(OKEY) || "null");
-    if (so) ov = { pcrs: !!so.pcrs, op: so.op >= 20 && so.op <= 100 ? so.op : 100, ref: !!so.ref, pr: !!so.pr };
+    if (so) ov = { pcrs: !!so.pcrs, op: so.op >= 20 && so.op <= 100 ? so.op : 100, ref: !!so.ref, agglo: !!so.agglo, pr: !!so.pr };
   } catch (e) {}
   function mkWms(url, layer, attr, z, label) {
     var l = L.tileLayer.wms(url, { layers: layer, styles: "", format: "image/png", transparent: true, version: "1.3.0",
@@ -3083,11 +3084,12 @@
   map.createPane("vec"); map.getPane("vec").style.zIndex = 350;
   var vecRenderer = L.canvas({ pane: "vec", padding: 0.3, tolerance: 8 });
   var refRenderer = vecRenderer, prRenderer = vecRenderer;
-  var oldLayer = null, refLayerGeo = null;
+  var oldLayer = null, refLayerGeo = null, aggloLayerGeo = null;
   // Canvas « vec » (au-dessus des parcelles) : PR au-dessus, référentiel dessous. Les OLD y ont une couche de détection
   // invisible (oldHit, tout en bas : popups et curseur) ; leur dessin visible est dans le volet « oldPane », sous les parcelles.
   var oldHit = null;
-  function vecOrder() { if (refLayerGeo) refLayerGeo.bringToBack(); if (oldHit) oldHit.bringToBack(); }
+  // Ordre dans le canvas (du bas vers le haut) : OLD (détection) < référentiel < agglomérations < PR
+  function vecOrder() { if (aggloLayerGeo) aggloLayerGeo.bringToBack(); if (refLayerGeo) refLayerGeo.bringToBack(); if (oldHit) oldHit.bringToBack(); }
   var prGroup = L.layerGroup().addTo(map), prData = null, refWanted = 0, prWanted = 0;
 
   function drawRefLegend(sitesSeen) {
@@ -3125,6 +3127,36 @@
       drawRefLegend(seen);
     }).catch(function () { if (token === refWanted) say("Référentiel indisponible : connexion nécessaire au premier chargement.", true); });
   }
+  // Agglomérations : magenta, plus épaisses que le référentiel (4 px) pour déborder de chaque côté ;
+  // légèrement translucides pour laisser voir la couleur du référentiel en dessous.
+  var AGGLO_COLOR = "#ff00ff", AGGLO_WEIGHT = 8, AGGLO_OPACITY = .6, aggloWanted = 0;
+  function syncAgglo() {
+    var token = ++aggloWanted;
+    if (!ov.agglo) {
+      if (aggloLayerGeo) { map.removeLayer(aggloLayerGeo); aggloLayerGeo = null; }
+      return;
+    }
+    if (aggloLayerGeo) return;
+    loadJson("donnees/agglomeration.json").then(function (fc) {
+      if (token !== aggloWanted || !ov.agglo || aggloLayerGeo) return;
+      aggloLayerGeo = L.geoJSON(fc, {
+        renderer: vecRenderer, bubblingMouseEvents: false,
+        style: function () { return { color: AGGLO_COLOR, weight: AGGLO_WEIGHT, opacity: AGGLO_OPACITY, lineCap: "round", lineJoin: "round" }; },
+        onEachFeature: function (f, layer) {
+          var p = f.properties;
+          attachPopup(layer, function (ll) {
+            return "<b>Agglomération" + (p.agglo ? " : " + esc(p.agglo) : "") + "</b>"
+              + (p.axe ? "<br>" + esc(shortRoute(p.axe)) + " (" + esc(p.axe) + ")" : "")
+              + (p.commune ? "<br>Commune : " + esc(p.commune) : "")
+              + (p.deb && p.fin ? "<br>PR " + esc(p.deb) + " &rarr; PR " + esc(p.fin) : "")
+              + (p.chaussee ? "<br>Chauss&eacute;e : " + esc(p.chaussee) : "")
+              + svLink(ll);
+          });
+        }
+      }).addTo(map);
+      vecOrder();
+    }).catch(function () { if (token === aggloWanted) say("Agglomérations indisponibles : connexion nécessaire au premier chargement.", true); });
+  }
   function labelIcon(txt) { return L.divIcon({ className: "pr-label", html: "<span>" + esc(txt) + "</span>", iconSize: [0, 0], iconAnchor: [0, 0] }); }
   function renderPr() {
     prGroup.clearLayers();
@@ -3153,6 +3185,7 @@
   }
   map.on("moveend", renderPr);
   $("ovRef").onchange = function () { ov.ref = this.checked; syncRef(); try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {} };
+  $("ovAgglo").onchange = function () { ov.agglo = this.checked; syncAgglo(); try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {} };
   $("ovPr").onchange = function () { ov.pr = this.checked; syncPr(); try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {} };
 
   $("ovPcrs").onchange = function () { ov.pcrs = this.checked; syncOverlays(); if (ov.pcrs) zoomHint(); };
@@ -3385,13 +3418,13 @@
     $("offScan").checked = localStorage.getItem("vhmaps-off-scan") !== "0";
   } catch (e) {}
 
-  syncOverlays(); syncRef(); syncPr(); syncOld(); syncScan(false);
+  syncOverlays(); syncRef(); syncAgglo(); syncPr(); syncOld(); syncScan(false);
 
   $("offline").onclick = function () {
     $("offBase").value = baseKey; updateEst(); updateStorage();
     $("ovPcrs").checked = ov.pcrs; $("ovOp").value = ov.op;
     $("ovOld").checked = oldOn; $("ovOldOp").value = Math.round(oldOpacity * 100);
-    $("ovRef").checked = ov.ref; $("ovPr").checked = ov.pr;
+    $("ovRef").checked = ov.ref; $("ovAgglo").checked = ov.agglo; $("ovPr").checked = ov.pr;
     $("ovScan").checked = scanOn; $("ovScanOp").value = Math.round(scanOpacity * 100);
     scanIndex().then(function () { $("offScanRow").hidden = false; updateEst(); updateStorage(); })
       .catch(function () { $("offScanRow").hidden = true; });

@@ -84,7 +84,7 @@ python outils/preparer_old.py old.gpkg donnees/old.json
 
 Dans le dialogue « Cartes » : cocher « Carte IGN SCAN 25 » (avec un curseur d'opacité). La carte se pose
 au-dessus du fond choisi (Plan IGN, photos…) : là où il n'y a pas de dalle, le fond reste visible.
-Ordre d'empilement des superpositions (du dessus vers le dessous) : PR, référentiel routier, parcelles, OLD, carte IGN SCAN 25, PCRS, puis le fond de carte.
+Ordre d'empilement des superpositions (du dessus vers le dessous) : PR, agglomérations, référentiel routier, parcelles, OLD, carte IGN SCAN 25, PCRS, puis le fond de carte.
 
 Les dalles GeoTIFF (ex. `SC25_TOUR_0250_6730_L93.tif`, Lambert-93) sont converties une fois pour toutes :
 
@@ -114,6 +114,20 @@ Compter quelques minutes de calcul pour 40 à 50 dalles.
   Autres options : `--qualite 80` (WebP), `--processus N`, `--nom`, `--attribution` (`python outils/preparer_scan25.py -h`).
 - **Licence** : les dalles publiées sur un site public sont accessibles à tous ; vérifier que la licence IGN des SCAN 25 le permet.
 
+## Superposition : agglomérations
+
+Dans le dialogue « Cartes » : cocher « Agglomérations (magenta) ». Les tronçons situés en agglomération (`donnees/agglomeration.json`)
+sont tracés en magenta, plus épais que le référentiel (8 px contre 4 px) et légèrement translucides : le trait déborde de part et d'autre
+du référentiel, ce qui laisse voir la superposition. La couche se place **au-dessus du référentiel et sous les PR**.
+Toucher un tronçon affiche l'agglomération, la route, la commune, les PR de début et de fin et la chaussée.
+Réglages (couleur, épaisseur, opacité) : `AGGLO_COLOR`, `AGGLO_WEIGHT`, `AGGLO_OPACITY` dans `index.html`.
+
+Fonctionne hors ligne (données enregistrées dans le téléphone après le premier chargement). Pour mettre à jour la couche :
+
+```
+python outils/preparer_agglomeration.py agglomeration.gpkg donnees/agglomeration.json
+```
+
 ## Bouton position (réticule)
 
 Premier bouton de la colonne de droite : affiche la position (avec la direction) sans enregistrer de tracé.
@@ -131,7 +145,7 @@ Dans le dialogue « Cartes » :
   Grand-Champ vert, La Gacilly jaune, Vannes bleu), avec légende ; toucher une ligne affiche l'axe et les PR de début et de fin.
 - « PR (points et numéros) » : points à partir du zoom 12, numéros à partir du zoom 14 (route + numéro à partir du zoom 16).
 
-Les données sont dans `donnees/` (`dalle-morbihan.pack`, `lineaire.json`, `pr.json`, `old.json`). Elles sont enregistrées dans le téléphone
+Les données sont dans `donnees/` (`dalle-morbihan.pack`, `lineaire.json`, `pr.json`, `old.json`, `agglomeration.json`). Elles sont enregistrées dans le téléphone
 après le premier chargement (fonctionnement hors ligne) et mises à jour en arrière-plan quand elles changent sur le serveur.
 
 ### Régénérer les données
