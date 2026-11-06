@@ -21,7 +21,7 @@
     --surface:#212e2b; --surface-a:rgba(33,46,43,.94); --err:#ff8a80; }
   .vh-base { filter: grayscale(var(--base-gray, 0)); }
   .leaflet-container { background: #dddddd; }
-  .leaflet-tooltip-pane .old-lbl { background: transparent; border: 0; box-shadow: none; padding: 0; color: #3d2f00; font-weight: 700; font-size: 12px;
+  .leaflet-tooltip-pane .old-lbl { background: transparent; border: 0; box-shadow: none; padding: 0; color: #3d0000; font-weight: 700; font-size: 12px;
     text-shadow: -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff, 1px 1px 0 #fff, 0 0 3px #fff; }
   .old-lbl:before { display: none; }
   .old-nolabels .old-lbl { display: none; }
@@ -338,14 +338,14 @@
   <label>Niveaux de gris du fond <input type="range" id="baseGray" min="0" max="100" step="5" value="0"></label>
   <details id="ovSec" open>
   <summary>Superpositions</summary>
-  <label class="chk"><input type="checkbox" id="ovScan"> <span id="ovScanName">Carte IGN SCAN 25 (dalles)</span></label>
-  <label>Opacité du SCAN 25 <input type="range" id="ovScanOp" min="20" max="100" step="10" value="100"></label>
-  <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
   <label class="chk"><input type="checkbox" id="ovPr"> PR (points et numéros)</label>
+  <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
   <label class="chk"><input type="checkbox" id="ovCadastre"> Parcelles cadastrales (IGN)</label>
   <label>Opacité du cadastre <input type="range" id="ovCadastreOp" min="20" max="100" step="10" value="85"></label>
   <label class="chk"><input type="checkbox" id="ovOld"> OLD (obligations légales de débroussaillement)</label>
   <label>Opacité des OLD <input type="range" id="ovOldOp" min="20" max="100" step="10" value="70"></label>
+  <label class="chk"><input type="checkbox" id="ovScan"> <span id="ovScanName">Carte IGN SCAN 25 (dalles)</span></label>
+  <label>Opacité du SCAN 25 <input type="range" id="ovScanOp" min="20" max="100" step="10" value="100"></label>
   <label class="chk"><input type="checkbox" id="ovPcrs"> PCRS (plan de corps de rue simplifié)</label>
   <label>Opacité du PCRS <input type="range" id="ovOp" min="20" max="100" step="10" value="100"></label>
   <p class="hint">Le PCRS s'affiche à partir du zoom 16, seulement là où il est diffusé en open data, et en ligne uniquement.</p>
@@ -405,6 +405,8 @@
   var MIN_STEP = 5;
 
   var map = L.map("map", { zoomControl: false }).setView([46.6, 2.5], 6);
+  // Ordre d'empilement des superpositions (du bas vers le haut) : fond < PCRS < SCAN 25 < OLD < parcelles < référentiel + PR (volet « vec », 350)
+  [["pcrsPane", 210], ["scanPane", 220], ["oldPane", 230], ["cadPane", 240]].forEach(function (p) { map.createPane(p[0]).style.zIndex = p[1]; });
   var IGN = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&LAYER=";
   var IGNH = IGN.replace("STYLE=normal", "STYLE=BDORTHOHISTORIQUE");   // orthophotos historiques : style dédié
   var BASES = {
@@ -2686,7 +2688,7 @@
         layers:"CADASTRALPARCELS.PARCELLAIRE_EXPRESS",styles:"",format:"image/png",
         transparent:true,version:"1.3.0",opacity:cadastreOpacity,
         attribution:"Parcellaire Express (PCI) © IGN / DGFiP",maxZoom:22,
-        pane:"overlayPane",uppercase:false
+        pane:"cadPane",uppercase:false
       });
       cadastreLayer.on("tileerror",function(){say("La couche cadastrale IGN ne répond pas. Vérifiez la connexion Internet.",true);});
       cadastreLayer.on("load",function(){say("Parcelles cadastrales affichées.");});
@@ -3027,7 +3029,7 @@
   } catch (e) {}
   function mkWms(url, layer, attr, z, label) {
     var l = L.tileLayer.wms(url, { layers: layer, styles: "", format: "image/png", transparent: true, version: "1.3.0",
-      minZoom: 16, maxZoom: 21, zIndex: z, attribution: attr });
+      minZoom: 16, maxZoom: 21, pane: "pcrsPane", zIndex: z, attribution: attr });
     var ok = 0, ko = 0;
     l.on("tileload", function () { ok++; });
     l.on("tileerror", function () {
@@ -3080,10 +3082,12 @@
   // capte survol et clics et les couches du dessous (OLD) ne reçoivent plus rien (ni popup, ni curseur « main »).
   map.createPane("vec"); map.getPane("vec").style.zIndex = 350;
   var vecRenderer = L.canvas({ pane: "vec", padding: 0.3, tolerance: 8 });
-  var refRenderer = vecRenderer, prRenderer = vecRenderer, oldRenderer = vecRenderer;
+  var refRenderer = vecRenderer, prRenderer = vecRenderer;
   var oldLayer = null, refLayerGeo = null;
-  // Ordre de dessin (donc de priorité au clic) : OLD en bas, référentiel au milieu, PR par-dessus
-  function vecOrder() { if (refLayerGeo) refLayerGeo.bringToBack(); if (oldLayer) oldLayer.bringToBack(); }
+  // Canvas « vec » (au-dessus des parcelles) : PR au-dessus, référentiel dessous. Les OLD y ont une couche de détection
+  // invisible (oldHit, tout en bas : popups et curseur) ; leur dessin visible est dans le volet « oldPane », sous les parcelles.
+  var oldHit = null;
+  function vecOrder() { if (refLayerGeo) refLayerGeo.bringToBack(); if (oldHit) oldHit.bringToBack(); }
   var prGroup = L.layerGroup().addTo(map), prData = null, refWanted = 0, prWanted = 0;
 
   function drawRefLegend(sitesSeen) {
@@ -3156,8 +3160,9 @@
 
   // ---------- OLD (obligations légales de débroussaillement) ----------
   var oldOn = false, oldOpacity = .7, oldWanted = 0;
-  var OLD_COLOR = "#ffd43b";
-  function oldStyle() { return { renderer: oldRenderer, color: "#c99700", weight: 1.5, opacity: Math.min(1, oldOpacity + .2), fillColor: OLD_COLOR, fillOpacity: oldOpacity * .55, bubblingMouseEvents: false }; }
+  var OLD_COLOR = "#ff0000";
+  var oldRenderer = L.canvas({ pane: "oldPane", padding: 0.3 });   // dessin visible (sous les parcelles) ; la détection des clics est faite par oldHit
+  function oldStyle() { return { renderer: oldRenderer, color: "#b30000", weight: 1.5, opacity: Math.min(1, oldOpacity + .2), fillColor: OLD_COLOR, fillOpacity: oldOpacity * .55, interactive: false }; }
   function oldPopup(p, ll) {
     var t = [];
     [["se", "Super-épareuse"], ["sebl", "Super-épareuse bras long"], ["man", "Manuel"], ["mane", "Manuel avec évacuation"], ["nold", "Zone non OLD"]].forEach(function (k) {
@@ -3176,17 +3181,29 @@
   // Numéros affichés seulement à partir du zoom 15 (sinon illisible)
   function oldLabelsZoom() { map.getContainer().classList.toggle("old-nolabels", map.getZoom() < 15); }
   map.on("zoomend", oldLabelsZoom);
+  function oldHitStyle() { return { renderer: vecRenderer, opacity: 0, fillOpacity: 0, weight: 1.5, bubblingMouseEvents: false }; }
+  function oldRemove() {
+    if (oldLayer) { map.removeLayer(oldLayer); oldLayer = null; }
+    if (oldHit) { map.removeLayer(oldHit); oldHit = null; }
+  }
   function syncOld() {
     var token = ++oldWanted;
-    if (!oldOn) { if (oldLayer) { map.removeLayer(oldLayer); oldLayer = null; } return; }
-    if (oldLayer) { oldLayer.setStyle(oldStyle()); if (!map.hasLayer(oldLayer)) oldLayer.addTo(map); vecOrder(); return; }
+    if (!oldOn) { oldRemove(); return; }
+    if (oldLayer) { oldLayer.setStyle(oldStyle()); if (!map.hasLayer(oldLayer)) oldLayer.addTo(map); if (oldHit && !map.hasLayer(oldHit)) oldHit.addTo(map); vecOrder(); return; }
     loadJson("donnees/old.json").then(function (fc) {
       if (token !== oldWanted || !oldOn || oldLayer) return;
+      // Dessin visible (volet oldPane, sous les parcelles) + numéros
       oldLayer = L.geoJSON(fc, {
         style: oldStyle,
         onEachFeature: function (f, layer) {
-          attachPopup(layer, function (ll) { return oldPopup(f.properties, ll); });
           if (f.properties && f.properties.id) layer.bindTooltip(String(f.properties.id), { permanent: true, direction: "center", className: "old-lbl", interactive: false });
+        }
+      }).addTo(map);
+      // Couche de détection invisible dans le canvas du dessus : survol et popups restent actifs malgré les parcelles
+      oldHit = L.geoJSON(fc, {
+        style: oldHitStyle,
+        onEachFeature: function (f, layer) {
+          attachPopup(layer, function (ll) { return oldPopup(f.properties, ll); });
         }
       }).addTo(map);
       vecOrder();
@@ -3273,7 +3290,7 @@
       if (!scanLayer || scanLayer.options.version !== idx.version) {
         if (scanLayer) map.removeLayer(scanLayer);
         scanLayer = new ScanLayer({ version: idx.version, minNativeZoom: idx.minZoom, maxNativeZoom: idx.maxZoom, maxZoom: 21,
-          bounds: box, zIndex: 3, opacity: scanOpacity, attribution: idx.attr });
+          bounds: box, pane: "scanPane", zIndex: 3, opacity: scanOpacity, attribution: idx.attr });
         scanLayer.on("tileerror", function () {
           if (scanErr) return;
           scanErr = true;

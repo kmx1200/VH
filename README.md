@@ -70,7 +70,7 @@ Dans le dialogue « Cartes » : cocher « PCRS » pour superposer le plan de cor
 ## Superposition : OLD (obligations légales de débroussaillement)
 
 Dans le dialogue « Cartes » : cocher « OLD » (avec un curseur d'opacité, comme pour les parcelles cadastrales).
-Les 277 zones (polygones jaunes) viennent de `donnees/old.json` ; toucher une zone affiche son numéro, la route,
+Les 277 zones (polygones rouges) viennent de `donnees/old.json` ; toucher une zone affiche son numéro, la route,
 le site, la surface, le traitement prévu (super-épareuse, bras long, manuel, évacuation, zone non OLD en %),
 la contrainte, les observations et la justification, avec un lien Street View.
 
@@ -84,7 +84,7 @@ python outils/preparer_old.py old.gpkg donnees/old.json
 
 Dans le dialogue « Cartes » : cocher « Carte IGN SCAN 25 » (avec un curseur d'opacité). La carte se pose
 au-dessus du fond choisi (Plan IGN, photos…) : là où il n'y a pas de dalle, le fond reste visible.
-Le PCRS, le référentiel, les PR et les OLD restent par-dessus.
+Ordre d'empilement des superpositions (du dessus vers le dessous) : PR, référentiel routier, parcelles, OLD, carte IGN SCAN 25, PCRS, puis le fond de carte.
 
 Les dalles GeoTIFF (ex. `SC25_TOUR_0250_6730_L93.tif`, Lambert-93) sont converties une fois pour toutes :
 
