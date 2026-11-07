@@ -254,7 +254,7 @@
 </div>
 
 <div class="tools" id="tools">
-  <button id="toolsToggle" class="tool" data-help="Affiche ou masque le menu (Importer GPX et boutons d’outils) pour libérer la carte." aria-expanded="false" aria-label="Menu"></button>
+  <button id="toolsToggle" class="tool" data-help="Affiche ou masque le menu (installation, import GPX et outils). Il se replie seul après quelques secondes." aria-expanded="false" aria-label="Menu"></button>
   <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
   <button id="import" class="tool" data-help="Charge un itinéraire GPX depuis le serveur ou depuis l’appareil." aria-label="Importer un GPX"></button>
   <button id="search" class="tool" data-help="Cherchez une adresse, un lieu ou des coordonnées, puis centrez la carte dessus." aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
@@ -3456,9 +3456,10 @@
   syncSheet();
   window.addEventListener("resize", syncSheet);
   if (window.ResizeObserver) new ResizeObserver(syncSheet).observe(document.querySelector(".sheet"));
-  // Menu hamburger (tous écrans) : au démarrage seul le bouton hamburger est visible ; il déplie « Importer GPX » et les boutons d'outils
+  // Menu hamburger (tous écrans) : au démarrage seul le bouton hamburger est visible ; il déplie « Importer GPX » et les boutons d'outils.
+  // Le menu se replie seul : après 6 s sans toucher un bouton, au choix d'un circuit VH et au démarrage / arrêt du suivi.
   (function () {
-    var tools = $("tools"), tg = $("toolsToggle"), mq = window.matchMedia("(max-width: 520px)");
+    var tools = $("tools"), tg = $("toolsToggle"), mq = window.matchMedia("(max-width: 520px)"), timer = null, DELAY = 6000;
     var ICO_OPEN = ICON("M6 6l12 12M18 6L6 18"), ICO_CLOSED = ICON("M4 6h16M4 12h16M4 18h16");
     function set(collapsed) {
       tools.classList.toggle("collapsed", collapsed);
@@ -3466,10 +3467,19 @@
       tg.setAttribute("aria-expanded", collapsed ? "false" : "true");
       tg.setAttribute("aria-label", collapsed ? "Ouvrir le menu" : "Fermer le menu");
       tg.innerHTML = collapsed ? ICO_CLOSED : ICO_OPEN;
+      arm();
     }
+    function arm() {
+      clearTimeout(timer);
+      if (!tools.classList.contains("collapsed")) timer = setTimeout(function () { set(true); }, DELAY);
+    }
+    function fold() { if (!tools.classList.contains("collapsed")) set(true); }
     tg.hidden = false;
     $("import").innerHTML = ICON("M12 16V4M7 9l5-5 5 5M5 20h14");
     tg.onclick = function () { set(!tools.classList.contains("collapsed")); };
+    ["pointerdown", "touchstart", "keydown"].forEach(function (ev) { tools.addEventListener(ev, arm, { passive: true }); });
+    $("toggle").addEventListener("click", fold);
+    $("route").addEventListener("change", fold);
     if (mq.addEventListener) mq.addEventListener("change", function () { set(tools.classList.contains("collapsed")); });
     set(true);
   })();
