@@ -52,7 +52,7 @@
   .ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
   #msg { font-size: .85rem; min-height: 1.2em; margin: 0 0 8px; }
   #msg.err { color: var(--err); }
-  .routebar { position: absolute; top: 0; left: 0; right: 0; z-index: 1000; display: flex; gap: 6px;
+  .routebar { position: absolute; top: 0; left: 0; right: 66px; z-index: 1000; display: flex; gap: 6px;
     padding: calc(10px + env(safe-area-inset-top, 0px)) 10px 0; }
   .routebar select { flex: 1; min-width: 0; font: inherit; padding: 12px; border-radius: 12px;
     border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
@@ -63,7 +63,7 @@
   #srvlist { list-style: none; margin: 0 0 12px; padding: 0; max-height: 50vh; overflow: auto; display: grid; gap: 6px; }
   #srvlist button { width: 100%; text-align: left; }
   [hidden] { display: none !important; }
-  .tools { position: absolute; z-index: 1000; right: 10px; top: calc(66px + env(safe-area-inset-top, 0px)); display: grid; gap: 8px; }
+  .tools { position: absolute; z-index: 1000; right: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); display: grid; gap: 8px; justify-items: end; }
   .tool { width: 46px; height: 46px; padding: 0; display: grid; place-items: center; background: var(--surface); color: var(--ink);
     border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(20,52,47,.18); }
   .tool[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
@@ -200,12 +200,20 @@
   .measure-vertex { width:22px; height:22px; box-sizing:border-box; border:3px solid #fff; border-radius:50%;
     background:var(--measure); box-shadow:0 1px 5px rgba(0,0,0,.55); cursor:move; touch-action:none; }
   .measure-vertex.selected { width:27px; height:27px; margin:-2.5px; border-width:3px; background:#1976d2; }
-  @media(max-width:520px){ .tools { top:calc(66px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
+  @media(max-width:520px){ .tools { top:calc(10px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
   @media (max-height: 520px) { .tools { grid-auto-flow: column; } }
   /* Smartphone : la fenêtre du recensement laisse libre la colonne de boutons de droite (46 px + marges) */
   @media (max-width: 520px) { .recens, .measure-panel, .guide { right: 66px; } .recens .row { gap: 4px; } }
   /* Smartphone : boutons repliables (poignée toujours visible) pour libérer la carte */
-  .tools.collapsed > .tool:not(#toolsToggle) { display: none; }
+  .tools.collapsed > :not(#toolsToggle) { display: none; }
+  /* Affichage épuré : au démarrage seul le bouton hamburger est visible. « Importer GPX » est dans le menu ;
+     le sélecteur d'itinéraire (« Tracé libre ») n'apparaît qu'une fois un GPX chargé. */
+  body.no-routes .routebar { display: none; }
+  body.no-routes .compass { top: calc(10px + env(safe-area-inset-top, 0px)); }
+  body.no-routes .legends:not(.no-compass) { top: calc(104px + env(safe-area-inset-top, 0px)); }
+  body.no-routes .legends.no-compass { top: calc(10px + env(safe-area-inset-top, 0px)); }
+  .tools #import { height: 46px; padding: 0 16px; border-radius: 12px; white-space: nowrap; box-shadow: 0 2px 8px rgba(20,52,47,.18); }
+  .tools [data-tip]::after { right: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
   .tools.collapsed #toolsToggle { opacity: .8; }
   body.tools-off .recens, body.tools-off .measure-panel, body.tools-off .guide { right: 10px; }
   /* Fenêtre de mesure réduite : right:auto la rend ajustée à son contenu, mais elle doit rester bornée pour ne pas passer sous les boutons de droite */
@@ -216,12 +224,11 @@
   }
 </style>
 </head>
-<body>
+<body class="no-routes">
 <div id="map" role="application" aria-label="Carte VHMaps"></div>
 
 <div class="routebar">
   <select id="route" aria-label="Itinéraire à suivre"></select>
-  <button id="import" class="ghost" data-tip="Importer un itinéraire (serveur ou appareil)">Importer GPX</button>
   <button id="del" class="ghost" data-tip="Supprimer cet itinéraire" aria-label="Supprimer cet itinéraire" hidden>✕</button>
   <input type="file" id="file" accept=".gpx,application/gpx+xml,text/xml" multiple hidden>
 </div>
@@ -249,7 +256,8 @@
 </div>
 
 <div class="tools" id="tools">
-  <button id="toolsToggle" class="tool" data-help="Affiche ou masque les boutons pour libérer la carte. Ils se masquent seuls après quelques secondes." aria-expanded="true" aria-label="Boutons" hidden></button>
+  <button id="toolsToggle" class="tool" data-help="Affiche ou masque le menu (Importer GPX et boutons d’outils) pour libérer la carte." aria-expanded="false" aria-label="Menu"></button>
+  <button id="import" class="ghost" data-tip="Importer un itinéraire (serveur ou appareil)">Importer GPX</button>
   <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
   <button id="search" class="tool" data-help="Cherchez une adresse, un lieu ou des coordonnées, puis centrez la carte dessus." aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
   <button id="locate" class="tool" data-help="Affiche votre position et votre direction sans enregistrer de tracé. Touchez de nouveau pour désactiver." aria-pressed="false" aria-label="Activer ma position"></button>
@@ -825,6 +833,7 @@
     sel.add(new Option("Tracé libre (aucun itinéraire)", ""));
     routes.forEach(function (r) { sel.add(new Option(r.name, r.id)); });
     sel.value = routeId;
+    document.body.classList.toggle("no-routes", !routes.length);
   }
   function remember() { try { localStorage.setItem(SKEY, routeId); } catch (e) {} }
   function segsOf(r) { return r.segs || (r.pts ? [{ pts: r.pts, color: REF_COLOR, name: "" }] : []); }
@@ -3449,30 +3458,21 @@
   syncSheet();
   window.addEventListener("resize", syncSheet);
   if (window.ResizeObserver) new ResizeObserver(syncSheet).observe(document.querySelector(".sheet"));
-  // Boutons de droite repliables sur smartphone : poignée + masquage automatique après inactivité
+  // Menu hamburger (tous écrans) : au démarrage seul le bouton hamburger est visible ; il déplie « Importer GPX » et les boutons d'outils
   (function () {
-    var tools = $("tools"), tg = $("toolsToggle"), mq = window.matchMedia("(max-width: 520px)"), timer = null, DELAY = 6000;
+    var tools = $("tools"), tg = $("toolsToggle"), mq = window.matchMedia("(max-width: 520px)");
     var ICO_OPEN = ICON("M6 6l12 12M18 6L6 18"), ICO_CLOSED = ICON("M4 6h16M4 12h16M4 18h16");
     function set(collapsed) {
       tools.classList.toggle("collapsed", collapsed);
       document.body.classList.toggle("tools-off", collapsed && mq.matches);
       tg.setAttribute("aria-expanded", collapsed ? "false" : "true");
+      tg.setAttribute("aria-label", collapsed ? "Ouvrir le menu" : "Fermer le menu");
       tg.innerHTML = collapsed ? ICO_CLOSED : ICO_OPEN;
-      arm();
     }
-    function arm() {
-      clearTimeout(timer);
-      if (mq.matches && !tools.classList.contains("collapsed")) timer = setTimeout(function () { set(true); }, DELAY);
-    }
-    function apply() {
-      tg.hidden = !mq.matches;
-      if (!mq.matches) { tools.classList.remove("collapsed"); document.body.classList.remove("tools-off"); clearTimeout(timer); }
-      else set(false);
-    }
+    tg.hidden = false;
     tg.onclick = function () { set(!tools.classList.contains("collapsed")); };
-    ["pointerdown", "touchstart", "keydown"].forEach(function (ev) { tools.addEventListener(ev, arm, { passive: true }); });
-    if (mq.addEventListener) mq.addEventListener("change", apply); else if (mq.addListener) mq.addListener(apply);
-    apply();
+    if (mq.addEventListener) mq.addEventListener("change", function () { set(tools.classList.contains("collapsed")); });
+    set(true);
   })();
 
   // Boussole : visible uniquement quand la fenêtre de suivi l'est (itinéraire choisi ou enregistrement en cours)
