@@ -2296,23 +2296,24 @@
     return "tri";
   }
   function vtDot(ll, fill, layer) { return L.circleMarker(ll, { radius: 6, color: fill === "#fff" ? VT_COLOR : "#fff", weight: 2, fillColor: fill, fillOpacity: 1, interactive: false }).addTo(layer); }
-  function vtDrawSet(s) {
+  // Résultat conservé : uniquement les droites (P1–P2 avec le recul, P2–A et P2–B avec la distance). Les points ne sont affichés que pendant la saisie.
+  function vtDrawSet(s, wip) {
     s.tris.forEach(function (a) {
-      L.polygon([s.p1, s.p2, a], { color: VT_COLOR, weight: 2, fillColor: VT_COLOR, fillOpacity: .18, interactive: false }).addTo(vtLayer);
       L.polyline([s.p2, a], { color: VT_COLOR, weight: 4, interactive: false }).addTo(vtLayer)
         .bindTooltip(vtFmt(s.dist) + " m", { permanent: true, direction: "center", className: "vt-label" });
-      vtDot(a, VT_COLOR, vtLayer);
     });
-    if (s.p1 && s.p2) L.polyline([s.p1, s.p2], { color: VT_COLOR, weight: 3, interactive: false }).addTo(vtLayer)
+    if (s.p1 && s.p2) L.polyline([s.p1, s.p2], { color: VT_COLOR, weight: 4, interactive: false }).addTo(vtLayer)
       .bindTooltip(vtFmt(s.recul) + " m", { permanent: true, direction: "center", className: "vt-label" });
-    if (s.p1) vtDot(s.p1, VT_COLOR, vtLayer);
-    if (s.p2) vtDot(s.p2, "#fff", vtLayer);
+    if (wip) {
+      if (s.p1) vtDot(s.p1, VT_COLOR, vtLayer);
+      if (s.p2) vtDot(s.p2, "#fff", vtLayer);
+    }
   }
   function vtRender() {
     vtLayer.clearLayers(); vtRub.clearLayers();
-    vtDone.forEach(vtDrawSet);
+    vtDone.forEach(function (s) { vtDrawSet(s, false); });
     var cur = { p1: vtCur.p1, p2: vtCur.p2, tris: vtCur.tris, recul: vtRecul(), dist: vtDist() }, st = vtStage();
-    vtDrawSet(cur);
+    vtDrawSet(cur, true);
     var cs = { color: VT_COLOR, weight: 2, dashArray: "6 6", fillColor: VT_COLOR, fillOpacity: .05, interactive: false };
     if (st === "p2") L.circle(cur.p1, Object.assign({ radius: cur.recul }, cs)).addTo(vtLayer);
     if (st === "tri") L.circle(cur.p2, Object.assign({ radius: cur.dist }, cs)).addTo(vtLayer);
@@ -2382,7 +2383,7 @@
       tip = "Recul : <b>" + vtFmt(vtRecul()) + " m</b>";
     } else if (st === "tri") {
       q = vtOnCircle(vtCur.p2, vtDist(), e.latlng);
-      L.polygon([vtCur.p1, vtCur.p2, q], { color: VT_COLOR, weight: 2, dashArray: "6 6", fillColor: VT_COLOR, fillOpacity: .1, interactive: false }).addTo(vtRub);
+      L.polyline([vtCur.p2, q], { color: VT_COLOR, weight: 3, dashArray: "2 7", interactive: false }).addTo(vtRub);
       tip = "Triangle n°" + (vtCur.tris.length + 1) + " · <b>" + vtFmt(vtDist()) + " m</b>";
     }
     if (q) vtDot(q, VT_COLOR, vtRub);
