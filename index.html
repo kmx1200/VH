@@ -212,8 +212,6 @@
   body.no-routes .compass { top: calc(10px + env(safe-area-inset-top, 0px)); }
   body.no-routes .legends:not(.no-compass) { top: calc(104px + env(safe-area-inset-top, 0px)); }
   body.no-routes .legends.no-compass { top: calc(10px + env(safe-area-inset-top, 0px)); }
-  .tools #import { height: 46px; padding: 0 16px; border-radius: 12px; white-space: nowrap; box-shadow: 0 2px 8px rgba(20,52,47,.18); }
-  .tools [data-tip]::after { right: calc(100% + 8px); top: 50%; transform: translateY(-50%); }
   .tools.collapsed #toolsToggle { opacity: .8; }
   body.tools-off .recens, body.tools-off .measure-panel, body.tools-off .guide { right: 10px; }
   /* Fenêtre de mesure réduite : right:auto la rend ajustée à son contenu, mais elle doit rester bornée pour ne pas passer sous les boutons de droite */
@@ -257,8 +255,8 @@
 
 <div class="tools" id="tools">
   <button id="toolsToggle" class="tool" data-help="Affiche ou masque le menu (Importer GPX et boutons d’outils) pour libérer la carte." aria-expanded="false" aria-label="Menu"></button>
-  <button id="import" class="ghost" data-tip="Importer un itinéraire (serveur ou appareil)">Importer GPX</button>
   <button id="install" class="tool" data-help="Ajoute VHMaps à l’écran d’accueil pour l’utiliser comme une application." aria-label="Installer l'application"></button>
+  <button id="import" class="tool" data-help="Charge un itinéraire GPX depuis le serveur ou depuis l’appareil." aria-label="Importer un GPX"></button>
   <button id="search" class="tool" data-help="Cherchez une adresse, un lieu ou des coordonnées, puis centrez la carte dessus." aria-pressed="false" aria-label="Rechercher une adresse ou un lieu"></button>
   <button id="locate" class="tool" data-help="Affiche votre position et votre direction sans enregistrer de tracé. Touchez de nouveau pour désactiver." aria-pressed="false" aria-label="Activer ma position"></button>
   <button id="trace" class="tool" data-help="Enregistre et affiche le chemin que vous parcourez à partir de votre position, sans suivre de circuit. Touchez de nouveau pour arrêter." aria-pressed="false" aria-label="Tracer mon parcours"></button>
@@ -3470,6 +3468,7 @@
       tg.innerHTML = collapsed ? ICO_CLOSED : ICO_OPEN;
     }
     tg.hidden = false;
+    $("import").innerHTML = ICON("M12 16V4M7 9l5-5 5 5M5 20h14");
     tg.onclick = function () { set(!tools.classList.contains("collapsed")); };
     if (mq.addEventListener) mq.addEventListener("change", function () { set(tools.classList.contains("collapsed")); });
     set(true);
