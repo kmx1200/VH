@@ -52,7 +52,7 @@
   .ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
   #msg { font-size: .85rem; min-height: 1.2em; margin: 0 0 8px; }
   #msg.err { color: var(--err); }
-  .routebar { position: absolute; top: 0; left: 0; right: 66px; z-index: 1000; display: flex; gap: 6px;
+  .routebar { position: absolute; top: 0; left: 0; right: calc(var(--tools-w, 46px) + 20px); z-index: 1000; display: flex; gap: 6px;
     padding: calc(10px + env(safe-area-inset-top, 0px)) 10px 0; }
   .routebar select { flex: 1; min-width: 0; font: inherit; padding: 12px; border-radius: 12px;
     border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
@@ -63,8 +63,10 @@
   #srvlist { list-style: none; margin: 0 0 12px; padding: 0; max-height: 50vh; overflow: auto; display: grid; gap: 6px; }
   #srvlist button { width: 100%; text-align: left; }
   [hidden] { display: none !important; }
-  .tools { position: absolute; z-index: 1000; right: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); display: grid; gap: 8px; justify-items: end; }
-  .tool { width: 46px; height: 46px; padding: 0; display: grid; place-items: center; background: var(--surface); color: var(--ink);
+  /* Colonne de boutons : taille (--tool-s), espacement (--tool-gap) et nombre de colonnes calculés par fitTools() dans le script,
+     pour que tous les boutons tiennent dans la hauteur de l'écran (smartphone compris). 46 px quand la place le permet. */
+  .tools { position: absolute; z-index: 1000; right: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); display: grid; gap: var(--tool-gap, 8px); justify-items: end; }
+  .tool { width: var(--tool-s, 46px); height: var(--tool-s, 46px); padding: 0; display: grid; place-items: center; background: var(--surface); color: var(--ink);
     border: 1px solid var(--line); box-shadow: 0 2px 8px rgba(20,52,47,.18); }
   .tool[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
   .compass { position: absolute; z-index: 1000; left: 10px; top: calc(66px + env(safe-area-inset-top, 0px)); width: 70px;
@@ -134,7 +136,6 @@
   .pin { width: 26px; height: 26px; border-radius: 50% 50% 50% 0; background: #d6336c; border: 3px solid #fff;
     transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0,0,0,.4); }
   .pin::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: #fff; }
-  @media (max-height: 720px) and (orientation: portrait) { .tools { grid-auto-flow: column; grid-template-rows: repeat(4, 46px); } }
   /* Info-bulles : titre = aria-label (suit l'état du bouton) + explication = data-help ; boutons texte : data-tip */
   .tool, [data-tip] { position: relative; -webkit-touch-callout: none; }
   .tool::after, [data-tip]::after { position: absolute; z-index: 1300; opacity: 0; pointer-events: none; transition: opacity .12s;
@@ -208,10 +209,12 @@
   .measure-vertex { width:22px; height:22px; box-sizing:border-box; border:3px solid #fff; border-radius:50%;
     background:var(--measure); box-shadow:0 1px 5px rgba(0,0,0,.55); cursor:move; touch-action:none; }
   .measure-vertex.selected { width:27px; height:27px; margin:-2.5px; border-width:3px; background:#1976d2; }
-  @media(max-width:520px){ .tools { top:calc(10px + env(safe-area-inset-top,0px)); grid-auto-flow:row; } }
-  @media (max-height: 520px) { .tools { grid-auto-flow: column; } }
-  /* Smartphone : la fenêtre du recensement laisse libre la colonne de boutons de droite (46 px + marges) */
-  @media (max-width: 520px) { .recens, .measure-panel, .guide { right: 66px; } .recens .row { gap: 4px; } }
+  /* Écran trop bas pour une seule colonne : fitTools() ajoute .multi et répartit les boutons sur plusieurs colonnes.
+     rtl : la 2e colonne se place à gauche de la 1re, le bouton menu reste en haut à droite. */
+  .tools.multi { direction: rtl; }
+  .tools.multi > * { direction: ltr; }
+  /* Smartphone : les fenêtres du bas laissent libre la colonne de boutons de droite (--tools-w = largeur réelle, calculée par fitTools) */
+  @media (max-width: 520px) { .recens, .measure-panel, .guide { right: calc(var(--tools-w, 46px) + 20px); } .recens .row { gap: 4px; } }
   /* Smartphone : boutons repliables (poignée toujours visible) pour libérer la carte */
   .tools.collapsed > :not(#toolsToggle) { display: none; }
   /* Affichage épuré : au démarrage seul le bouton hamburger est visible. « Importer GPX » est dans le menu ;
@@ -225,7 +228,7 @@
   /* Fenêtre de mesure réduite : right:auto la rend ajustée à son contenu, mais elle doit rester bornée pour ne pas passer sous les boutons de droite */
   .measure-panel.folded { max-width: min(460px, calc(100vw - 20px)); }
   @media (max-width: 520px) {
-    .measure-panel.folded { max-width: calc(100vw - 76px); }
+    .measure-panel.folded { max-width: calc(100vw - var(--tools-w, 46px) - 30px); }
     body.tools-off .measure-panel.folded { max-width: calc(100vw - 20px); }
   }
 </style>
@@ -364,6 +367,7 @@
   <label class="chk"><input type="checkbox" id="ovAgglo"> Agglomérations (magenta)</label>
   <label class="chk"><input type="checkbox" id="ovCadastre"> Parcelles cadastrales (IGN)</label>
   <label>Opacité du cadastre <input type="range" id="ovCadastreOp" min="20" max="100" step="10" value="85"></label>
+  <p class="hint">Touchez une parcelle (zoom 15 ou plus) pour afficher sa section, son numéro et sa contenance. En ligne uniquement.</p>
   <label class="chk"><input type="checkbox" id="ovOld"> OLD (obligations légales de débroussaillement)</label>
   <label>Opacité des OLD <input type="range" id="ovOldOp" min="20" max="100" step="10" value="70"></label>
   <label class="chk"><input type="checkbox" id="ovScan"> <span id="ovScanName">Carte IGN SCAN 25 (dalles)</span></label>
@@ -2883,6 +2887,93 @@
   $("ovCadastreOp").oninput=function(){cadastreOpacity=Number(this.value)/100;if(cadastreLayer)cadastreLayer.setOpacity(cadastreOpacity);try{localStorage.setItem("vhmaps-cadastre-op",this.value);}catch(e){}};
   try{cadastreOn=localStorage.getItem("vhmaps-cadastre")==="1";cadastreOpacity=(Number(localStorage.getItem("vhmaps-cadastre-op"))||85)/100;$("ovCadastre").checked=cadastreOn;$("ovCadastreOp").value=Math.round(cadastreOpacity*100);if(cadastreOn)syncCadastre();}catch(e){}
 
+  // ---------- Parcelles : identification au toucher (WFS Géoplateforme, Parcellaire Express) ----------
+  // Couche « Parcelles cadastrales » affichée et aucun outil en attente d'un point : toucher la carte interroge le WFS IGN.
+  // La parcelle touchée est surlignée et une fenêtre donne commune, section, numéro, contenance et référence (IDU).
+  // Le dessin des parcelles reste en WMS (léger, tous zooms) ; le WFS ne sert qu'à la parcelle touchée (1 requête par toucher).
+  var CAD_WFS = "https://data.geopf.fr/wfs/ows", CAD_TYPE = "CADASTRALPARCELS.PARCELLAIRE_EXPRESS:parcelle", CAD_MINZOOM = 15;
+  var cadHit = null, cadPopup = null, cadSeq = 0, cadCtrl = null, cadSkip = false;
+  function cadClear() {
+    if (cadHit) { map.removeLayer(cadHit); cadHit = null; }
+    if (cadPopup) { var p = cadPopup; cadPopup = null; map.closePopup(p); }
+  }
+  function cadInRing(x, y, r) {
+    var c = false;
+    for (var i = 0, j = r.length - 1; i < r.length; j = i++) {
+      var xi = r[i][0], yi = r[i][1], xj = r[j][0], yj = r[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  }
+  function cadInGeom(x, y, g) {   // point dans un (Multi)Polygon GeoJSON, trous compris
+    var polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+    for (var p = 0; p < polys.length; p++) {
+      if (!cadInRing(x, y, polys[p][0])) continue;
+      var hole = false;
+      for (var h = 1; h < polys[p].length; h++) if (cadInRing(x, y, polys[p][h])) { hole = true; break; }
+      if (!hole) return true;
+    }
+    return false;
+  }
+  function cadRef(pr) {
+    var num = /^\d+$/.test(pr.numero || "") ? String(parseInt(pr.numero, 10)) : (pr.numero || "?");
+    return { sec: (pr.section || "?").replace(/^0+(?=\w)/, ""), num: num };
+  }
+  function cadShow(f, ll) {
+    var pr = f.properties || {}, r = cadRef(pr), m2 = Number(pr.contenance) || 0;
+    var surf = m2 ? m2.toLocaleString("fr-FR") + " m² (" + (m2 / 10000).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ha)" : "non renseignée";
+    var txt = (pr.nom_com || "") + " — section " + r.sec + " n° " + r.num + (pr.idu ? " (" + pr.idu + ")" : "") + (m2 ? " — " + m2.toLocaleString("fr-FR") + " m²" : "");
+    cadClear();
+    cadHit = L.geoJSON(f, { interactive: false, style: { color: "#ff7800", weight: 3, opacity: 1, fillColor: "#ff7800", fillOpacity: .18 } }).addTo(map);
+    var div = document.createElement("div");
+    div.innerHTML = "<b>Parcelle " + esc(r.sec) + " " + esc(r.num) + "</b><br>" + esc(pr.nom_com || "") +
+      (pr.code_insee ? " <small>(" + esc(pr.code_insee) + ")</small>" : "") + "<br>Contenance : " + esc(surf) +
+      "<br><small>Réf. " + esc(pr.idu || "—") + (pr.feuille ? " · feuille " + esc(pr.feuille) : "") + "</small>" +
+      "<br><a href=\"#\" data-cad=\"copy\">Copier la référence</a>";
+    div.querySelector("[data-cad=copy]").onclick = function (ev) {
+      ev.preventDefault();
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function () { say("Référence copiée : " + txt); }, function () { say(txt); });
+      else say(txt);
+    };
+    cadPopup = L.popup({ maxWidth: 260 }).setLatLng(ll).setContent(div);
+    cadPopup.on("remove", function () { if (cadHit) { map.removeLayer(cadHit); cadHit = null; } cadPopup = null; });
+    cadPopup.openOn(map);
+    say("Parcelle " + r.sec + " " + r.num + (pr.nom_com ? " — " + pr.nom_com : "") + ".");
+  }
+  function cadIdentify(ll) {
+    var seq = ++cadSeq, d = 0.00002;   // petite emprise (≈ 2 m) autour du point touché, puis test point dans polygone
+    if (cadCtrl) cadCtrl.abort();
+    cadCtrl = window.AbortController ? new AbortController() : null;
+    var q = new URLSearchParams({ SERVICE: "WFS", VERSION: "2.0.0", REQUEST: "GetFeature", TYPENAMES: CAD_TYPE,
+      OUTPUTFORMAT: "application/json", SRSNAME: "EPSG:4326", COUNT: "10",
+      // WFS 2.0 + urn EPSG:4326 : ordre latitude, longitude ; la réponse GeoJSON est en longitude, latitude
+      BBOX: (ll.lat - d) + "," + (ll.lng - d) + "," + (ll.lat + d) + "," + (ll.lng + d) + ",urn:ogc:def:crs:EPSG::4326" });
+    say("Recherche de la parcelle…");
+    fetch(CAD_WFS + "?" + q, cadCtrl ? { signal: cadCtrl.signal } : {}).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }).then(function (gj) {
+      if (seq !== cadSeq) return;
+      var fs = (gj && gj.features) || [], f = null;
+      for (var i = 0; i < fs.length; i++) if (fs[i].geometry && cadInGeom(ll.lng, ll.lat, fs[i].geometry)) { f = fs[i]; break; }
+      if (!f) { cadClear(); say("Aucune parcelle à cet endroit (voirie ou domaine public non cadastré)."); return; }
+      cadShow(f, ll);
+    }).catch(function (e) {
+      if (e && e.name === "AbortError") return;
+      if (seq === cadSeq) say("Parcelle : le service cadastral IGN ne répond pas. Vérifiez la connexion Internet.", true);
+    });
+  }
+  // État des outils relevé au « preclick », avant que leurs propres gestionnaires de clic ne se désactivent
+  // (Street View, Localiser un PR, mesures, triangles de visibilité, recherche ouverte) : ce toucher-là leur appartient.
+  map.on("preclick", function () { cadSkip = !!(measureMode || svArmed || pkArmed || vtOn || !$("searchbar").hidden); });
+  map.on("click", function (e) {
+    if (!cadastreOn || cadSkip) return;
+    if (e.sourceTarget && e.sourceTarget !== map) return;   // clic sur un tracé, un PR, une OLD… : leur propre fenêtre
+    if (map.getZoom() < CAD_MINZOOM) { say("Zoomez davantage (niveau " + CAD_MINZOOM + " ou plus) pour identifier une parcelle."); return; }
+    cadIdentify(e.latlng);
+  });
+  $("ovCadastre").addEventListener("change", function () { if (!this.checked) { cadSeq++; cadClear(); } });
+
   // ---------- Guidage et partage ----------
   var destination=null,guidanceLine=null,guidanceMarker=null,guidanceOrigin=null,guidanceWatch=null;
   function compassText(d){return["N","NE","E","SE","S","SO","O","NO"][Math.round(d/45)%8];}
@@ -3059,7 +3150,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 35";
+  $("appVer").textContent = "VHMaps — version 36";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
@@ -3658,6 +3749,44 @@
     $("route").addEventListener("change", fold);
     if (mq.addEventListener) mq.addEventListener("change", function () { set(tools.classList.contains("collapsed")); });
     set(true);
+  })();
+
+  // Colonne de boutons adaptée à la hauteur disponible : tous les boutons du menu restent visibles, même sur smartphone.
+  // 46 px si la place le permet, sinon réduits jusqu'à 38 px ; en dessous, répartition sur 2 colonnes (ou plus).
+  // La place disponible va du haut de la colonne jusqu'au-dessus de la fenêtre de suivi et de la mention des sources.
+  (function () {
+    var tools = $("tools"), root = document.documentElement, MAX = 46, MIN = 38, raf = 0;
+    function fitTools() {
+      raf = 0;
+      var n = Array.prototype.filter.call(tools.children, function (el) { return !el.hidden; }).length;
+      if (!n) return;
+      var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      var sh = document.querySelector(".sheet"), attr = document.querySelector(".leaflet-control-attribution");
+      var bottom = (sh && !sh.hidden ? sh.offsetHeight : 0) + (attr ? attr.offsetHeight : 0) + 10;
+      var avail = vh - tools.getBoundingClientRect().top - bottom;
+      var gap = avail < 760 ? 6 : 8, cols, rows = n, s = MAX;
+      for (cols = 1; cols <= 4; cols++) {
+        rows = Math.ceil(n / cols);
+        s = Math.floor((avail - (rows - 1) * gap) / rows);
+        if (s >= MIN) break;
+      }
+      if (cols > 4) cols = 4;
+      s = Math.max(MIN, Math.min(MAX, s));
+      tools.style.setProperty("--tool-s", s + "px");
+      tools.style.setProperty("--tool-gap", gap + "px");
+      tools.classList.toggle("multi", cols > 1);
+      tools.style.gridAutoFlow = cols > 1 ? "column" : "row";
+      tools.style.gridTemplateRows = cols > 1 ? "repeat(" + rows + ", " + s + "px)" : "";
+      root.style.setProperty("--tools-w", (cols * s + (cols - 1) * gap) + "px");
+    }
+    function schedule() { if (!raf) raf = requestAnimationFrame(fitTools); }
+    window.addEventListener("resize", schedule);
+    window.addEventListener("orientationchange", schedule);
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", schedule);
+    if (window.ResizeObserver) new ResizeObserver(schedule).observe(document.querySelector(".sheet"));
+    // Bouton « Installer » masqué ou affiché : le nombre de boutons change
+    new MutationObserver(schedule).observe(tools, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
+    schedule();
   })();
 
   // Boussole : visible uniquement quand la fenêtre de suivi l'est (itinéraire choisi ou enregistrement en cours)
