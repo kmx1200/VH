@@ -47,6 +47,20 @@ Chaque `<trk>` (et chaque `<trkseg>`) devient un segment distinct. La couleur es
 Sans couleur, une couleur est attribuée automatiquement. Une légende s'affiche dès qu'il y a plusieurs segments,
 et le message de suivi indique le segment sur lequel on se trouve. Voir `itineraires/exemple-couleurs.gpx`.
 
+## Triangles de visibilité (bouton triangle)
+
+Choisir l'accès (privé, recul 2 m ; secondaire, recul 4 m), la vitesse de référence (50 / 70 / 80 / 90 km/h) et le temps de réaction (6 ou 8 s),
+puis poser P1 (ligne d'effet), P2 (point d'observation, ramené sur le cercle de recul) et deux points sur le cercle de distance de visibilité.
+
+- **Plusieurs accès** : chaque accès tracé reçoit une couleur différente (palette de 8 couleurs ; la première couleur libre est réutilisée après une suppression).
+  Les étiquettes sur la carte portent la pastille de couleur et le numéro de l'accès (`n°2 · 116,7 m`).
+- **Suivi dans le panneau** : une ligne par accès avec sa couleur, son numéro et ses paramètres (type d'accès, recul, vitesse, temps → distance, nombre de triangles).
+  Toucher la ligne zoome sur l'accès ; ✎ le rouvre (mêmes paramètres, points conservés) ; ✕ le supprime.
+- **Modifier un accès** : ✎ puis « Paramètres » (les points sont ramenés sur les nouveaux cercles, les triangles gardent leur direction),
+  ou « Annuler point » pour replacer un triangle, puis « ✓ Valider la modification » (l'accès reprend sa place et sa couleur).
+- **Copie d'écran** : la légende (couleur + paramètres de chaque accès) est ajoutée en haut à gauche de l'image.
+- « Terminer » ferme l'outil : les triangles restent affichés ; rouvrir l'outil réaffiche la liste.
+
 ## Cartes hors ligne (mode avion)
 
 Bouton « carte » (colonne de boutons à droite) : choisir le fond (Plan IGN, photographies aériennes IGN actuelles, ou photographies aériennes anciennes 1965-1980 et 1980-1995),

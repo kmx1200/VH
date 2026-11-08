@@ -201,8 +201,13 @@
   #vtHead #vtValue { flex:1 1 100%; min-width:0; font-size:.88rem; }
   #vtChoices { display:flex; flex-wrap:wrap; gap:6px; }
   #vtChoices button { flex:1 1 40%; }
-  #vtSummary { font-weight:700; font-size:.86rem; padding:6px 8px; border-radius:10px; background:var(--surface); border:1px solid var(--line); }
-  .leaflet-tooltip.vt-label { background:var(--surface-a); color:var(--ink); border:1px solid #7c3aed; font-weight:700; font-size:.78rem; padding:2px 6px; border-radius:8px; box-shadow:none; }
+  .vt-sw { display:inline-block; width:.95em; height:.95em; border-radius:50%; flex:none; margin-right:6px; vertical-align:-2px; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.4); }
+  #vtList { max-height:11em !important; }
+  #vtList li { align-items:stretch; }
+  #vtList .ml-go { white-space:normal; line-height:1.25; font-size:.84rem; }
+  #vtList .vt-cur { flex:1; padding:6px 10px; border:1px dashed var(--line); border-radius:10px; font-weight:700; font-size:.84rem; line-height:1.25; }
+  .measure-panel #vtValid { color:#fff; background:var(--go); }
+  .leaflet-tooltip.vt-label { background:var(--surface-a); color:var(--ink); border:1px solid var(--line); font-weight:700; font-size:.78rem; padding:2px 6px; border-radius:8px; box-shadow:none; }
   .leaflet-tooltip.vt-label::before { display:none; }
   .leaflet-tooltip.measure-label { background:var(--surface-a); color:var(--ink); border:1px solid var(--measure); font-weight:700; font-size:.78rem; padding:2px 6px; border-radius:8px; box-shadow:none; }
   .leaflet-tooltip.measure-label::before { display:none; }
@@ -280,13 +285,13 @@
   <button id="shot" class="tool" data-help="Enregistre une image de la carte seule, sans les boutons. Les mesures affichées et leurs valeurs y sont ajoutées." aria-label="Copie d'écran de la carte"></button>
   <button id="measureLine" class="tool" data-help="Posez des points pour mesurer une distance. Les poignées permettent d’ajuster le tracé." aria-label="Mesurer une distance"></button>
   <button id="measureArea" class="tool" data-help="Posez au moins 3 points pour mesurer une surface." aria-label="Mesurer une surface"></button>
-  <button id="vt" class="tool" data-help="Triangles de visibilité d’un accès : choisissez l’accès (recul 2 m ou 4 m), la vitesse de référence et le temps de réaction, puis posez les points sur la carte." aria-label="Triangles de visibilité" aria-pressed="false"></button>
+  <button id="vt" class="tool" data-help="Triangles de visibilité : choisissez l’accès (recul 2 m ou 4 m), la vitesse de référence et le temps de réaction, puis posez les points sur la carte. Chaque accès a sa couleur ; la liste du panneau permet de le retrouver, le modifier ou le supprimer." aria-label="Triangles de visibilité" aria-pressed="false"></button>
 </div>
 <div id="vtPanel" class="measure-panel" hidden>
   <div id="vtHead"><b>Triangles de visibilité</b><span id="vtValue"></span></div>
   <div id="vtChoices"></div>
-  <div id="vtSummary" hidden></div>
-  <div class="row"><button id="vtUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="vtParams" class="ghost" data-tip="Changer l’accès, la vitesse ou le temps de réaction (possible entre deux accès)">Paramètres</button><button id="vtReset" class="ghost" data-tip="Effacer tous les triangles de la carte">Effacer</button><button id="vtClose" class="ghost" data-tip="Terminer : ferme l’outil, les triangles restent affichés">Terminer</button></div>
+  <ul id="vtList" hidden></ul>
+  <div class="row"><button id="vtValid" class="ghost" data-tip="Valider la modification de cet accès" hidden>✓ Valider la modification</button><button id="vtUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="vtParams" class="ghost" data-tip="Changer l’accès, la vitesse ou le temps de réaction de l’accès en cours (les points sont ramenés sur les nouveaux cercles)">Paramètres</button><button id="vtReset" class="ghost" data-tip="Effacer tous les triangles de la carte">Effacer</button><button id="vtClose" class="ghost" data-tip="Terminer : ferme l’outil, les triangles restent affichés">Terminer</button></div>
 </div>
 <div id="measurePanel" class="measure-panel" hidden>
   <div id="measureHead"><b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span><button id="measureFold" class="ghost" aria-expanded="true" aria-label="Réduire la fenêtre de mesure" title="Réduire pour mieux voir la carte (les tracés sont conservés)">▾</button></div>
@@ -1251,6 +1256,26 @@
     });
     c.restore();
   }
+  function shotVtLegend(c, W, H) {   // légende des triangles de visibilité : pastille de couleur + n° + paramètres
+    var items = vtItems();
+    if (!items.length) return;
+    var title = "Triangles de visibilité", pad = 12, lh = 20, maxW = Math.min(560, W - 20), sw = 7;
+    c.save();
+    c.font = "700 14px system-ui, sans-serif"; var w = c.measureText(title).width;
+    items.forEach(function (l) { c.font = "500 13px system-ui, sans-serif"; w = Math.max(w, c.measureText(l.t).width + sw * 2 + 8); });
+    var bw = Math.min(maxW, Math.ceil(w) + pad * 2), bh = pad * 2 + lh + items.length * lh + 4, x = 10, y = 10;
+    c.shadowColor = "rgba(0,0,0,.3)"; c.shadowBlur = 8; c.fillStyle = "rgba(255,255,255,.96)"; shotRR(c, x, y, bw, bh, 14); c.fill();
+    c.shadowColor = "transparent"; c.lineWidth = 1; c.strokeStyle = "#d5ddd3"; c.stroke();
+    c.textBaseline = "middle"; c.textAlign = "left"; c.fillStyle = "#14342f";
+    c.font = "700 14px system-ui, sans-serif"; c.fillText(title, x + pad, y + pad + lh / 2, bw - pad * 2);
+    var ty = y + pad + lh + 4;
+    items.forEach(function (l) {
+      c.beginPath(); c.arc(x + pad + sw, ty + lh / 2, sw, 0, Math.PI * 2); c.fillStyle = l.col; c.fill(); c.lineWidth = 2; c.strokeStyle = "#fff"; c.stroke();
+      c.fillStyle = "#14342f"; c.font = "500 13px system-ui, sans-serif";
+      c.fillText(l.t, x + pad + sw * 2 + 8, ty + lh / 2, bw - pad * 2 - sw * 2 - 8); ty += lh;
+    });
+    c.restore();
+  }
   function shotAttribution(c, W, H) {
     var a = document.querySelector(".leaflet-control-attribution"), t = a ? a.textContent.replace(/\s+/g, " ").trim() : "";
     if (!t) return;
@@ -1310,6 +1335,7 @@
       items.forEach(function (it, k) { it.draw(res[k]); });
       shotAttribution(c, W, H);
       shotMeasurePanel(c, W, H);
+      shotVtLegend(c, W, H);
       return new Promise(function (resolve, reject) {
         try { cv.toBlob(function (b) { b ? resolve({ blob: b, failed: failed }) : reject(new Error("blob")); }, "image/png"); }
         catch (e) { reject(e); }
@@ -2276,11 +2302,15 @@
   // 1) type d'accès (recul 2 m ou 4 m), vitesse, temps de réaction ; 2) point P1 sur la ligne d'effet + cercle de rayon = recul ;
   // 3) point P2 sur ce cercle (point d'observation) + cercle de rayon = vitesse (m/s) × temps ; 4) deux points A et B sur ce cercle :
   // chacun donne un triangle de visibilité (P1, P2, point). Les points cliqués sont ramenés exactement sur le cercle.
-  var VT_COLOR = "#7c3aed", VT_R = 6371000;   // VT_R = rayon terrestre de Leaflet (L.Circle), pour des cercles identiques à l'écran
+  var VT_COLORS = ["#7c3aed", "#e8590c", "#2f9e44", "#1d6fd8", "#c2255c", "#0b7285", "#f08c00", "#495057"], VT_R = 6371000;   // VT_R = rayon terrestre de Leaflet (L.Circle), pour des cercles identiques à l'écran
   var VT_ACCESS = { prive: { label: "Accès privé", recul: 2 }, secondaire: { label: "Accès secondaire", recul: 4 } };
   var VT_SPEEDS = [50, 70, 80, 90], VT_TIMES = [6, 8];
-  var vtOn = false, vtCfg = { access: null, speed: 0, time: 0 }, vtCur = { p1: null, p2: null, tris: [] }, vtDone = [];
+  // Un « accès » = P1, P2 et ses deux triangles ; chaque accès a sa couleur, ses paramètres (accès, vitesse, temps) et une ligne dans la liste du panneau.
+  // vtCur = accès en cours (at >= 0 : accès en modification, qui reprendra sa place dans la liste) ; vtDone = accès validés.
+  function vtNew() { return { p1: null, p2: null, tris: [], color: null, at: -1, cfg0: null }; }
+  var vtOn = false, vtCfg = { access: null, speed: 0, time: 0 }, vtCur = vtNew(), vtDone = [];
   var vtLayer = L.layerGroup().addTo(map), vtRub = L.layerGroup().addTo(map), vtTipEl = null, vtLast = null;
+  function vtCfgOk() { return !!(vtCfg.access && vtCfg.speed && vtCfg.time); }
   function vtRecul() { return vtCfg.access ? VT_ACCESS[vtCfg.access].recul : 0; }
   function vtDist() { return vtCfg.speed * vtCfg.time / 3.6; }
   function vtFmt(v) { return (Math.round(v * 10) / 10).toString().replace(".", ","); }
@@ -2291,37 +2321,79 @@
     if (d < 1e-6) { p = { x: 0, y: -1 }; d = 1; }
     return vtLL(c, { x: p.x / d * r, y: p.y / d * r });
   }
+  function vtFree() {   // première couleur de la palette non utilisée par un accès validé
+    var used = vtDone.map(function (x) { return x.color; });
+    for (var i = 0; i < VT_COLORS.length; i++) if (used.indexOf(VT_COLORS[i]) < 0) return VT_COLORS[i];
+    return VT_COLORS[vtDone.length % VT_COLORS.length];
+  }
+  function vtColor() { if (!vtCur.color || (!vtCur.p1 && vtCur.at < 0)) vtCur.color = vtFree(); return vtCur.color; }   // accès pas encore commencé : toujours la première couleur libre
+  function vtNumCur() { return vtCur.at >= 0 ? vtCur.at + 1 : vtDone.length + 1; }
+  function vtNumDone(i) { return vtCur.at >= 0 && i >= vtCur.at ? i + 2 : i + 1; }
+  function vtSet() {   // accès en cours sous forme d'objet (paramètres précédents conservés pendant un changement de paramètres)
+    var cf = vtCfgOk() ? vtCfg : (vtCur.cfg0 || vtCfg), g = vtCur.p1 && vtCur.p2 ? vtCur.p1.distanceTo(vtCur.p2) : 0;
+    return { p1: vtCur.p1, p2: vtCur.p2, tris: vtCur.tris, color: vtColor(), access: cf.access, speed: cf.speed, time: cf.time,
+      recul: cf.access ? VT_ACCESS[cf.access].recul : g, dist: cf.speed && cf.time ? cf.speed * cf.time / 3.6 : 0 };
+  }
+  function vtCommit() {
+    var s = vtSet();
+    if (vtCur.at >= 0) vtDone.splice(Math.min(vtCur.at, vtDone.length), 0, s); else vtDone.push(s);
+    vtCur = vtNew();
+  }
   function vtStage() {
     if (!vtCfg.access) return "access";
     if (!vtCfg.speed) return "speed";
     if (!vtCfg.time) return "time";
     if (!vtCur.p1) return "p1";
     if (!vtCur.p2) return "p2";
-    return "tri";
+    return vtCur.tris.length >= 2 ? "full" : "tri";
   }
-  function vtDot(ll, fill, layer) { return L.circleMarker(ll, { radius: 6, color: fill === "#fff" ? VT_COLOR : "#fff", weight: 2, fillColor: fill, fillOpacity: 1, interactive: false }).addTo(layer); }
-  // Résultat conservé : uniquement les droites (P1–P2 avec le recul, P2–A et P2–B avec la distance). Les points ne sont affichés que pendant la saisie.
-  function vtDrawSet(s, wip) {
+  function vtDot(ll, fill, layer, col) { return L.circleMarker(ll, { radius: 6, color: fill === "#fff" ? col : "#fff", weight: 2, fillColor: fill, fillOpacity: 1, interactive: false }).addTo(layer); }
+  function vtLbl(col, num, txt) { return '<i class="vt-sw" style="background:' + col + '"></i>n°' + num + ' · ' + txt; }
+  // Résultat conservé : uniquement les droites (P1–P2 avec le recul, P2–A et P2–B avec la distance), dans la couleur de l'accès. Les points ne sont affichés que pendant la saisie.
+  function vtDrawSet(s, wip, num) {
     s.tris.forEach(function (a) {
-      L.polyline([s.p2, a], { color: VT_COLOR, weight: 4, interactive: false }).addTo(vtLayer)
-        .bindTooltip(vtFmt(s.dist) + " m", { permanent: true, direction: "center", className: "vt-label" });
+      L.polyline([s.p2, a], { color: s.color, weight: 4, interactive: false }).addTo(vtLayer)
+        .bindTooltip(vtLbl(s.color, num, vtFmt(s.dist || s.p2.distanceTo(a)) + " m"), { permanent: true, direction: "center", className: "vt-label" });
     });
-    if (s.p1 && s.p2) L.polyline([s.p1, s.p2], { color: VT_COLOR, weight: 4, interactive: false }).addTo(vtLayer)
-      .bindTooltip(vtFmt(s.recul) + " m", { permanent: true, direction: "center", className: "vt-label" });
+    if (s.p1 && s.p2) L.polyline([s.p1, s.p2], { color: s.color, weight: 4, interactive: false }).addTo(vtLayer)
+      .bindTooltip(vtLbl(s.color, num, vtFmt(s.recul) + " m"), { permanent: true, direction: "center", className: "vt-label" });
     if (wip) {
-      if (s.p1) vtDot(s.p1, VT_COLOR, vtLayer);
-      if (s.p2) vtDot(s.p2, "#fff", vtLayer);
+      if (s.p1) vtDot(s.p1, s.color, vtLayer, s.color);
+      if (s.p2) vtDot(s.p2, "#fff", vtLayer, s.color);
     }
   }
   function vtRender() {
     vtLayer.clearLayers(); vtRub.clearLayers();
-    vtDone.forEach(function (s) { vtDrawSet(s, false); });
-    var cur = { p1: vtCur.p1, p2: vtCur.p2, tris: vtCur.tris, recul: vtRecul(), dist: vtDist() }, st = vtStage();
-    vtDrawSet(cur, true);
-    var cs = { color: VT_COLOR, weight: 2, dashArray: "6 6", fillColor: VT_COLOR, fillOpacity: .05, interactive: false };
+    if (vtCfgOk() && vtCur.p1 && vtCur.p2) {   // paramètres (re)choisis : les points sont ramenés sur les nouveaux cercles
+      vtCur.p2 = vtOnCircle(vtCur.p1, vtRecul(), vtCur.p2);
+      vtCur.tris = vtCur.tris.map(function (a) { return vtOnCircle(vtCur.p2, vtDist(), a); });
+    }
+    vtDone.forEach(function (s, i) { vtDrawSet(s, false, vtNumDone(i)); });
+    var cur = vtSet(), st = vtStage();
+    vtDrawSet(cur, true, vtNumCur());
+    var cs = { color: cur.color, weight: 2, dashArray: "6 6", fillColor: cur.color, fillOpacity: .05, interactive: false };
     if (st === "p2") L.circle(cur.p1, Object.assign({ radius: cur.recul }, cs)).addTo(vtLayer);
     if (st === "tri") L.circle(cur.p2, Object.assign({ radius: cur.dist }, cs)).addTo(vtLayer);
     vtPanelUpdate();
+  }
+  function vtDesc(s) {   // paramètres utilisés par un accès
+    var p = [];
+    if (s.access) p.push(VT_ACCESS[s.access].label + " · recul " + vtFmt(s.recul) + " m");
+    if (s.speed) p.push(s.speed + " km/h");
+    if (s.time) p.push(s.time + " s");
+    var t = p.join(" · ");
+    if (s.access && s.speed && s.time) t += " → " + vtFmt(s.dist) + " m";
+    return t;
+  }
+  function vtItems() {   // lignes de suivi (panneau et copie d'écran) : couleur + n° + paramètres
+    function nt(n) { return n + " triangle" + (n > 1 ? "s" : ""); }
+    var r = vtDone.map(function (s, i) { return { col: s.color, i: i, t: "n°" + vtNumDone(i) + " · " + vtDesc(s) + " · " + nt(s.tris.length) }; });
+    if (vtOn && (vtCur.p1 || vtCur.at >= 0)) {
+      var c = vtSet(), n = vtCur.tris.length;
+      r.splice(vtCur.at >= 0 ? Math.min(vtCur.at, r.length) : r.length, 0,
+        { col: c.color, t: "n°" + vtNumCur() + " (" + (vtCur.at >= 0 ? "en modification" : "en cours") + ") · " + vtDesc(c) + (n ? " · " + nt(n) : "") });
+    }
+    return r;
   }
   function vtPanelUpdate() {
     if (!vtOn) return;
@@ -2339,20 +2411,30 @@
     else if (st === "time") { txt = "Choisissez le temps de réaction."; opts(VT_TIMES.map(function (v) { return [v + " secondes", v]; }), function (v) { vtCfg.time = v; }); }
     else if (st === "p1") txt = "Cliquez le point sur la ligne d’effet.";
     else if (st === "p2") txt = "Cliquez le point d’observation sur le cercle (recul " + vtFmt(vtRecul()) + " m).";
-    else txt = "Cliquez un point sur le cercle (rayon " + vtFmt(vtDist()) + " m) : triangle n°" + (n + 1) + ".";
+    else if (st === "tri") txt = "Cliquez un point sur le cercle (rayon " + vtFmt(vtDist()) + " m) : triangle n°" + (n + 1) + " de l’accès n°" + vtNumCur() + ".";
+    else txt = "Accès n°" + vtNumCur() + " complet : changez les paramètres, annulez un point pour replacer un triangle, ou validez.";
     $("vtValue").textContent = txt;
-    var parts = [];
-    if (vtCfg.access) parts.push(VT_ACCESS[vtCfg.access].label + " · recul " + vtFmt(vtRecul()) + " m");
-    if (vtCfg.speed) parts.push(vtCfg.speed + " km/h");
-    if (vtCfg.time) parts.push(vtCfg.time + " s");
-    var sum = parts.join(" · ");
-    if (vtCfg.access && vtCfg.speed && vtCfg.time) sum += " → distance " + vtFmt(vtDist()) + " m";
-    var nt = vtDone.reduce(function (a, s) { return a + s.tris.length; }, 0) + n;
-    if (nt) sum += " · " + nt + " triangle" + (nt > 1 ? "s" : "");
-    $("vtSummary").textContent = sum; $("vtSummary").hidden = !sum;
+    var list = $("vtList"), items = vtItems();
+    list.innerHTML = "";
+    items.forEach(function (it) {
+      var li = document.createElement("li"), sw = document.createElement("span"); sw.className = "vt-sw"; sw.style.background = it.col;
+      if (it.i === undefined) {   // accès en cours : simple ligne de rappel
+        var cur = document.createElement("div"); cur.className = "vt-cur"; cur.appendChild(sw); cur.appendChild(document.createTextNode(it.t));
+        cur.style.borderColor = it.col; li.appendChild(cur);
+      } else {
+        var go = document.createElement("button"); go.className = "ghost ml-go"; go.setAttribute("data-i", it.i); go.title = "Zoomer sur cet accès";
+        go.appendChild(sw); go.appendChild(document.createTextNode(it.t));
+        var ed = document.createElement("button"); ed.className = "ghost ml-x"; ed.textContent = "✎"; ed.setAttribute("data-edit", it.i); ed.title = "Modifier cet accès"; ed.setAttribute("aria-label", "Modifier l’accès n°" + vtNumDone(it.i));
+        var x = document.createElement("button"); x.className = "ghost ml-x"; x.textContent = "✕"; x.setAttribute("data-del", it.i); x.setAttribute("aria-label", "Supprimer l’accès n°" + vtNumDone(it.i));
+        li.appendChild(go); li.appendChild(ed); li.appendChild(x);
+      }
+      list.appendChild(li);
+    });
+    list.hidden = !items.length;
     box.hidden = !box.childNodes.length;
-    $("vtParams").disabled = !!vtCur.p1;
-    $("vtUndo").disabled = !(vtCur.p1 || vtDone.length);
+    $("vtValid").hidden = vtCur.at < 0; $("vtValid").disabled = !vtCur.p2;
+    $("vtParams").disabled = false;
+    $("vtUndo").disabled = !(vtCur.p1 || (vtDone.length && vtCur.at < 0));
     $("vtReset").disabled = !(vtCur.p1 || vtDone.length);
   }
   function vtPick(ll) {
@@ -2363,11 +2445,11 @@
     else if (st === "tri") {
       vtCur.tris.push(vtOnCircle(vtCur.p2, vtDist(), ll));
       if (vtCur.tris.length >= 2) {
-        vtDone.push({ p1: vtCur.p1, p2: vtCur.p2, tris: vtCur.tris, recul: vtRecul(), dist: vtDist() });
-        vtCur = { p1: null, p2: null, tris: [] };
-        say("Deux triangles tracés. Cliquez un nouveau point sur la ligne d’effet pour un autre accès, ou Terminer.");
+        vtCommit();
+        say("Deux triangles tracés. Cliquez un nouveau point sur la ligne d’effet pour un autre accès (nouvelle couleur), ou Terminer.");
       } else say("Premier triangle tracé : cliquez un second point sur le cercle.");
-    } else return;
+    } else if (st === "full") { say("Accès complet : changez les paramètres, annulez un point pour replacer un triangle, ou validez la modification."); return; }
+    else return;
     vtRender();
     if (vtLast) vtRubber(vtLast);
   }
@@ -2375,24 +2457,40 @@
     if (vtCur.tris.length) vtCur.tris.pop();
     else if (vtCur.p2) vtCur.p2 = null;
     else if (vtCur.p1) vtCur.p1 = null;
-    else if (vtDone.length) { var s = vtDone.pop(); vtCur = { p1: s.p1, p2: s.p2, tris: s.tris.slice(0, -1) }; }
+    else if (vtDone.length && vtCur.at < 0) {
+      var s = vtDone.pop();
+      vtCfg = { access: s.access, speed: s.speed, time: s.time };
+      vtCur = { p1: s.p1, p2: s.p2, tris: s.tris.slice(0, -1), color: s.color, at: -1, cfg0: null };
+    }
     vtRender();
   }
   function vtRubber(e) {   // aperçu élastique : point ramené sur le cercle + triangle en pointillés
     vtRub.clearLayers();
-    var st = vtOn ? vtStage() : "", q = null, tip = "";
+    var st = vtOn ? vtStage() : "", q = null, tip = "", col = vtColor();
     if (st === "p2") {
       q = vtOnCircle(vtCur.p1, vtRecul(), e.latlng);
-      L.polyline([vtCur.p1, q], { color: VT_COLOR, weight: 3, dashArray: "2 7", interactive: false }).addTo(vtRub);
+      L.polyline([vtCur.p1, q], { color: col, weight: 3, dashArray: "2 7", interactive: false }).addTo(vtRub);
       tip = "Recul : <b>" + vtFmt(vtRecul()) + " m</b>";
     } else if (st === "tri") {
       q = vtOnCircle(vtCur.p2, vtDist(), e.latlng);
-      L.polyline([vtCur.p2, q], { color: VT_COLOR, weight: 3, dashArray: "2 7", interactive: false }).addTo(vtRub);
-      tip = "Triangle n°" + (vtCur.tris.length + 1) + " · <b>" + vtFmt(vtDist()) + " m</b>";
+      L.polyline([vtCur.p2, q], { color: col, weight: 3, dashArray: "2 7", interactive: false }).addTo(vtRub);
+      tip = "Accès n°" + vtNumCur() + " · triangle n°" + (vtCur.tris.length + 1) + " · <b>" + vtFmt(vtDist()) + " m</b>";
     }
-    if (q) vtDot(q, VT_COLOR, vtRub);
+    if (q) vtDot(q, col, vtRub, col);
     if (!vtTipEl) vtTipEl = tipNew();
     if (tip) tipPut(vtTipEl, e.containerPoint, tip); else vtTipEl.style.display = "none";
+  }
+  function vtEdit(i) {   // rouvre un accès validé : mêmes paramètres, points conservés ; il reprend sa place et sa couleur à la validation
+    var s = vtDone[i]; if (!s) return;
+    if (!vtOn) vtStart();
+    else if (vtCur.tris.length || (vtCur.at >= 0 && vtCur.p2)) vtCommit();   // l'accès en cours est validé d'abord
+    i = vtDone.indexOf(s); if (i < 0) return;
+    vtDone.splice(i, 1);
+    vtCfg = { access: s.access, speed: s.speed, time: s.time };
+    vtCur = { p1: s.p1, p2: s.p2, tris: s.tris.slice(), color: s.color, at: i, cfg0: null };
+    map.fitBounds(L.latLngBounds([s.p1, s.p2].concat(s.tris)), { padding: [50, 50], maxZoom: 19 });
+    say("Modification de l’accès n°" + (i + 1) + " : changez les paramètres, annulez un point pour replacer un triangle, puis « Valider la modification ».");
+    vtRender();
   }
   function vtStart() {
     if (vtOn) return;
@@ -2400,7 +2498,7 @@
     if (pkArmed) setPk(false);
     if (measureMode) setMeasure(null);
     if (!$("measurePanel").hidden) foldMeasure(true);
-    vtOn = true; vtCfg = { access: null, speed: 0, time: 0 }; vtCur = { p1: null, p2: null, tris: [] };
+    vtOn = true; vtCfg = { access: null, speed: 0, time: 0 }; vtCur = vtNew();
     $("vtPanel").hidden = false;
     $("map").classList.add("vt-armed");
     $("vt").setAttribute("aria-pressed", "true");
@@ -2409,8 +2507,8 @@
   }
   function vtStop() {
     if (!vtOn) return;
-    if (vtCur.tris.length) vtDone.push({ p1: vtCur.p1, p2: vtCur.p2, tris: vtCur.tris, recul: vtRecul(), dist: vtDist() });
-    vtCur = { p1: null, p2: null, tris: [] };
+    if (vtCur.tris.length || (vtCur.at >= 0 && vtCur.p2)) vtCommit();
+    vtCur = vtNew();
     vtOn = false;
     $("vtPanel").hidden = true;
     $("map").classList.remove("vt-armed");
@@ -2421,9 +2519,21 @@
   $("vt").innerHTML = ICON("M4 20V5l15 15zM4 16h4v4");
   $("vt").onclick = function () { vtOn ? vtStop() : vtStart(); };
   $("vtUndo").onclick = vtUndo;
-  $("vtParams").onclick = function () { vtCfg = { access: null, speed: 0, time: 0 }; vtRender(); };
-  $("vtReset").onclick = function () { vtDone = []; vtCur = { p1: null, p2: null, tris: [] }; vtRender(); };
+  $("vtParams").onclick = function () { if (vtCfgOk()) vtCur.cfg0 = { access: vtCfg.access, speed: vtCfg.speed, time: vtCfg.time }; vtCfg = { access: null, speed: 0, time: 0 }; vtRender(); };
+  $("vtValid").onclick = function () { if (!vtCur.p2) return; vtCommit(); say("Accès validé. Cliquez un nouveau point sur la ligne d’effet pour un autre accès, ou Terminer."); vtRender(); };
+  $("vtReset").onclick = function () {
+    if (vtDone.length && !confirm("Effacer les " + vtDone.length + " accès tracé(s) ?")) return;
+    vtDone = []; vtCur = vtNew(); vtRender();
+  };
   $("vtClose").onclick = vtStop;
+  // Liste des accès : zoom, modification ou suppression individuelle
+  $("vtList").onclick = function (e) {
+    var t = e.target.closest("button"); if (!t) return;
+    if (t.hasAttribute("data-del")) { var di = +t.getAttribute("data-del"); vtDone.splice(di, 1); if (vtCur.at > di) vtCur.at--; vtRender(); return; }
+    if (t.hasAttribute("data-edit")) { vtEdit(+t.getAttribute("data-edit")); return; }
+    var s = vtDone[+t.getAttribute("data-i")];
+    if (s) map.fitBounds(L.latLngBounds([s.p1, s.p2].concat(s.tris)), { padding: [50, 50], maxZoom: 19 });
+  };
   map.on("click", function (e) { vtPick(e.latlng); });
   map.on("mousemove", function (e) { vtLast = e; if (vtOn) vtRubber(e); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && vtOn) vtStop(); });
