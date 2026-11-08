@@ -71,6 +71,8 @@ Chaque partage d'itinéraire (recherche d'un lieu → « Partager l'itinéraire 
 
 - la boîte de partage demande le **destinataire** (suggestions parmi ceux déjà utilisés) et l'**objet** ; l'objet est ajouté au message envoyé ;
 - la **date/heure**, le **lieu** (libellé et coordonnées) et le **canal** (WhatsApp, E-mail, SMS, partage système, lien copié) sont enregistrés automatiquement, une seule ligne par partage ;
+- si le lieu est à moins de 40 m d'une route du référentiel (RD), la **route, le PR et l'abscisse** (même calcul que l'outil « PR au clic ») sont enregistrés aussi, affichés dans la boîte de partage, la liste et la synthèse (`D20 PR 12+300`),
+  et exportés dans trois colonnes Excel (Route, PR, Abscisse (m)) ; hors référentiel ou sans données `donnees/`, ces champs restent vides.
 - le bouton 📒 de la barre de recherche (ou « Main courante » dans la boîte de partage) ouvre la liste : filtre, « Voir sur la carte », suppression d'une ligne,
   **Copier la synthèse** (une ligne par transmission : date | lieu | destinataire | objet | canal | coordonnées) et **Exporter Excel** (fichier .xlsx généré dans l'appli, sans bibliothèque : date/heure, coordonnées numériques, colonne « Lien itinéraire » avec hyperlien cliquable vers Google Maps, en-tête figée avec filtres) ;
 - les données restent dans le navigateur de l'appareil (`localStorage`, clé `vhmaps-main-courante`, 500 lignes max) : l'application ne peut pas savoir à qui le lien est réellement parvenu,

@@ -423,6 +423,7 @@
 <dialog id="shareDlg">
   <h2 id="shareTitle">Partager l’itinéraire</h2>
   <p class="hint" id="shareDescription">Choisissez une application pour transmettre la destination et l’itinéraire. Le lieu, la date, le destinataire et l’objet sont inscrits dans la main courante.</p>
+  <p class="hint" id="shareLoc" hidden></p>
   <label>Destinataire<input id="shareTo" type="text" list="shareToList" autocomplete="off" placeholder="Nom de la personne ou du service"></label>
   <datalist id="shareToList"></datalist>
   <label>Objet<input id="shareObj" type="text" autocomplete="off" placeholder="Ex. : repérage accès, visite de chantier"></label>
@@ -3147,9 +3148,15 @@
   function logSave(a){try{localStorage.setItem(LOGKEY,JSON.stringify(a.slice(-500)));return true;}catch(e){say("Main courante : enregistrement impossible sur cet appareil.",true);return false;}}
   function logDate(ts){var d=new Date(ts);return isNaN(d)?"":d.toLocaleString("fr-FR",{dateStyle:"short",timeStyle:"short"});}
   function logCount(){$("shareLogOpen").textContent="Main courante ("+logLoad().length+")";}
+  function logPr(e){   // « PR 12+300 » (ou « PR 12−50 » si le lieu est en amont du PR) ; vide si hors référentiel
+    if(e.pr===undefined||e.pr===null||e.pr==="")return "";
+    var m=Number(e.m);return "PR "+e.pr+(m>=0?"+"+m:"−"+(-m))+(e.approx?" (estimé)":"");
+  }
+  function logRd(e){return e.route?e.route+(logPr(e)?" "+logPr(e):""):"";}
+  function logApplyLoc(e,l){e.route=l.route;e.axe=l.axe;e.pr=l.pr;e.m=l.m;e.approx=l.approx;}
   function logSynth(a){   // une ligne mémorisable par transmission : date | lieu | destinataire | objet | canal | coordonnées
     return "Main courante VHMaps — "+a.length+" transmission"+(a.length>1?"s":"")+"\n"+a.map(function(e){
-      return logDate(e.ts)+" | "+e.label+" | À : "+(e.to||"non précisé")+" | Objet : "+(e.obj||"non précisé")+" | "+(e.canaux||[]).join(", ")+" | "+Number(e.lat).toFixed(5)+", "+Number(e.lng).toFixed(5);
+      return logDate(e.ts)+" | "+e.label+(logRd(e)?" | "+logRd(e):"")+" | À : "+(e.to||"non précisé")+" | Objet : "+(e.obj||"non précisé")+" | "+(e.canaux||[]).join(", ")+" | "+Number(e.lat).toFixed(5)+", "+Number(e.lng).toFixed(5);
     }).join("\n");
   }
   // Export Excel (.xlsx) généré sur place, sans bibliothèque : un classeur est une archive zip (stockage sans compression) de quelques fichiers XML
@@ -3176,18 +3183,21 @@
   }
   function logXlsx(a){   // classeur « Main courante » : en-tête figée et filtrable, date/heure et coordonnées numériques
     function esc(v){return String(v==null?"":v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
-    var heads=["Date et heure","Lieu","Latitude","Longitude","Destinataire","Objet","Canal","Lien itinéraire"],L="ABCDEFGH";
+    var heads=["Date et heure","Lieu","Latitude","Longitude","Route","PR","Abscisse (m)","Destinataire","Objet","Canal","Lien itinéraire"],L="ABCDEFGHIJK";
     function str(c,r,v,st){return '<c r="'+c+r+'"'+(st?' s="'+st+'"':'')+' t="inlineStr"><is><t xml:space="preserve">'+esc(v)+'</t></is></c>';}
     function num(c,r,v,st){return '<c r="'+c+r+'" s="'+st+'"><v>'+v+'</v></c>';}
     var rows='<row r="1">'+heads.map(function(h,i){return str(L[i],1,h,1);}).join("")+'</row>',links=[];
     a.forEach(function(e,i){
-      var r=i+2,d=new Date(e.ts),serial=(d.getTime()-d.getTimezoneOffset()*60000)/86400000+25569;
+      var r=i+2,d=new Date(e.ts),hasPr=!(e.pr===undefined||e.pr===null||e.pr===""),serial=(d.getTime()-d.getTimezoneOffset()*60000)/86400000+25569;
       rows+='<row r="'+r+'">'+(isNaN(serial)?str("A",r,""):num("A",r,serial,2))+str("B",r,e.label)+num("C",r,Number(e.lat),3)+num("D",r,Number(e.lng),3)
-        +str("E",r,e.to)+str("F",r,e.obj)+str("G",r,(e.canaux||[]).join(", "))
-        +str("H",r,"Ouvrir l’itinéraire",4)+'</row>';
+        +(e.route?str("E",r,e.route+(e.approx?" (PR estimé)":"")):"")
+        +(hasPr?(/^\d+$/.test(String(e.pr))?num("F",r,parseInt(e.pr,10),0):str("F",r,e.pr)):"")
+        +(hasPr&&isFinite(Number(e.m))?num("G",r,Number(e.m),0):"")
+        +str("H",r,e.to)+str("I",r,e.obj)+str("J",r,(e.canaux||[]).join(", "))
+        +str("K",r,"Ouvrir l’itinéraire",4)+'</row>';
       links.push("https://www.google.com/maps/dir/?api=1&destination="+e.lat+","+e.lng+"&travelmode=driving");
     });
-    var widths=[18,38,11,11,24,34,22,22];
+    var widths=[18,38,11,11,12,8,13,24,34,22,22];
     var X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
     var ns='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
     var rel='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -3197,7 +3207,7 @@
       {name:"xl/workbook.xml",text:X+'<workbook '+ns+' xmlns:r="'+rel+'"><sheets><sheet name="Main courante" sheetId="1" r:id="rId1"/></sheets></workbook>'},
       {name:"xl/_rels/workbook.xml.rels",text:X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="'+rel+'/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="'+rel+'/styles" Target="styles.xml"/></Relationships>'},
       {name:"xl/styles.xml",text:X+'<styleSheet '+ns+'><numFmts count="2"><numFmt numFmtId="164" formatCode="dd/mm/yyyy\\ hh:mm"/><numFmt numFmtId="165" formatCode="0.00000"/></numFmts><fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><u/><sz val="11"/><color rgb="FF0563C1"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E7E3"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'},
-      {name:"xl/worksheets/sheet1.xml",text:X+'<worksheet '+ns+' xmlns:r="'+rel+'"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>'+widths.map(function(w,i){return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>';}).join("")+'</cols><sheetData>'+rows+'</sheetData><autoFilter ref="A1:H'+(a.length+1)+'"/>'+(links.length?'<hyperlinks>'+links.map(function(u,i){return '<hyperlink ref="H'+(i+2)+'" r:id="rId'+(i+1)+'" tooltip="Ouvrir l’itinéraire"/>';}).join("")+'</hyperlinks>':'')+'</worksheet>'},
+      {name:"xl/worksheets/sheet1.xml",text:X+'<worksheet '+ns+' xmlns:r="'+rel+'"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>'+widths.map(function(w,i){return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>';}).join("")+'</cols><sheetData>'+rows+'</sheetData><autoFilter ref="A1:K'+(a.length+1)+'"/>'+(links.length?'<hyperlinks>'+links.map(function(u,i){return '<hyperlink ref="K'+(i+2)+'" r:id="rId'+(i+1)+'" tooltip="Ouvrir l’itinéraire"/>';}).join("")+'</hyperlinks>':'')+'</worksheet>'},
       {name:"xl/worksheets/_rels/sheet1.xml.rels",text:X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+links.map(function(u,i){return '<Relationship Id="rId'+(i+1)+'" Type="'+rel+'/hyperlink" Target="'+esc(u)+'" TargetMode="External"/>';}).join("")+'</Relationships>'}
     ]);
   }
@@ -3206,13 +3216,14 @@
     var a=logLoad(),e=null,i;
     for(i=0;i<a.length;i++)if(a[i].id===shareEntry){e=a[i];break;}
     if(!e){e={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),ts:new Date().toISOString(),label:shareDest.label,lat:shareDest.lat,lng:shareDest.lng,canaux:[]};a.push(e);shareEntry=e.id;}
+    if(shareDest.loc)logApplyLoc(e,shareDest.loc);
     e.to=$("shareTo").value.trim();e.obj=$("shareObj").value.trim();
     if(e.canaux.indexOf(canal)<0)e.canaux.push(canal);
     if(logSave(a))logCount();
   }
   function logShown(){
     var f=$("logFilter").value.trim().toLowerCase();
-    return logLoad().filter(function(e){return !f||[e.label,e.to,e.obj].join(" ").toLowerCase().indexOf(f)>=0;});
+    return logLoad().filter(function(e){return !f||[e.label,e.to,e.obj,logRd(e)].join(" ").toLowerCase().indexOf(f)>=0;});
   }
   function logRender(){
     var all=logLoad(),shown=logShown(),ul=$("logList");
@@ -3221,7 +3232,7 @@
     shown.slice().reverse().forEach(function(e){
       var li=document.createElement("li"),h=document.createElement("div"),m=document.createElement("div"),r=document.createElement("div"),see=document.createElement("button"),del=document.createElement("button");
       h.className="lg-h";h.textContent=logDate(e.ts)+" · "+e.label;
-      m.className="lg-m";m.textContent="À : "+(e.to||"non précisé")+" · Objet : "+(e.obj||"non précisé")+" · "+(e.canaux||[]).join(", ");
+      m.className="lg-m";m.textContent=(logRd(e)?logRd(e)+" · ":"")+"À : "+(e.to||"non précisé")+" · Objet : "+(e.obj||"non précisé")+" · "+(e.canaux||[]).join(", ");
       r.className="row";
       see.className="ghost";see.textContent="Voir sur la carte";
       see.onclick=function(){$("logDlg").close();map.setView([e.lat,e.lng],17);say(e.label);};
@@ -3259,13 +3270,26 @@
     $("shareEmail").href="mailto:?subject="+encodeURIComponent(title+(obj?" – "+obj:""))+"&body="+encodeURIComponent(text);
     $("shareSms").href="sms:?&body="+encodeURIComponent(text);
   }
+  function shareLocate(d){   // lieu sur une route du référentiel (tolérance 40 m) : route + PR + abscisse, inscrits dans la main courante
+    d.loc=null;$("shareLoc").hidden=true;
+    try{
+      qIndex().then(function(idx){
+        var res=pkFind(L.latLng(d.lat,d.lng),idx,40);
+        if(!res.length)return;
+        var r=res[0];d.loc={route:shortRoute(r.e.axe),axe:r.e.axe,pr:r.pr,m:r.m,approx:!!r.approx};
+        if(shareDest!==d)return;   // une autre boîte de partage a été ouverte entre-temps
+        $("shareLoc").textContent="Sur "+logRd(d.loc)+" · inscrit dans la main courante.";$("shareLoc").hidden=false;
+        if(shareEntry){var a=logLoad();a.forEach(function(e){if(e.id===shareEntry)logApplyLoc(e,d.loc);});logSave(a);}   // entrée déjà créée avant la fin du calcul
+      }).catch(function(){});
+    }catch(err){}
+  }
   function shareRoute(d){
     if(!d||typeof d.lat!=="number")d=destination;
     if(!d){say("Sélectionnez d’abord une destination dans la recherche.",true);return;}
     shareDest=d;shareEntry=null;$("shareTo").value="";$("shareObj").value="";
     var dl=$("shareToList"),seen={};dl.innerHTML="";
     logLoad().reverse().forEach(function(e){if(e.to&&!seen[e.to]){seen[e.to]=1;var o=document.createElement("option");o.value=e.to;dl.appendChild(o);}});   // destinataires déjà utilisés
-    logCount();shareBuild();
+    logCount();shareBuild();shareLocate(d);
     var dlg=$("shareDlg");if(typeof dlg.showModal==="function")dlg.showModal();else if(navigator.share){navigator.share(shareData).then(function(){shareLog("Partage système");}).catch(function(){});}else{window.location.href=$("shareEmail").href;}
   }
   $("shareObj").oninput=function(){if(shareDest)shareBuild();};
