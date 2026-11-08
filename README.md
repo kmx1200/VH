@@ -56,8 +56,12 @@ puis poser P1 (ligne d'effet), P2 (point d'observation, ramené sur le cercle de
   Les étiquettes sur la carte portent la pastille de couleur et le numéro de l'accès (`n°2 · 116,7 m`).
 - **Suivi dans le panneau** : une ligne par accès avec sa couleur, son numéro et ses paramètres (type d'accès, recul, vitesse, temps → distance, nombre de triangles).
   Toucher la ligne zoome sur l'accès ; ✎ le rouvre (mêmes paramètres, points conservés) ; ✕ le supprime.
-- **Modifier un accès** : ✎ puis « Paramètres » (les points sont ramenés sur les nouveaux cercles, les triangles gardent leur direction),
-  ou « Annuler point » pour replacer un triangle, puis « ✓ Valider la modification » (l'accès reprend sa place et sa couleur).
+- **Modifier un accès** (✎) : P1 est conservé, puis « Paramètres » :
+  - *recul modifié* (2 m ↔ 4 m) : P2 se déplace automatiquement à la nouvelle distance, dans la même direction ; les triangles suivent P2 ;
+  - *vitesse ou temps modifié* : les anciens triangles restent affichés en pointillés (« ancien · 116,7 m ») ; cliquer un point sur le nouveau cercle remplace
+    l'ancien triangle le plus proche (direction vue depuis P2), mis en évidence en rouge pendant le déplacement du curseur ;
+    un triangle non redéfini garde sa direction sur le nouveau cercle à la validation ;
+  - « Annuler point » replace un triangle (l'ancien remplacé revient) ; « ✓ Valider la modification » remet l'accès à sa place, avec sa couleur.
 - **Copie d'écran** : la légende (couleur + paramètres de chaque accès) est ajoutée en haut à gauche de l'image.
 - « Terminer » ferme l'outil : les triangles restent affichés ; rouvrir l'outil réaffiche la liste.
 

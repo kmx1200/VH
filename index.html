@@ -2307,7 +2307,18 @@
   var VT_SPEEDS = [50, 70, 80, 90], VT_TIMES = [6, 8];
   // Un « accès » = P1, P2 et ses deux triangles ; chaque accès a sa couleur, ses paramètres (accès, vitesse, temps) et une ligne dans la liste du panneau.
   // vtCur = accès en cours (at >= 0 : accès en modification, qui reprendra sa place dans la liste) ; vtDone = accès validés.
-  function vtNew() { return { p1: null, p2: null, tris: [], color: null, at: -1, cfg0: null }; }
+  function vtNew() { return { p1: null, p2: null, tris: [], color: null, at: -1, cfg0: null, old: [], repl: [] }; }
+  // old = anciens triangles {p, d} (à l'ancienne distance) en attente d'être redéfinis après un changement de vitesse / temps ; repl = anciens remplacés (pour « Annuler point »)
+  function vtHasWork() { return !!(vtCur.tris.length || vtCur.old.length || (vtCur.at >= 0 && vtCur.p2)); }
+  function vtFrom(s, at, tris) { return Object.assign(vtNew(), { p1: s.p1, p2: s.p2, tris: tris, color: s.color, at: at }); }
+  function vtNearOld(ll) {   // ancien triangle dont la direction (vue depuis P2) est la plus proche du point cliqué
+    var c = vtXY(vtCur.p2, ll), best = -1, ba = 1e9;
+    vtCur.old.forEach(function (o, i) {
+      var q = vtXY(vtCur.p2, o.p), a = Math.abs(Math.atan2(c.x * q.y - c.y * q.x, c.x * q.x + c.y * q.y));
+      if (a < ba) { ba = a; best = i; }
+    });
+    return best;
+  }
   var vtOn = false, vtCfg = { access: null, speed: 0, time: 0 }, vtCur = vtNew(), vtDone = [];
   var vtLayer = L.layerGroup().addTo(map), vtRub = L.layerGroup().addTo(map), vtTipEl = null, vtLast = null;
   function vtCfgOk() { return !!(vtCfg.access && vtCfg.speed && vtCfg.time); }
@@ -2335,6 +2346,9 @@
       recul: cf.access ? VT_ACCESS[cf.access].recul : g, dist: cf.speed && cf.time ? cf.speed * cf.time / 3.6 : 0 };
   }
   function vtCommit() {
+    var d0 = vtSet().dist;
+    if (vtCur.p2) vtCur.old.forEach(function (o) { vtCur.tris.push(vtOnCircle(vtCur.p2, d0 || o.d, o.p)); });
+    vtCur.old = []; vtCur.repl = [];
     var s = vtSet();
     if (vtCur.at >= 0) vtDone.splice(Math.min(vtCur.at, vtDone.length), 0, s); else vtDone.push(s);
     vtCur = vtNew();
@@ -2364,13 +2378,26 @@
   }
   function vtRender() {
     vtLayer.clearLayers(); vtRub.clearLayers();
-    if (vtCfgOk() && vtCur.p1 && vtCur.p2) {   // paramètres (re)choisis : les points sont ramenés sur les nouveaux cercles
+    if (vtCfgOk() && vtCur.cfg0) {   // paramètres (re)choisis : si la distance de visibilité change, les triangles existants attendent d'être redéfinis
+      var od = vtCur.cfg0.speed * vtCur.cfg0.time / 3.6;
+      if (vtCur.tris.length && Math.abs(od - vtDist()) > 0.05) {
+        vtCur.tris.forEach(function (a) { vtCur.old.push({ p: a, d: od }); });
+        vtCur.tris = []; vtCur.repl = [];
+      }
+      vtCur.cfg0 = null;
+    }
+    if (vtCfgOk() && vtCur.p1 && vtCur.p2) {   // P2 déplacé sur le nouveau cercle de recul (même direction) ; triangles et anciens triangles suivent P2
       vtCur.p2 = vtOnCircle(vtCur.p1, vtRecul(), vtCur.p2);
       vtCur.tris = vtCur.tris.map(function (a) { return vtOnCircle(vtCur.p2, vtDist(), a); });
+      vtCur.old = vtCur.old.map(function (o) { return { p: vtOnCircle(vtCur.p2, o.d, o.p), d: o.d }; });
     }
     vtDone.forEach(function (s, i) { vtDrawSet(s, false, vtNumDone(i)); });
     var cur = vtSet(), st = vtStage();
     vtDrawSet(cur, true, vtNumCur());
+    vtCur.old.forEach(function (o) {
+      L.polyline([cur.p2, o.p], { color: cur.color, weight: 4, opacity: .45, dashArray: "3 9", interactive: false }).addTo(vtLayer)
+        .bindTooltip("ancien · " + vtFmt(o.d) + " m", { permanent: true, direction: "center", className: "vt-label" });
+    });
     var cs = { color: cur.color, weight: 2, dashArray: "6 6", fillColor: cur.color, fillOpacity: .05, interactive: false };
     if (st === "p2") L.circle(cur.p1, Object.assign({ radius: cur.recul }, cs)).addTo(vtLayer);
     if (st === "tri") L.circle(cur.p2, Object.assign({ radius: cur.dist }, cs)).addTo(vtLayer);
@@ -2391,7 +2418,7 @@
     if (vtOn && (vtCur.p1 || vtCur.at >= 0)) {
       var c = vtSet(), n = vtCur.tris.length;
       r.splice(vtCur.at >= 0 ? Math.min(vtCur.at, r.length) : r.length, 0,
-        { col: c.color, t: "n°" + vtNumCur() + " (" + (vtCur.at >= 0 ? "en modification" : "en cours") + ") · " + vtDesc(c) + (n ? " · " + nt(n) : "") });
+        { col: c.color, t: "n°" + vtNumCur() + " (" + (vtCur.at >= 0 ? "en modification" : "en cours") + ") · " + vtDesc(c) + (n ? " · " + nt(n) : "") + (vtCur.old.length ? " · " + vtCur.old.length + " à redéfinir" : "") });
     }
     return r;
   }
@@ -2411,6 +2438,7 @@
     else if (st === "time") { txt = "Choisissez le temps de réaction."; opts(VT_TIMES.map(function (v) { return [v + " secondes", v]; }), function (v) { vtCfg.time = v; }); }
     else if (st === "p1") txt = "Cliquez le point sur la ligne d’effet.";
     else if (st === "p2") txt = "Cliquez le point d’observation sur le cercle (recul " + vtFmt(vtRecul()) + " m).";
+    else if (st === "tri" && vtCur.old.length) txt = "Cliquez un point sur le cercle (rayon " + vtFmt(vtDist()) + " m) : il remplace l’ancien triangle le plus proche (" + vtCur.old.length + " à redéfinir). « Valider » conserve la direction des autres.";
     else if (st === "tri") txt = "Cliquez un point sur le cercle (rayon " + vtFmt(vtDist()) + " m) : triangle n°" + (n + 1) + " de l’accès n°" + vtNumCur() + ".";
     else txt = "Accès n°" + vtNumCur() + " complet : changez les paramètres, annulez un point pour replacer un triangle, ou validez.";
     $("vtValue").textContent = txt;
@@ -2432,7 +2460,7 @@
     });
     list.hidden = !items.length;
     box.hidden = !box.childNodes.length;
-    $("vtValid").hidden = vtCur.at < 0; $("vtValid").disabled = !vtCur.p2;
+    $("vtValid").hidden = !(vtCur.at >= 0 || vtCur.old.length); $("vtValid").disabled = !vtCur.p2;
     $("vtParams").disabled = false;
     $("vtUndo").disabled = !(vtCur.p1 || (vtDone.length && vtCur.at < 0));
     $("vtReset").disabled = !(vtCur.p1 || vtDone.length);
@@ -2443,6 +2471,8 @@
     if (st === "p1") { vtCur.p1 = ll; say("Cliquez le point d’observation sur le cercle (recul " + vtFmt(vtRecul()) + " m)."); }
     else if (st === "p2") { vtCur.p2 = vtOnCircle(vtCur.p1, vtRecul(), ll); say("Cliquez un point sur le cercle de rayon " + vtFmt(vtDist()) + " m : premier triangle."); }
     else if (st === "tri") {
+      var ni = vtCur.old.length ? vtNearOld(ll) : -1;
+      vtCur.repl.push(ni >= 0 ? vtCur.old.splice(ni, 1)[0] : null);   // l'ancien triangle le plus proche est effacé
       vtCur.tris.push(vtOnCircle(vtCur.p2, vtDist(), ll));
       if (vtCur.tris.length >= 2) {
         vtCommit();
@@ -2454,13 +2484,13 @@
     if (vtLast) vtRubber(vtLast);
   }
   function vtUndo() {
-    if (vtCur.tris.length) vtCur.tris.pop();
-    else if (vtCur.p2) vtCur.p2 = null;
+    if (vtCur.tris.length) { vtCur.tris.pop(); var r = vtCur.repl.pop(); if (r) vtCur.old.push(r); }   // l'ancien triangle remplacé revient
+    else if (vtCur.p2) { vtCur.p2 = null; vtCur.old = []; vtCur.repl = []; }
     else if (vtCur.p1) vtCur.p1 = null;
     else if (vtDone.length && vtCur.at < 0) {
       var s = vtDone.pop();
       vtCfg = { access: s.access, speed: s.speed, time: s.time };
-      vtCur = { p1: s.p1, p2: s.p2, tris: s.tris.slice(0, -1), color: s.color, at: -1, cfg0: null };
+      vtCur = vtFrom(s, -1, s.tris.slice(0, -1));
     }
     vtRender();
   }
@@ -2475,6 +2505,11 @@
       q = vtOnCircle(vtCur.p2, vtDist(), e.latlng);
       L.polyline([vtCur.p2, q], { color: col, weight: 3, dashArray: "2 7", interactive: false }).addTo(vtRub);
       tip = "Accès n°" + vtNumCur() + " · triangle n°" + (vtCur.tris.length + 1) + " · <b>" + vtFmt(vtDist()) + " m</b>";
+      var ni = vtCur.old.length ? vtNearOld(e.latlng) : -1;
+      if (ni >= 0) {
+        L.polyline([vtCur.p2, vtCur.old[ni].p], { color: "#e03131", weight: 6, opacity: .8, dashArray: "3 9", interactive: false }).addTo(vtRub);
+        tip += "<br>remplace l’ancien de <b>" + vtFmt(vtCur.old[ni].d) + " m</b>";
+      }
     }
     if (q) vtDot(q, col, vtRub, col);
     if (!vtTipEl) vtTipEl = tipNew();
@@ -2483,13 +2518,13 @@
   function vtEdit(i) {   // rouvre un accès validé : mêmes paramètres, points conservés ; il reprend sa place et sa couleur à la validation
     var s = vtDone[i]; if (!s) return;
     if (!vtOn) vtStart();
-    else if (vtCur.tris.length || (vtCur.at >= 0 && vtCur.p2)) vtCommit();   // l'accès en cours est validé d'abord
+    else if (vtHasWork()) vtCommit();   // l'accès en cours est validé d'abord
     i = vtDone.indexOf(s); if (i < 0) return;
     vtDone.splice(i, 1);
     vtCfg = { access: s.access, speed: s.speed, time: s.time };
-    vtCur = { p1: s.p1, p2: s.p2, tris: s.tris.slice(), color: s.color, at: i, cfg0: null };
+    vtCur = vtFrom(s, i, s.tris.slice());
     map.fitBounds(L.latLngBounds([s.p1, s.p2].concat(s.tris)), { padding: [50, 50], maxZoom: 19 });
-    say("Modification de l’accès n°" + (i + 1) + " : changez les paramètres, annulez un point pour replacer un triangle, puis « Valider la modification ».");
+    say("Modification de l’accès n°" + (i + 1) + " : P1 est conservé. Recul modifié : P2 se déplace dans la même direction. Vitesse ou temps modifié : recliquez les points sur le nouveau cercle. Puis « Valider la modification ».");
     vtRender();
   }
   function vtStart() {
@@ -2507,7 +2542,7 @@
   }
   function vtStop() {
     if (!vtOn) return;
-    if (vtCur.tris.length || (vtCur.at >= 0 && vtCur.p2)) vtCommit();
+    if (vtHasWork()) vtCommit();
     vtCur = vtNew();
     vtOn = false;
     $("vtPanel").hidden = true;
