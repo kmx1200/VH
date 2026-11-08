@@ -65,6 +65,17 @@ puis poser P1 (ligne d'effet), P2 (point d'observation, ramené sur le cercle de
 - **Copie d'écran** : la légende (couleur + paramètres de chaque accès) est ajoutée en haut à gauche de l'image.
 - « Terminer » ferme l'outil : les triangles restent affichés ; rouvrir l'outil réaffiche la liste.
 
+## Main courante des transmissions d'itinéraire
+
+Chaque partage d'itinéraire (recherche d'un lieu → « Partager l'itinéraire ») est inscrit dans une main courante :
+
+- la boîte de partage demande le **destinataire** (suggestions parmi ceux déjà utilisés) et l'**objet** ; l'objet est ajouté au message envoyé ;
+- la **date/heure**, le **lieu** (libellé et coordonnées) et le **canal** (WhatsApp, E-mail, SMS, partage système, lien copié) sont enregistrés automatiquement, une seule ligne par partage ;
+- le bouton 📒 de la barre de recherche (ou « Main courante » dans la boîte de partage) ouvre la liste : filtre, « Voir sur la carte », suppression d'une ligne,
+  **Copier la synthèse** (une ligne par transmission : date | lieu | destinataire | objet | canal | coordonnées) et **Exporter Excel** (fichier .xlsx généré dans l'appli, sans bibliothèque : date/heure, coordonnées numériques, lien d'itinéraire, en-tête figée avec filtres) ;
+- les données restent dans le navigateur de l'appareil (`localStorage`, clé `vhmaps-main-courante`, 500 lignes max) : l'application ne peut pas savoir à qui le lien est réellement parvenu,
+  le destinataire est celui qui est saisi. Exporter le fichier Excel régulièrement pour en garder une copie.
+
 ## Cartes hors ligne (mode avion)
 
 Bouton « carte » (colonne de boutons à droite) : choisir le fond (Plan IGN, photographies aériennes IGN actuelles, ou photographies aériennes anciennes 1965-1980 et 1980-1995),
