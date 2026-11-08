@@ -72,7 +72,7 @@ Chaque partage d'itinéraire (recherche d'un lieu → « Partager l'itinéraire 
 - la boîte de partage demande le **destinataire** (suggestions parmi ceux déjà utilisés) et l'**objet** ; l'objet est ajouté au message envoyé ;
 - la **date/heure**, le **lieu** (libellé et coordonnées) et le **canal** (WhatsApp, E-mail, SMS, partage système, lien copié) sont enregistrés automatiquement, une seule ligne par partage ;
 - le bouton 📒 de la barre de recherche (ou « Main courante » dans la boîte de partage) ouvre la liste : filtre, « Voir sur la carte », suppression d'une ligne,
-  **Copier la synthèse** (une ligne par transmission : date | lieu | destinataire | objet | canal | coordonnées) et **Exporter Excel** (fichier .xlsx généré dans l'appli, sans bibliothèque : date/heure, coordonnées numériques, lien d'itinéraire, en-tête figée avec filtres) ;
+  **Copier la synthèse** (une ligne par transmission : date | lieu | destinataire | objet | canal | coordonnées) et **Exporter Excel** (fichier .xlsx généré dans l'appli, sans bibliothèque : date/heure, coordonnées numériques, colonne « Lien itinéraire » avec hyperlien cliquable vers Google Maps, en-tête figée avec filtres) ;
 - les données restent dans le navigateur de l'appareil (`localStorage`, clé `vhmaps-main-courante`, 500 lignes max) : l'application ne peut pas savoir à qui le lien est réellement parvenu,
   le destinataire est celui qui est saisi. Exporter le fichier Excel régulièrement pour en garder une copie.
 
