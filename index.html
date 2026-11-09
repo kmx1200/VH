@@ -211,6 +211,15 @@
   #vtList { max-height:11em !important; }
   #vtList li { align-items:stretch; }
   #vtList .ml-go { white-space:normal; line-height:1.25; font-size:.84rem; }
+  #vtProf { width:min(96vw,680px); }
+  #vtProf svg { width:100%; height:auto; display:block; }
+  #vtProf .vtp-in { display:flex; gap:12px; flex-wrap:wrap; margin:0 0 8px; }
+  #vtProf .vtp-in label { display:flex; flex-direction:row; align-items:center; gap:6px; margin:0; }
+  #vtProf .vtp-in input { width:5.2em; font:inherit; padding:6px 8px; border-radius:8px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  #vtProf .vtp-h { display:flex; align-items:center; gap:8px; font-weight:700; font-size:.9rem; margin:12px 0 2px; }
+  #vtProf .vtp-r { font-size:.84rem; margin:2px 0 4px; }
+  #vtProf .vtp-r.bad { color:#c92a2a; font-weight:700; }
+  #vtProf .vtp-s { font-size:.8rem; opacity:.75; margin:0 0 4px; }
   #vtList .vt-cur { flex:1; padding:6px 10px; border:1px dashed var(--line); border-radius:10px; font-weight:700; font-size:.84rem; line-height:1.25; }
   .measure-panel #vtValid { color:#fff; background:var(--go); }
   .leaflet-tooltip.vt-label { background:var(--surface-a); color:var(--ink); border:1px solid var(--line); font-weight:700; font-size:.78rem; padding:2px 6px; border-radius:8px; box-shadow:none; }
@@ -437,6 +446,17 @@
     <a id="shareSms" class="ghost" style="display:block;text-decoration:none;padding:12px;border-radius:12px">SMS</a>
   </div>
   <div class="row" style="margin-top:8px"><button id="shareLogOpen" class="ghost">Main courante</button><button id="shareClose" class="ghost">Fermer</button></div>
+</dialog>
+
+<dialog id="vtProf">
+  <h2 id="vtProfTitle">Profils en long</h2>
+  <div class="vtp-in">
+    <label>Hauteur d’œil (m)<input id="vtpEye" type="number" inputmode="decimal" min="0" max="5" step="0.05" value="1.1"></label>
+    <label>Hauteur de l’objet vu (m)<input id="vtpObj" type="number" inputmode="decimal" min="0" max="5" step="0.05" value="0.7"></label>
+  </div>
+  <div id="vtProfBody"></div>
+  <p class="hint" style="margin-top:10px">Altitudes : RGE ALTI® (IGN, service d’altimétrie de la Géoplateforme), terrain nu. Végétation, clôtures, murs et bâtiments ne sont pas pris en compte : une visée dégagée ici ne garantit pas la visibilité réelle.</p>
+  <div class="row"><button id="vtProfClose" class="ghost">Fermer</button></div>
 </dialog>
 
 <dialog id="logDlg">
@@ -2509,9 +2529,10 @@
       } else {
         var go = document.createElement("button"); go.className = "ghost ml-go"; go.setAttribute("data-i", it.i); go.title = "Zoomer sur cet accès";
         go.appendChild(sw); go.appendChild(document.createTextNode(it.t));
+        var pf = document.createElement("button"); pf.className = "ghost ml-x"; pf.textContent = "⛰"; pf.setAttribute("data-prof", it.i); pf.title = "Profils en long des deux droites"; pf.setAttribute("aria-label", "Profils en long de l’accès n°" + vtNumDone(it.i));
         var ed = document.createElement("button"); ed.className = "ghost ml-x"; ed.textContent = "✎"; ed.setAttribute("data-edit", it.i); ed.title = "Modifier cet accès"; ed.setAttribute("aria-label", "Modifier l’accès n°" + vtNumDone(it.i));
         var x = document.createElement("button"); x.className = "ghost ml-x"; x.textContent = "✕"; x.setAttribute("data-del", it.i); x.setAttribute("aria-label", "Supprimer l’accès n°" + vtNumDone(it.i));
-        li.appendChild(go); li.appendChild(ed); li.appendChild(x);
+        li.appendChild(go); li.appendChild(pf); li.appendChild(ed); li.appendChild(x);
       }
       list.appendChild(li);
     });
@@ -2622,10 +2643,125 @@
   $("vtList").onclick = function (e) {
     var t = e.target.closest("button"); if (!t) return;
     if (t.hasAttribute("data-del")) { var di = +t.getAttribute("data-del"); vtDone.splice(di, 1); if (vtCur.at > di) vtCur.at--; vtRender(); return; }
+    if (t.hasAttribute("data-prof")) { vtProfOpen(+t.getAttribute("data-prof")); return; }
     if (t.hasAttribute("data-edit")) { vtEdit(+t.getAttribute("data-edit")); return; }
     var s = vtDone[+t.getAttribute("data-i")];
     if (s) map.fitBounds(L.latLngBounds([s.p1, s.p2].concat(s.tris)), { padding: [50, 50], maxZoom: 19 });
   };
+  // ---------- Profils en long des deux droites d'un accès (altimétrie IGN : RGE ALTI via la Géoplateforme) ----------
+  // Chaque droite P2→A et P2→B est échantillonnée (≈ 1 point tous les 2 m, 100 points au plus) ; les altitudes sont demandées au service d'altimétrie
+  // (une requête par droite). Ligne de visée : œil à hauteur d'œil au-dessus du terrain en P2, objet à sa hauteur au-dessus du terrain en A (ou B).
+  var VT_ALTI = "https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json", VT_ALTI_RES = "ign_rge_alti_wld";
+  var vtProfCache = {}, vtProfSeq = 0, vtProfCur = null;
+  function vtProfPts(a, b) {
+    var D = a.distanceTo(b), n = Math.max(2, Math.min(100, Math.ceil(D / 2))), out = [];
+    for (var i = 0; i <= n; i++) { var f = i / n; out.push({ d: D * f, lat: a.lat + (b.lat - a.lat) * f, lng: a.lng + (b.lng - a.lng) * f }); }
+    return out;
+  }
+  function vtAlti(pts) {   // altitudes (m) des points, null si le service n'a pas de donnée
+    var url = VT_ALTI + "?lon=" + encodeURIComponent(pts.map(function (p) { return p.lng.toFixed(6); }).join("|")) +
+      "&lat=" + encodeURIComponent(pts.map(function (p) { return p.lat.toFixed(6); }).join("|")) +
+      "&resource=" + VT_ALTI_RES + "&delimiter=" + encodeURIComponent("|") + "&indent=false&measures=false&zonly=true";
+    var ctrl = window.AbortController ? new AbortController() : null, to = setTimeout(function () { if (ctrl) ctrl.abort(); }, 15000);
+    return fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }).then(function (j) {
+      clearTimeout(to);
+      var el = j && j.elevations;
+      if (!el || el.length !== pts.length) throw new Error("réponse inattendue");
+      return el.map(function (e) { var z = typeof e === "number" ? e : (e && e.z); return typeof z === "number" && z > -90000 ? z : null; });
+    }, function (err) { clearTimeout(to); throw err; });
+  }
+  function vtFillNull(z) {   // comble les trous isolés par interpolation ; échoue si trop de points manquent
+    var ok = z.filter(function (v) { return v !== null; }).length;
+    if (ok < z.length * 0.8 || z[0] === null || z[z.length - 1] === null) throw new Error("pas de données d'altitude à cet endroit");
+    for (var i = 1; i < z.length - 1; i++) if (z[i] === null) {
+      var j = i; while (z[j] === null) j++;
+      var k = i - 1, f = (i - k) / (j - k); z[i] = z[k] + (z[j] - z[k]) * f;
+    }
+    return z;
+  }
+  function vtProfLoad(s) {
+    var key = [s.p2].concat(s.tris).map(function (q) { return q.lat.toFixed(6) + "," + q.lng.toFixed(6); }).join(";");
+    if (vtProfCache[key]) return Promise.resolve(vtProfCache[key]);
+    return Promise.all(s.tris.map(function (a) {
+      var pts = vtProfPts(s.p2, a);
+      return vtAlti(pts).then(function (z) { return { pts: pts, z: vtFillNull(z), az: svAzimuth(s.p2, a) }; });
+    })).then(function (lines) { vtProfCache[key] = lines; return lines; });
+  }
+  function vtProfAnalyse(line, hEye, hObj) {
+    var n = line.z.length - 1, D = line.pts[n].d, zEye = line.z[0] + hEye, zObj = line.z[n] + hObj, minC = Infinity, minAt = 0, bad = [];
+    for (var i = 1; i < n; i++) {
+      var c = zEye + (zObj - zEye) * line.pts[i].d / D - line.z[i];
+      if (c < minC) { minC = c; minAt = line.pts[i].d; }
+      if (c < 0) bad.push(i);
+    }
+    return { D: D, zEye: zEye, zObj: zObj, z0: line.z[0], zn: line.z[n], slope: (line.z[n] - line.z[0]) / D * 100, minC: minC, minAt: minAt, bad: bad };
+  }
+  function vtNice(v, list) { for (var i = 0; i < list.length; i++) if (list[i] >= v) return list[i]; return list[list.length - 1]; }
+  function vtProfSvg(line, an, col) {
+    var W = 640, H = 220, ml = 50, mr = 14, mt = 12, mb = 30, pw = W - ml - mr, ph = H - mt - mb, D = an.D;
+    var lo = Math.min.apply(null, line.z.concat([an.zEye, an.zObj])), hi = Math.max.apply(null, line.z.concat([an.zEye, an.zObj]));
+    if (hi - lo < 6) { var mid = (hi + lo) / 2; lo = mid - 3; hi = mid + 3; }
+    var pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    var span = hi - lo;
+    function X(d) { return (ml + d / D * pw).toFixed(1); }
+    function Y(z) { return (mt + ph - (z - lo) / span * ph).toFixed(1); }
+    var o = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Profil en long" font-family="sans-serif" font-size="10" fill="currentColor">';
+    var ys = vtNice(span / 4, [0.5, 1, 2, 5, 10, 20, 50, 100]), t;
+    for (t = Math.ceil(lo / ys) * ys; t <= hi; t += ys) o += '<line x1="' + ml + '" x2="' + (W - mr) + '" y1="' + Y(t) + '" y2="' + Y(t) + '" stroke="currentColor" stroke-opacity=".15"/><text x="' + (ml - 5) + '" y="' + (+Y(t) + 3) + '" text-anchor="end">' + (Math.round(t * 10) / 10).toString().replace(".", ",") + '</text>';
+    var xs = vtNice(D / 5, [5, 10, 20, 25, 50, 100]);
+    for (t = 0; t <= D + 0.01; t += xs) o += '<line x1="' + X(t) + '" x2="' + X(t) + '" y1="' + mt + '" y2="' + (mt + ph) + '" stroke="currentColor" stroke-opacity=".15"/><text x="' + X(t) + '" y="' + (H - 14) + '" text-anchor="middle">' + Math.round(t) + '</text>';
+    o += '<text x="' + (ml + pw / 2) + '" y="' + (H - 2) + '" text-anchor="middle" opacity=".7">distance depuis P2 (m)</text>';
+    o += '<text x="10" y="' + (mt + ph / 2) + '" text-anchor="middle" opacity=".7" transform="rotate(-90 10 ' + (mt + ph / 2) + ')">altitude (m)</text>';
+    var path = line.pts.map(function (p, i) { return (i ? "L" : "M") + X(p.d) + " " + Y(line.z[i]); }).join(" ");
+    o += '<path d="' + path + ' L' + X(D) + " " + Y(lo) + " L" + X(0) + " " + Y(lo) + ' Z" fill="currentColor" fill-opacity=".12" stroke="none"/>';
+    o += '<path d="' + path + '" fill="none" stroke="currentColor" stroke-width="1.6"/>';
+    o += '<line x1="' + X(0) + '" y1="' + Y(an.zEye) + '" x2="' + X(D) + '" y2="' + Y(an.zObj) + '" stroke="' + col + '" stroke-width="2" stroke-dasharray="6 4"/>';
+    o += '<line x1="' + X(0) + '" y1="' + Y(an.z0) + '" x2="' + X(0) + '" y2="' + Y(an.zEye) + '" stroke="' + col + '" stroke-width="2.5"/><circle cx="' + X(0) + '" cy="' + Y(an.zEye) + '" r="3.5" fill="' + col + '"/>';
+    o += '<line x1="' + X(D) + '" y1="' + Y(an.zn) + '" x2="' + X(D) + '" y2="' + Y(an.zObj) + '" stroke="' + col + '" stroke-width="2.5"/><circle cx="' + X(D) + '" cy="' + Y(an.zObj) + '" r="3.5" fill="' + col + '"/>';
+    an.bad.forEach(function (i) { o += '<circle cx="' + X(line.pts[i].d) + '" cy="' + Y(line.z[i]) + '" r="2.8" fill="#e03131"/>'; });
+    var ex = (ph / span) / (pw / D);
+    o += '<text x="' + (W - mr - 2) + '" y="' + (mt + 10) + '" text-anchor="end" opacity=".7">échelle verticale ×' + (ex >= 1.05 ? Math.round(ex * 10) / 10 : 1).toString().replace(".", ",") + '</text></svg>';
+    return o;
+  }
+  function vtProfRender() {
+    var c = vtProfCur; if (!c) return;
+    var he = parseFloat($("vtpEye").value), ho = parseFloat($("vtpObj").value);
+    he = isFinite(he) && he >= 0 ? he : 1.1; ho = isFinite(ho) && ho >= 0 ? ho : 0.7;
+    var h = "";
+    c.lines.forEach(function (ln, i) {
+      var an = vtProfAnalyse(ln, he, ho), bad = an.bad.length > 0;
+      h += '<div class="vtp-h"><span class="vt-sw" style="background:' + c.s.color + '"></span>Droite ' + (i + 1) + ' · azimut ' + Math.round(ln.az) + '° · ' + vtFmt(an.D) + ' m</div>';
+      h += vtProfSvg(ln, an, c.s.color);
+      h += '<div class="vtp-s">Altitude P2 ' + vtFmt(an.z0) + ' m · extrémité ' + vtFmt(an.zn) + ' m · pente moyenne ' + (an.slope >= 0 ? "+" : "−") + vtFmt(Math.abs(an.slope)) + ' %</div>';
+      h += bad ? '<div class="vtp-r bad">Relief gênant : le terrain dépasse la ligne de visée entre ' + Math.round(ln.pts[an.bad[0]].d) + ' m et ' + Math.round(ln.pts[an.bad[an.bad.length - 1]].d) + ' m (jusqu’à ' + vtFmt(-an.minC) + ' m).</div>'
+        : '<div class="vtp-r">Ligne de visée dégagée vis-à-vis du relief : marge minimale ' + vtFmt(an.minC) + ' m à ' + Math.round(an.minAt) + ' m.</div>';
+    });
+    $("vtProfBody").innerHTML = h;
+  }
+  function vtProfOpen(i) {
+    var s = vtDone[i];
+    if (!s || !s.tris.length) { say("Cet accès n’a pas encore de droite à profiler.", true); return; }
+    if (navigator.onLine === false) { say("Les profils en long nécessitent une connexion (altimétrie IGN).", true); return; }
+    var seq = ++vtProfSeq;
+    vtProfCur = null;
+    $("vtProfTitle").textContent = "Profils en long · accès n°" + vtNumDone(i);
+    $("vtProfBody").innerHTML = '<p class="hint">Chargement des altitudes (IGN)…</p>';
+    if (!$("vtProf").open) $("vtProf").showModal();
+    vtProfLoad(s).then(function (lines) {
+      if (seq !== vtProfSeq) return;
+      vtProfCur = { s: s, lines: lines };
+      vtProfRender();
+    }).catch(function (err) {
+      if (seq !== vtProfSeq) return;
+      $("vtProfBody").innerHTML = '<p class="hint">Profils indisponibles : ' + (err && err.name === "AbortError" ? "le service d’altimétrie IGN ne répond pas" : (err && err.message) || "erreur") + '. Vérifiez la connexion, puis recommencez.</p>';
+    });
+  }
+  $("vtpEye").oninput = $("vtpObj").oninput = vtProfRender;
+  $("vtProfClose").onclick = function () { vtProfSeq++; $("vtProf").close(); };
+
   map.on("click", function (e) { vtPick(e.latlng); });
   map.on("mousemove", function (e) { vtLast = e; if (vtOn) vtRubber(e); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && vtOn) vtStop(); });

@@ -62,6 +62,13 @@ puis poser P1 (ligne d'effet), P2 (point d'observation, ramené sur le cercle de
     l'ancien triangle le plus proche (direction vue depuis P2), mis en évidence en rouge pendant le déplacement du curseur ;
     un triangle non redéfini garde sa direction sur le nouveau cercle à la validation ;
   - « Annuler point » replace un triangle (l'ancien remplacé revient) ; « ✓ Valider la modification » remet l'accès à sa place, avec sa couleur.
+- **Profils en long (⛰)** : le bouton ⛰ d'une ligne d'accès ouvre les profils en long des deux droites P2→A et P2→B.
+  Les altitudes viennent du service d'altimétrie de la Géoplateforme (`data.geopf.fr/altimetrie`, ressource `ign_rge_alti_wld`, RGE ALTI®),
+  échantillonnées environ tous les 2 m (une requête par droite). Chaque profil montre le terrain, la ligne de visée (œil à P2, objet à l'extrémité),
+  les points où le relief dépasse cette ligne (en rouge), l'azimut, la pente moyenne et la marge minimale.
+  Hauteur d'œil 1,10 m et hauteur de l'objet vu 0,70 m par défaut, modifiables dans la fenêtre (recalcul immédiat, sans nouvelle requête).
+  Limites : terrain nu (ni végétation, ni clôtures, ni bâtiments) ; connexion nécessaire (les résultats déjà obtenus restent en mémoire jusqu'au rechargement de la page) ;
+  l'échelle verticale est exagérée et indiquée sur le graphique.
 - **Copie d'écran** : la légende (couleur + paramètres de chaque accès) est ajoutée en haut à gauche de l'image.
 - « Terminer » ferme l'outil : les triangles restent affichés ; rouvrir l'outil réaffiche la liste.
 
