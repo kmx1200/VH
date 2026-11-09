@@ -155,6 +155,7 @@
   /* Plein écran sans circuit VH chargé : on masque le sélecteur (« Tracé libre ») et le bouton Importer GPX */
   body.fs-on.no-vh .routebar { display: none; }
   .tool:focus-visible::after, [data-tip]:focus-visible::after, .tool.tip-on::after, [data-tip].tip-on::after { opacity: 1; }
+  .tool[data-secure]:not(.authorized)::after { display: none !important; }   /* commande protégée : info-bulle visible uniquement une fois le code validé */
   @media (hover: hover) { .tool:hover::after, [data-tip]:hover::after { opacity: 1; transition-delay: .3s; } }
   .shot-toast { position: fixed; z-index: 1400; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); max-width: min(90vw, 460px);
     padding: 9px 14px; border-radius: 12px; background: var(--ink); color: var(--paper); font-size: .85rem; font-weight: 600; text-align: center; opacity: 0; pointer-events: none; transition: opacity .2s; }
@@ -301,7 +302,7 @@
   <button id="shot" class="tool" data-help="Enregistre une image de la carte seule, sans les boutons. Les mesures affichées et leurs valeurs y sont ajoutées." aria-label="Copie d'écran de la carte"></button>
   <button id="measureLine" class="tool" data-help="Posez des points pour mesurer une distance. Les poignées permettent d’ajuster le tracé." aria-label="Mesurer une distance"></button>
   <button id="measureArea" class="tool" data-help="Posez au moins 3 points pour mesurer une surface." aria-label="Mesurer une surface"></button>
-  <button id="vt" class="tool" data-help="Triangles de visibilité : choisissez l’accès (recul 2 m ou 4 m), la vitesse de référence et le temps de réaction, puis posez les points sur la carte. Chaque accès a sa couleur ; la liste du panneau permet de le retrouver, le modifier ou le supprimer." aria-label="Triangles de visibilité" aria-pressed="false"></button>
+  <button id="vt" class="tool" data-secure data-help="Triangles de visibilité : choisissez l’accès (recul 2 m ou 4 m), la vitesse de référence et le temps de réaction, puis posez les points sur la carte. Chaque accès a sa couleur ; la liste du panneau permet de le retrouver, le modifier ou le supprimer." aria-label="Triangles de visibilité" aria-pressed="false"></button>
 </div>
 <div id="vtPanel" class="measure-panel" hidden>
   <div id="vtHead"><b>Triangles de visibilité</b><span id="vtValue"></span></div>
@@ -457,6 +458,14 @@
   <div id="vtProfBody"></div>
   <p class="hint" style="margin-top:10px">Altitudes : RGE ALTI® (IGN, service d’altimétrie de la Géoplateforme), terrain nu. Végétation, clôtures, murs et bâtiments ne sont pas pris en compte : une visée dégagée ici ne garantit pas la visibilité réelle.</p>
   <div class="row"><button id="vtProfClose" class="ghost">Fermer</button></div>
+</dialog>
+
+<dialog id="secDlg">
+  <h2>Code de sécurité</h2>
+  <p class="hint">Saisissez le code à trois chiffres.</p>
+  <input id="secCode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" aria-label="Code de sécurité à trois chiffres">
+  <p class="hint" id="secMsg" role="alert" hidden></p>
+  <div class="row" style="margin-top:8px"><button id="secOk" disabled>Valider</button><button id="secCancel" class="ghost">Annuler</button></div>
 </dialog>
 
 <dialog id="logDlg">
@@ -2595,7 +2604,7 @@
   }
   function vtEdit(i) {   // rouvre un accès validé : mêmes paramètres, points conservés ; il reprend sa place et sa couleur à la validation
     var s = vtDone[i]; if (!s) return;
-    if (!vtOn) vtStart();
+    if (!vtOn) return;   // l'outil ne se lance que par le bouton protégé (code journalier)
     else if (vtHasWork()) vtCommit();   // l'accès en cours est validé d'abord
     i = vtDone.indexOf(s); if (i < 0) return;
     vtDone.splice(i, 1);
@@ -2630,7 +2639,50 @@
     vtRender();
   }
   $("vt").innerHTML = ICON("M4 20V5l15 15zM4 16h4v4");
-  $("vt").onclick = function () { vtOn ? vtStop() : vtStart(); };
+  // ---------- Code de sécurité journalier : protège le lancement de l'outil (l'arrêter ne demande rien) ----------
+  var SEC_KEY = "vhmaps-sec", SEC_MAX = 3, SEC_MSG = "En cours de développement", secAuth = false, secRun = null, secMem = null;
+  function secDay() { var d = new Date(); return d.getFullYear() + "-" + ("0" + (d.getMonth() + 1)).slice(-2) + "-" + ("0" + d.getDate()).slice(-2); }
+  function secCode() {   // recalculé à chaque vérification depuis la date locale ; jamais mémorisé ni écrit en dur
+    var j = ("0" + new Date().getDate()).slice(-2), a = +j.charAt(0), b = +j.charAt(1);
+    return "" + a + ((a + b) % 10) + b;
+  }
+  function secLoad() {   // échecs du jour (persistants) ; le compteur repart à zéro au changement de date
+    var st = null, today = secDay();
+    try { st = JSON.parse(localStorage.getItem(SEC_KEY)); } catch (e) {}
+    if (!st || typeof st.n !== "number") st = secMem;   // stockage vidé ou illisible en cours de session : la copie en mémoire fait foi
+    if (!st || st.d !== today || st.n < 0) st = { d: today, n: 0 };
+    return st;
+  }
+  function secSave(st) { secMem = st; try { localStorage.setItem(SEC_KEY, JSON.stringify(st)); } catch (e) {} }
+  function secSync() { $("vt").classList.toggle("authorized", secAuth); }   // même état que l'autorisation de lancement
+  function secClose() { secRun = null; var d = $("secDlg"); if (d.open) d.close(); }
+  function secAsk(run) {
+    if (secLoad().n >= SEC_MAX || typeof $("secDlg").showModal !== "function") { say(SEC_MSG); return; }   // bloqué pour la journée : aucune nouvelle demande de code
+    secRun = run; $("secCode").value = ""; $("secOk").disabled = true; $("secMsg").hidden = true;
+    $("secDlg").showModal(); $("secCode").focus();
+  }
+  function secCheck() {
+    var st = secLoad(), v = $("secCode").value;
+    if (st.n >= SEC_MAX) { secClose(); say(SEC_MSG); return; }
+    if (v.length !== 3) return;
+    if (v === secCode()) {
+      var run = secRun; secSave({ d: secDay(), n: 0 }); secClose();
+      secAuth = true; secSync();
+      if (run) run();   // exactement le traitement d'origine du bouton
+      return;
+    }
+    st.n++; secSave(st);   // l'échec est enregistré avant tout affichage : fermer ou actualiser ne rend aucune tentative
+    $("secCode").value = ""; $("secOk").disabled = true;
+    $("secMsg").textContent = SEC_MSG; $("secMsg").hidden = false;
+    if (st.n >= SEC_MAX) { secClose(); say(SEC_MSG); } else $("secCode").focus();
+  }
+  $("secCode").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 3); $("secOk").disabled = this.value.length !== 3; });
+  $("secCode").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); secCheck(); } });
+  $("secOk").onclick = secCheck;
+  $("secCancel").onclick = secClose;
+  $("secDlg").addEventListener("close", function () { secRun = null; });
+  new MutationObserver(function () { if ($("vt").getAttribute("aria-pressed") !== "true") { secAuth = false; secSync(); } }).observe($("vt"), { attributes: true, attributeFilter: ["aria-pressed"] });
+  $("vt").onclick = function () { if (vtOn) { vtStop(); return; } secAsk(vtStart); };
   $("vtUndo").onclick = vtUndo;
   $("vtParams").onclick = function () { if (vtCfgOk()) vtCur.cfg0 = { access: vtCfg.access, speed: vtCfg.speed, time: vtCfg.time }; vtCfg = { access: null, speed: 0, time: 0 }; vtRender(); };
   $("vtValid").onclick = function () { if (!vtCur.p2) return; vtCommit(); say("Accès validé. Cliquez un nouveau point sur la ligne d’effet pour un autre accès, ou Terminer."); vtRender(); };
@@ -3626,7 +3678,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 8.0";
+  $("appVer").textContent = "VHMaps — version 8.1";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
