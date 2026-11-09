@@ -204,6 +204,12 @@ En plus des adresses, lieux-dits et coordonnées, la recherche accepte :
 Cette recherche utilise `donnees/pr.json` et `donnees/lineaire.json` : elle fonctionne hors ligne et même si les
 couches « Référentiel » et « PR » ne sont pas affichées.
 
+## Street View par appui long
+
+Quand aucune superposition n'est cochée (fonds de carte seuls) et qu'aucun outil n'attend un toucher, un **appui long (≈ 0,6 s)** sur la carte
+lance Street View directionnel : le point appuyé est le lieu, puis un second toucher choisit l'azimut (toucher de nouveau le lieu = sans orientation).
+Le mouvement du doigt (> 10 px), un second doigt ou un appui sur un tracé, un repère ou un bouton annulent l'appui long. Même résultat qu'avec le bouton Street View.
+
 ## Localiser un PR (bouton repère)
 
 Bouton « repère » de la colonne de droite : touchez-le, puis touchez un point proche d'une route du référentiel.

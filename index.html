@@ -1765,6 +1765,43 @@
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && svArmed) setSv(false); });
 
+  // Appui long sur le fond de carte nu (aucune superposition cochée, aucun outil actif) : lance Street View directionnel.
+  // Le point de l'appui long devient le lieu ; le toucher suivant choisit l'azimut (même chaîne que le bouton Street View).
+  (function () {
+    var LP_MS = 600, LP_MOVE = 10, OVS = ["ovPr", "ovRef", "ovAgglo", "ovCadastre", "ovOld", "ovScan", "ovPcrs"];
+    var box = map.getContainer(), timer = null, sx = 0, sy = 0, swallowUntil = 0, fired = false;
+    function bare() {   // seulement des fonds de carte, et aucun autre outil qui attend un toucher
+      for (var i = 0; i < OVS.length; i++) { var c = $(OVS[i]); if (c && c.checked) return false; }
+      return !(measureMode || svArmed || pkArmed || vtOn) && $("searchbar").hidden;
+    }
+    function cancel() { clearTimeout(timer); timer = null; }
+    box.addEventListener("pointerdown", function (e) {
+      cancel(); fired = false;
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (!e.isPrimary || !bare()) return;
+      if (e.target.closest && e.target.closest(".leaflet-control, .leaflet-interactive, .leaflet-marker-icon, .leaflet-popup, button, a, input")) return;
+      sx = e.clientX; sy = e.clientY;
+      var cp = map.mouseEventToContainerPoint(e);
+      timer = setTimeout(function () {
+        timer = null; fired = true;
+        if (!bare()) return;
+        if (navigator.vibrate) try { navigator.vibrate(30); } catch (err) {}
+        setSv(true);
+        svPick(map.containerPointToLatLng(cp));
+      }, LP_MS);
+    }, true);
+    box.addEventListener("pointermove", function (e) {
+      if (timer && Math.hypot(e.clientX - sx, e.clientY - sy) > LP_MOVE) cancel();
+    }, true);
+    ["pointerup", "pointercancel"].forEach(function (ev) {
+      box.addEventListener(ev, function () { cancel(); if (fired) { swallowUntil = Date.now() + 500; fired = false; } }, true);
+    });
+    box.addEventListener("click", function (e) {   // le relâchement de l'appui long ne doit pas compter comme 2e point
+      if (Date.now() < swallowUntil) { swallowUntil = 0; e.stopPropagation(); e.preventDefault(); }
+    }, true);
+    box.addEventListener("contextmenu", function (e) { if (timer || fired || Date.now() < swallowUntil) e.preventDefault(); });
+  })();
+
   // ---------- Localiser un PR : d'un point de la carte vers route + PR + abscisse ----------
   var pkArmed = false, pkPin = null, pkTipEl = null, pkTipSeq = 0, pkTipT = 0, pkTipLast = 0, pkTipCp = null;
   $("pk").innerHTML = ICON("M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10zM10 11a2 2 0 1 0 4 0a2 2 0 1 0-4 0");
