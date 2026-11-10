@@ -464,7 +464,7 @@
 <dialog id="secDlg">
   <h2>Code de sécurité</h2>
   <p class="hint">Saisissez le code à six chiffres.</p>
-  <input id="secCode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" aria-label="Code de sécurité à six chiffres">
+  <input id="secCode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="••••••" autocomplete="off" aria-label="Code de sécurité à six chiffres">
   <p class="hint" id="secMsg" role="alert" hidden></p>
   <div class="row" style="margin-top:8px"><button id="secOk" disabled>Valider</button><button id="secCancel" class="ghost">Annuler</button></div>
 </dialog>
@@ -2673,8 +2673,8 @@
   function secCheck() {
     var st = secLoad(), v = $("secCode").value;
     if (st.n >= SEC_MAX) { secClose(); say(SEC_MSG); return; }
-    if (v.length !== 3) return;
-    if (v === secCode()) {
+    if (v.length < 3) return;
+    if (v.slice(0, 3) === secCode()) {   // seuls les trois premiers chiffres comptent : les suivants, affichés pour brouiller les pistes, sont ignorés
       var run = secRun; secSave({ d: secDay(), n: 0 }); secClose();
       secAuth = true; secSync();
       if (run) run();   // exactement le traitement d'origine du bouton
@@ -2685,7 +2685,7 @@
     $("secMsg").textContent = SEC_MSG; $("secMsg").hidden = false;
     if (st.n >= SEC_MAX) { secClose(); say(SEC_MSG); } else $("secCode").focus();
   }
-  $("secCode").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 3); $("secOk").disabled = this.value.length !== 3; });
+  $("secCode").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 6); $("secOk").disabled = this.value.length < 3; });
   $("secCode").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); secCheck(); } });
   $("secOk").onclick = secCheck;
   $("secCancel").onclick = secClose;
@@ -3791,7 +3791,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 8.2";
+  $("appVer").textContent = "VHMaps — version 8.3";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
