@@ -457,13 +457,14 @@
   </div>
   <div id="vtProfBody"></div>
   <p class="hint" style="margin-top:10px">Altitudes : RGE ALTI® (IGN, service d’altimétrie de la Géoplateforme), terrain nu. Végétation, clôtures, murs et bâtiments ne sont pas pris en compte : une visée dégagée ici ne garantit pas la visibilité réelle.</p>
-  <div class="row"><button id="vtProfClose" class="ghost">Fermer</button></div>
+  <p class="hint" id="vtProfMsg" role="status" hidden></p>
+  <div class="row"><button id="vtProfShot" disabled>Enregistrer l’image</button><button id="vtProfClose" class="ghost">Fermer</button></div>
 </dialog>
 
 <dialog id="secDlg">
   <h2>Code de sécurité</h2>
-  <p class="hint">Saisissez le code à trois chiffres.</p>
-  <input id="secCode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" aria-label="Code de sécurité à trois chiffres">
+  <p class="hint">Saisissez le code à six chiffres.</p>
+  <input id="secCode" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" aria-label="Code de sécurité à six chiffres">
   <p class="hint" id="secMsg" role="alert" hidden></p>
   <div class="row" style="margin-top:8px"><button id="secOk" disabled>Valider</button><button id="secCancel" class="ghost">Annuler</button></div>
 </dialog>
@@ -1243,6 +1244,13 @@
     c.font = cs.fontStyle + " " + cs.fontWeight + " " + cs.fontSize + " " + cs.fontFamily;
     c.textBaseline = "middle"; c.textAlign = "left";
     var tx = x + bw + (parseFloat(cs.paddingLeft) || 0), ty = y + r.height / 2, t = el.textContent;
+    var sw = el.querySelector ? el.querySelector(".vt-sw") : null;   // étiquettes des triangles de visibilité : pastille de la couleur de l'accès
+    if (sw) {
+      var sr = sw.getBoundingClientRect(), scs = getComputedStyle(sw);
+      c.beginPath(); c.arc(sr.left - R.left + sr.width / 2, sr.top - R.top + sr.height / 2, sr.width / 2 - 1, 0, Math.PI * 2);
+      c.fillStyle = scs.backgroundColor; c.fill(); c.lineWidth = 2; c.strokeStyle = "#fff"; c.stroke();
+      tx = sr.right - R.left + (parseFloat(scs.marginRight) || 0);
+    }
     if (cs.textShadow && cs.textShadow !== "none") { c.lineJoin = "round"; c.lineWidth = 3; c.strokeStyle = "#fff"; c.strokeText(t, tx, ty); }
     c.fillStyle = cs.color; c.fillText(t, tx, ty);
     c.restore();
@@ -1334,7 +1342,7 @@
     c.fillStyle = "#222"; c.fillText(t, W - w + 5, H - 8, w - 8);
     c.restore();
   }
-  function shotCapture() {
+  function shotCapture(opt) {   // opt.bare : renvoie le canvas de la carte seule (utilisé par l'image « triangles + profils »)
     var el = map.getContainer(), R = el.getBoundingClientRect(), W = Math.round(R.width), H = Math.round(R.height);
     var sc = Math.min(Math.max(window.devicePixelRatio || 1, 1), 3, 4096 / Math.max(W, H));
     var cv = document.createElement("canvas"); cv.width = Math.round(W * sc); cv.height = Math.round(H * sc);
@@ -1375,13 +1383,14 @@
         var al = shotOpacity(m, pane);
         items.push({ pr: Promise.resolve(null), draw: function () { shotMarker(c, m, R, al); } });
       });
-      [].slice.call(pane.querySelectorAll(".leaflet-tooltip.measure-label, .leaflet-tooltip.old-lbl")).forEach(function (t) {
+      [].slice.call(pane.querySelectorAll(".leaflet-tooltip.measure-label, .leaflet-tooltip.old-lbl, .leaflet-tooltip.vt-label")).forEach(function (t) {
         var al = shotOpacity(t, pane);
         if (al > 0) items.push({ pr: Promise.resolve(null), draw: function () { shotText(c, t, R, al); } });
       });
     });
     return Promise.all(items.map(function (i) { return i.pr; })).then(function (res) {
       items.forEach(function (it, k) { it.draw(res[k]); });
+      if (opt && opt.bare) return { canvas: cv, W: W, H: H, failed: failed };
       shotAttribution(c, W, H);
       shotMeasurePanel(c, W, H);
       shotVtLegend(c, W, H);
@@ -2778,33 +2787,47 @@
     o += '<text x="' + (W - mr - 2) + '" y="' + (mt + 10) + '" text-anchor="end" opacity=".7">échelle verticale ×' + (ex >= 1.05 ? Math.round(ex * 10) / 10 : 1).toString().replace(".", ",") + '</text></svg>';
     return o;
   }
+  function vtProfHeights() {
+    var he = parseFloat($("vtpEye").value), ho = parseFloat($("vtpObj").value);
+    return [isFinite(he) && he >= 0 ? he : 1.1, isFinite(ho) && ho >= 0 ? ho : 0.7];
+  }
+  function vtProfInfo(ln, i, an) {   // textes d'une droite : repris à l'écran et dans l'image enregistrée
+    var bad = an.bad.length > 0;
+    return {
+      head: "Droite " + (i + 1) + " · azimut " + Math.round(ln.az) + "° · " + vtFmt(an.D) + " m",
+      stats: "Altitude P2 " + vtFmt(an.z0) + " m · extrémité " + vtFmt(an.zn) + " m · pente moyenne " + (an.slope >= 0 ? "+" : "−") + vtFmt(Math.abs(an.slope)) + " %",
+      bad: bad,
+      res: bad ? "Relief gênant : le terrain dépasse la ligne de visée entre " + Math.round(ln.pts[an.bad[0]].d) + " m et " + Math.round(ln.pts[an.bad[an.bad.length - 1]].d) + " m (jusqu’à " + vtFmt(-an.minC) + " m)."
+        : "Ligne de visée dégagée vis-à-vis du relief : marge minimale " + vtFmt(an.minC) + " m à " + Math.round(an.minAt) + " m."
+    };
+  }
   function vtProfRender() {
     var c = vtProfCur; if (!c) return;
-    var he = parseFloat($("vtpEye").value), ho = parseFloat($("vtpObj").value);
-    he = isFinite(he) && he >= 0 ? he : 1.1; ho = isFinite(ho) && ho >= 0 ? ho : 0.7;
+    var hh = vtProfHeights(), he = hh[0], ho = hh[1];
     var h = "";
     c.lines.forEach(function (ln, i) {
-      var an = vtProfAnalyse(ln, he, ho), bad = an.bad.length > 0;
-      h += '<div class="vtp-h"><span class="vt-sw" style="background:' + c.s.color + '"></span>Droite ' + (i + 1) + ' · azimut ' + Math.round(ln.az) + '° · ' + vtFmt(an.D) + ' m</div>';
+      var an = vtProfAnalyse(ln, he, ho), t = vtProfInfo(ln, i, an);
+      h += '<div class="vtp-h"><span class="vt-sw" style="background:' + c.s.color + '"></span>' + t.head + '</div>';
       h += vtProfSvg(ln, an, c.s.color);
-      h += '<div class="vtp-s">Altitude P2 ' + vtFmt(an.z0) + ' m · extrémité ' + vtFmt(an.zn) + ' m · pente moyenne ' + (an.slope >= 0 ? "+" : "−") + vtFmt(Math.abs(an.slope)) + ' %</div>';
-      h += bad ? '<div class="vtp-r bad">Relief gênant : le terrain dépasse la ligne de visée entre ' + Math.round(ln.pts[an.bad[0]].d) + ' m et ' + Math.round(ln.pts[an.bad[an.bad.length - 1]].d) + ' m (jusqu’à ' + vtFmt(-an.minC) + ' m).</div>'
-        : '<div class="vtp-r">Ligne de visée dégagée vis-à-vis du relief : marge minimale ' + vtFmt(an.minC) + ' m à ' + Math.round(an.minAt) + ' m.</div>';
+      h += '<div class="vtp-s">' + t.stats + '</div>';
+      h += '<div class="vtp-r' + (t.bad ? ' bad' : '') + '">' + t.res + '</div>';
     });
     $("vtProfBody").innerHTML = h;
+    $("vtProfShot").disabled = false;
   }
   function vtProfOpen(i) {
     var s = vtDone[i];
     if (!s || !s.tris.length) { say("Cet accès n’a pas encore de droite à profiler.", true); return; }
     if (navigator.onLine === false) { say("Les profils en long nécessitent une connexion (altimétrie IGN).", true); return; }
     var seq = ++vtProfSeq;
-    vtProfCur = null;
+    vtProfCur = null; $("vtProfShot").disabled = true; $("vtProfMsg").hidden = true;
+    map.fitBounds(L.latLngBounds([s.p1, s.p2].concat(s.tris)), { padding: [50, 50], maxZoom: 19, animate: false });   // la carte cadre l'accès (image enregistrée)
     $("vtProfTitle").textContent = "Profils en long · accès n°" + vtNumDone(i);
     $("vtProfBody").innerHTML = '<p class="hint">Chargement des altitudes (IGN)…</p>';
     if (!$("vtProf").open) $("vtProf").showModal();
     vtProfLoad(s).then(function (lines) {
       if (seq !== vtProfSeq) return;
-      vtProfCur = { s: s, lines: lines };
+      vtProfCur = { s: s, lines: lines, num: vtNumDone(i) };
       vtProfRender();
     }).catch(function (err) {
       if (seq !== vtProfSeq) return;
@@ -2813,6 +2836,96 @@
   }
   $("vtpEye").oninput = $("vtpObj").oninput = vtProfRender;
   $("vtProfClose").onclick = function () { vtProfSeq++; $("vtProf").close(); };
+  // ---------- Image « triangles + profils » : la carte cadrée sur l'accès, puis les deux profils en long, dans un seul PNG ----------
+  function vtpSvgImage(svg) {   // profil SVG (couleurs fixes, fond clair) -> image dessinable dans le canvas
+    var xml = svg.replace(/currentColor/g, "#1f2d2a").replace("<svg viewBox", '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="220" viewBox');
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(new Blob([xml], { type: "image/svg+xml;charset=utf-8" })), im = new Image();
+      im.onload = function () { URL.revokeObjectURL(url); resolve(im); };
+      im.onerror = function () { URL.revokeObjectURL(url); reject(new Error("profil non exportable")); };
+      im.src = url;
+    });
+  }
+  function vtpWrap(c, t, maxW) {
+    var w = t.split(" "), out = [], cur = "";
+    w.forEach(function (x) { var n = cur ? cur + " " + x : x; if (cur && c.measureText(n).width > maxW) { out.push(cur); cur = x; } else cur = n; });
+    if (cur) out.push(cur);
+    return out;
+  }
+  function vtProfImage() {
+    var pc = vtProfCur;
+    if (!pc) return Promise.reject(new Error("profils non chargés"));
+    var s = pc.s, hh = vtProfHeights(), he = hh[0], ho = hh[1], col = s.color;
+    var ans = pc.lines.map(function (ln) { return vtProfAnalyse(ln, he, ho); });
+    var jobs = [shotCapture({ bare: true })].concat(pc.lines.map(function (ln, i) { return vtpSvgImage(vtProfSvg(ln, ans[i], col)); }));
+    return Promise.all(jobs).then(function (r) {
+      var cap = r[0], imgs = r.slice(1), f = cap.canvas.width / cap.W;
+      // partie de la carte à garder : emprise de l'accès + marge, rapport largeur/hauteur entre 1,25 et 2
+      var pts = [s.p1, s.p2].concat(s.tris).map(function (q) { return map.latLngToContainerPoint(q); });
+      var x0 = Math.min.apply(null, pts.map(function (p) { return p.x; })) - 70, x1 = Math.max.apply(null, pts.map(function (p) { return p.x; })) + 70;
+      var y0 = Math.min.apply(null, pts.map(function (p) { return p.y; })) - 70, y1 = Math.max.apply(null, pts.map(function (p) { return p.y; })) + 70;
+      var cw = x1 - x0, ch = y1 - y0, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+      if (cw / ch < 1.25) cw = ch * 1.25; else if (cw / ch > 2) ch = cw / 2;
+      cw = Math.min(cw, cap.W); ch = Math.min(ch, cap.H);
+      var rx = Math.max(0, Math.min(cap.W - cw, mx - cw / 2)), ry = Math.max(0, Math.min(cap.H - ch, my - ch / 2));
+      var OW = 820, M = 20, rw = OW - 2 * M, rh = rw * ch / cw, chH = rw * 220 / 640;
+      var date = new Date().toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+      var NOTE = "Altitudes : RGE ALTI® (IGN, service d’altimétrie de la Géoplateforme), terrain nu. Végétation, clôtures, murs et bâtiments ne sont pas pris en compte : une visée dégagée ici ne garantit pas la visibilité réelle.";
+      function paint(c, draw) {   // une passe de mesure (draw = false), puis une passe de dessin
+        var y = M;
+        c.textBaseline = "top";
+        function T(t, font, color, lh) { c.font = font; vtpWrap(c, t, rw).forEach(function (l) { if (draw) { c.fillStyle = color; c.fillText(l, M, y); } y += lh; }); }
+        function dot(cx, cy) { c.beginPath(); c.arc(cx, cy, 7, 0, Math.PI * 2); c.fillStyle = col; c.fill(); c.lineWidth = 2; c.strokeStyle = "#fff"; c.stroke(); }
+        c.font = "700 19px system-ui, sans-serif";
+        if (draw) { dot(M + 8, y + 11); c.fillStyle = "#14342f"; c.fillText("Triangles de visibilité · accès n°" + pc.num, M + 24, y); }
+        y += 28;
+        T(vtDesc(s), "600 13.5px system-ui, sans-serif", "#14342f", 19);
+        T("Hauteur d’œil " + vtFmt(he) + " m · hauteur de l’objet vu " + vtFmt(ho) + " m · " + date, "12px system-ui, sans-serif", "#555", 18);
+        y += 8;
+        if (draw) {
+          c.drawImage(cap.canvas, rx * f, ry * f, cw * f, ch * f, M, y, rw, rh);
+          c.lineWidth = 1; c.strokeStyle = "#b8c4c0"; c.strokeRect(M + .5, y + .5, rw - 1, rh - 1);
+          c.save(); c.translate(M, y); shotAttribution(c, rw, rh); c.restore();
+          c.textBaseline = "top";
+        }
+        y += rh + 6;
+        pc.lines.forEach(function (ln, i) {
+          var t = vtProfInfo(ln, i, ans[i]);
+          y += 10;
+          c.font = "700 14px system-ui, sans-serif";
+          if (draw) { dot(M + 8, y + 9); c.fillStyle = "#14342f"; c.fillText(t.head, M + 24, y); }
+          y += 22;
+          if (draw) c.drawImage(imgs[i], M, y, rw, chH);
+          y += chH + 2;
+          T(t.stats, "12.5px system-ui, sans-serif", "#555", 18);
+          T(t.res, "600 13px system-ui, sans-serif", t.bad ? "#c92a2a" : "#1f6b34", 18);
+        });
+        y += 12;
+        T(NOTE, "11px system-ui, sans-serif", "#666", 15);
+        return y + M;
+      }
+      var H = Math.ceil(paint(document.createElement("canvas").getContext("2d"), false));
+      var px = Math.min(2, Math.max(1, f), 8192 / H, 16000000 / (OW * H));
+      var cv = document.createElement("canvas"); cv.width = Math.round(OW * px); cv.height = Math.round(H * px);
+      var c = cv.getContext("2d"); c.scale(px, px); c.fillStyle = "#ffffff"; c.fillRect(0, 0, OW, H);
+      paint(c, true);
+      return new Promise(function (resolve, reject) {
+        cv.toBlob(function (b) { b ? resolve({ blob: b, failed: cap.failed }) : reject(new Error("image trop grande")); }, "image/png");
+      });
+    });
+  }
+  $("vtProfShot").onclick = function () {
+    var btn = this, m = $("vtProfMsg"), pc = vtProfCur;
+    if (btn.disabled || !pc) return;
+    btn.disabled = true; m.hidden = false; m.textContent = "Préparation de l’image…";
+    var name = shotStamp().replace("VHMaps_", "VHMaps_triangles-acces" + pc.num + "_");
+    vtProfImage().then(function (r) {
+      return Promise.resolve(shotDeliver(r.blob, name, r.failed)).then(function () {
+        m.textContent = "Image enregistrée : " + name + (r.failed ? " (" + r.failed + " élément" + (r.failed > 1 ? "s" : "") + " de carte non inclus : connexion nécessaire)" : "");
+      });
+    }).catch(function (err) { m.textContent = "Image impossible : " + ((err && err.message) || "erreur") + "."; })
+      .then(function () { btn.disabled = false; });
+  };
 
   map.on("click", function (e) { vtPick(e.latlng); });
   map.on("mousemove", function (e) { vtLast = e; if (vtOn) vtRubber(e); });
@@ -3678,7 +3791,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 8.1";
+  $("appVer").textContent = "VHMaps — version 8.2";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
