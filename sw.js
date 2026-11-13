@@ -1,5 +1,5 @@
 /* VHMaps — service worker : fonctionnement hors ligne */
-const VERSION = "vhmaps-v8.3";
+const VERSION = "vhmaps-v8.4";
 const SHELL = VERSION + "-shell";
 const TILES = VERSION + "-tiles";      // tuiles vues en navigation (limité)
 const DATA = VERSION + "-data";
@@ -7,10 +7,12 @@ const OFFLINE = "vhmaps-offline-tiles"; // cartes téléchargées volontairement
 const DONNEES = "vhmaps-donnees";       // dalle, référentiel et PR (dossier donnees/) : conservés entre les versions
 const MAX_TILES = 800;
 const LEAFLET = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/";
+const MAPLIBRE = "https://cdn.jsdelivr.net/npm/maplibre-gl@4.7.1/dist/maplibre-gl";   // vue 3D
 const PRECACHE = [
   "./", "index.html", "manifest.json",
   "icons/icon.svg", "icons/icon-180.png", "icons/icon-192.png", "icons/icon-512.png",
-  LEAFLET + "leaflet.min.js", LEAFLET + "leaflet.min.css"
+  LEAFLET + "leaflet.min.js", LEAFLET + "leaflet.min.css",
+  "vue3d.js", MAPLIBRE + ".js", MAPLIBRE + ".css"
 ];
 
 self.addEventListener("install", (e) => {
@@ -92,7 +94,8 @@ self.addEventListener("fetch", (e) => {
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 
-  if (url.hostname === "tile.openstreetmap.org" || (url.hostname === "data.geopf.fr" && url.pathname.startsWith("/wmts"))) {
+  if (url.hostname === "tile.openstreetmap.org" || (url.hostname === "data.geopf.fr" && url.pathname.startsWith("/wmts")) ||
+      (url.hostname === "s3.amazonaws.com" && url.pathname.startsWith("/elevation-tiles-prod/"))) {
     e.respondWith(tileResponse(req));
     return;
   }
@@ -100,7 +103,7 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(networkFirst(req, DATA).catch(() => Response.error()));
     return;
   }
-  if (url.hostname === "cdnjs.cloudflare.com") {            // Leaflet
+  if (url.hostname === "cdnjs.cloudflare.com" || url.hostname === "cdn.jsdelivr.net") {   // Leaflet, MapLibre
     e.respondWith(cacheFirst(req, SHELL));
     return;
   }

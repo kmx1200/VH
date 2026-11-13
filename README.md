@@ -47,6 +47,16 @@ Chaque `<trk>` (et chaque `<trkseg>`) devient un segment distinct. La couleur es
 Sans couleur, une couleur est attribuée automatiquement. Une légende s'affiche dès qu'il y a plusieurs segments,
 et le message de suivi indique le segment sur lequel on se trouve. Voir `itineraires/exemple-couleurs.gpx`.
 
+## Vue 3D (bouton cube)
+
+Bouton « 3D » de la colonne de droite : ouvre une carte inclinée avec relief (MapLibre GL JS, chargé à la demande depuis `vue3d.js`).
+Le fond est celui de la carte 2D (Plan IGN, photographies aériennes…) ; la dalle du Morbihan, non utilisable en 3D, est remplacée par la photo aérienne.
+Le relief vient des tuiles AWS Terrain Tiles (gratuites, sans clé). L'itinéraire de référence et le tracé enregistré sont affichés ; la caméra suit la position et le cap.
+
+- « ◎ Suivi » : caméra qui suit la position (en pause quand on déplace la carte à la main) ; « ⛰ × » : exagération du relief (×1, ×1,5, ×2,5) ; « 2D » : retour à la carte.
+- Hors ligne : les tuiles déjà consultées (fond et relief) sont réutilisées ; le relief n'est pas inclus dans « Hors ligne → Télécharger ».
+- Précision du relief : environ 10 à 30 m, adaptée aux collines mais pas aux talus ni aux petits dénivelés.
+
 ## Triangles de visibilité (bouton triangle)
 
 Choisir l'accès (privé, recul 2 m ; secondaire, recul 4 m), la vitesse de référence (50 / 70 / 80 / 90 km/h) et le temps de réaction (6 ou 8 s),
