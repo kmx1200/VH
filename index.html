@@ -294,7 +294,6 @@
   <button id="locate" class="tool" data-help="Affiche votre position et votre direction sans enregistrer de tracé. Touchez de nouveau pour désactiver." aria-pressed="false" aria-label="Activer ma position"></button>
   <button id="trace" class="tool" data-help="Enregistre et affiche le chemin que vous parcourez à partir de votre position, sans suivre de circuit. Touchez de nouveau pour arrêter." aria-pressed="false" aria-label="Tracer mon parcours"></button>
   <button id="rcBtn" class="tool" data-help="Recensement linéaire : parcourez la route et marquez le début et la fin de chaque segment. Longueurs, PR et abscisses, export Excel et QGIS." aria-pressed="false" aria-label="Recensement linéaire"></button>
-  <button id="view3d" class="tool" data-help="Vue 3D : carte inclinée avec relief, qui suit votre position et votre cap. Touchez « 2D » pour revenir." aria-label="Vue 3D"></button>
   <button id="fs" class="tool" data-help="Masque la barre du navigateur pour agrandir la carte." aria-pressed="false" aria-label="Plein écran"></button>
   <button id="sv" class="tool" data-help="Touchez ensuite un point de la carte pour ouvrir Google Street View à cet endroit." aria-pressed="false" aria-label="Street View : choisir un point"></button>
   <button id="pk" class="tool" data-help="Touchez ensuite un point proche d’une route du référentiel pour obtenir la route, le PR et l’abscisse." aria-pressed="false" aria-label="Localiser un PR : choisir un point"></button>
@@ -4464,18 +4463,6 @@
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
   }
-
-  // Vue 3D (MapLibre GL JS, chargée à la demande depuis vue3d.js)
-  window.__vh = { map: map, BASES: BASES, base: function () { return baseKey; }, ref: refLayer, line: line, say: say, haversine: haversine, bearing: bearing };
-  $("view3d").innerHTML = ICON("M12 3l9 5v8l-9 5-9-5V8zM12 12l9-4M12 12v9M12 12L3 8");
-  $("view3d").onclick = function () {
-    if (window.vue3d) { window.vue3d.open(); return; }
-    say("Chargement de la vue 3D…");
-    var sc = document.createElement("script"); sc.src = "vue3d.js";
-    sc.onload = function () { window.vue3d.open(); };
-    sc.onerror = function () { say("Vue 3D indisponible : une connexion est nécessaire au premier chargement.", true); };
-    document.head.appendChild(sc);
-  };
 
   load(); render(); initRoutes();
   if (points.length) { drawAll(keepView); $("toggle").textContent = "Reprendre"; say("Itinéraire précédent restauré."); }
