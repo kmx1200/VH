@@ -275,6 +275,7 @@
 <div class="legends">
   <div class="legend" id="legend" hidden></div>
   <div class="legend" id="legendRef" hidden></div>
+  <div class="legend" id="legendTrafic" hidden></div>
 </div>
 
 <div class="searchbar" id="searchbar" role="search" hidden>
@@ -387,6 +388,7 @@
   <label class="chk"><input type="checkbox" id="ovPr"> PR (points et numéros)</label>
   <label class="chk"><input type="checkbox" id="ovRef"> Référentiel routier (couleur par site)</label>
   <label class="chk"><input type="checkbox" id="ovAgglo"> Agglomérations (magenta)</label>
+  <label class="chk"><input type="checkbox" id="ovTrafic"> Trafics 2025 (couleur selon le trafic)</label>
   <label class="chk"><input type="checkbox" id="ovCadastre"> Parcelles cadastrales (IGN)</label>
   <label>Opacité du cadastre <input type="range" id="ovCadastreOp" min="20" max="100" step="10" value="85"></label>
   <p class="hint">Touchez une parcelle (zoom 15 ou plus) pour afficher sa section, son numéro et sa contenance. En ligne uniquement.</p>
@@ -486,7 +488,7 @@
   var MIN_STEP = 5;
 
   var map = L.map("map", { zoomControl: false }).setView([46.6, 2.5], 6);
-  // Ordre d'empilement des superpositions (du bas vers le haut) : fond < PCRS < SCAN 25 < OLD < parcelles < référentiel < agglomérations < PR (volet « vec », 350)
+  // Ordre d'empilement des superpositions (du bas vers le haut) : fond < PCRS < SCAN 25 < OLD < parcelles < référentiel < agglomérations < trafics < PR (volet « vec », 350)
   [["pcrsPane", 210], ["scanPane", 220], ["oldPane", 230], ["cadPane", 240]].forEach(function (p) { map.createPane(p[0]).style.zIndex = p[1]; });
   var IGN = "https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&STYLE=normal&TILEMATRIXSET=PM&LAYER=";
   var IGNH = IGN.replace("STYLE=normal", "STYLE=BDORTHOHISTORIQUE");   // orthophotos historiques : style dédié
@@ -1806,7 +1808,7 @@
   // Appui long sur le fond de carte nu (aucune superposition cochée, aucun outil actif) : lance Street View directionnel.
   // Le point de l'appui long devient le lieu ; le toucher suivant choisit l'azimut (même chaîne que le bouton Street View).
   (function () {
-    var LP_MS = 600, LP_MOVE = 10, OVS = ["ovPr", "ovRef", "ovAgglo", "ovCadastre", "ovOld", "ovScan", "ovPcrs"];
+    var LP_MS = 600, LP_MOVE = 10, OVS = ["ovPr", "ovRef", "ovAgglo", "ovTrafic", "ovCadastre", "ovOld", "ovScan", "ovPcrs"];
     var box = map.getContainer(), timer = null, sx = 0, sy = 0, swallowUntil = 0, fired = false;
     function bare() {   // seulement des fonds de carte, et aucun autre outil qui attend un toucher
       for (var i = 0; i < OVS.length; i++) { var c = $(OVS[i]); if (c && c.checked) return false; }
@@ -3791,7 +3793,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 8.3";
+  $("appVer").textContent = "VHMaps — version 8.4";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
@@ -3937,10 +3939,10 @@
 
   // ---------- Superpositions (PCRS) ----------
   var PCRS_LAYER = "PCRS.LAMB93";
-  var OKEY = "vhmaps-overlays", ov = { pcrs: false, op: 100, ref: false, agglo: false, pr: false }, ovLayers = {};
+  var OKEY = "vhmaps-overlays", ov = { pcrs: false, op: 100, ref: false, agglo: false, trafic: false, pr: false }, ovLayers = {};
   try {
     var so = JSON.parse(localStorage.getItem(OKEY) || "null");
-    if (so) ov = { pcrs: !!so.pcrs, op: so.op >= 20 && so.op <= 100 ? so.op : 100, ref: !!so.ref, agglo: !!so.agglo, pr: !!so.pr };
+    if (so) ov = { pcrs: !!so.pcrs, op: so.op >= 20 && so.op <= 100 ? so.op : 100, ref: !!so.ref, agglo: !!so.agglo, trafic: !!so.trafic, pr: !!so.pr };
   } catch (e) {}
   function mkWms(url, layer, attr, z, label) {
     var l = L.tileLayer.wms(url, { layers: layer, styles: "", format: "image/png", transparent: true, version: "1.3.0",
@@ -3998,12 +4000,12 @@
   map.createPane("vec"); map.getPane("vec").style.zIndex = 350;
   var vecRenderer = L.canvas({ pane: "vec", padding: 0.3, tolerance: 8 });
   var refRenderer = vecRenderer, prRenderer = vecRenderer;
-  var oldLayer = null, refLayerGeo = null, aggloLayerGeo = null;
+  var oldLayer = null, refLayerGeo = null, aggloLayerGeo = null, traficLayerGeo = null;
   // Canvas « vec » (au-dessus des parcelles) : PR au-dessus, référentiel dessous. Les OLD y ont une couche de détection
   // invisible (oldHit, tout en bas : popups et curseur) ; leur dessin visible est dans le volet « oldPane », sous les parcelles.
   var oldHit = null;
-  // Ordre dans le canvas (du bas vers le haut) : OLD (détection) < référentiel < agglomérations < PR
-  function vecOrder() { if (aggloLayerGeo) aggloLayerGeo.bringToBack(); if (refLayerGeo) refLayerGeo.bringToBack(); if (oldHit) oldHit.bringToBack(); }
+  // Ordre dans le canvas (du bas vers le haut) : OLD (détection) < référentiel < agglomérations < trafics < PR
+  function vecOrder() { if (traficLayerGeo) traficLayerGeo.bringToBack(); if (aggloLayerGeo) aggloLayerGeo.bringToBack(); if (refLayerGeo) refLayerGeo.bringToBack(); if (oldHit) oldHit.bringToBack(); }
   var prGroup = L.layerGroup().addTo(map), prData = null, refWanted = 0, prWanted = 0;
 
   function drawRefLegend(sitesSeen) {
@@ -4071,6 +4073,55 @@
       vecOrder();
     }).catch(function () { if (token === aggloWanted) say("Agglomérations indisponibles : connexion nécessaire au premier chargement.", true); });
   }
+  // Trafics moyens journaliers annuels 2025 (TraficSE2025) : tronçons colorés par classe de trafic (véhicules/jour),
+  // mêmes classes et mêmes couleurs que la légende du Département. Toucher un tronçon : trafic et % de poids lourds.
+  var TRAFIC_WEIGHT = 5, TRAFIC_OPACITY = .95, traficWanted = 0;
+  var TRAFIC_CLASSES = [   // [borne haute exclue, couleur, libellé]
+    [500, "#ebe88e", "Moins de 500"], [1000, "#e4df29", "500 - 1 000"], [2500, "#24ba0e", "1 000 - 2 500"],
+    [5000, "#1980f4", "2 500 - 5 000"], [10000, "#faa735", "5 000 - 10 000"], [20000, "#e43f34", "10 000 - 20 000"],
+    [Infinity, "#b00a07", "Plus de 20 000"]
+  ];
+  function traficClass(t) { for (var i = 0; i < TRAFIC_CLASSES.length; i++) if (t < TRAFIC_CLASSES[i][0]) return TRAFIC_CLASSES[i]; return TRAFIC_CLASSES[TRAFIC_CLASSES.length - 1]; }
+  function fmtNum(n) { return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202f"); }
+  function drawTraficLegend() {
+    var leg = $("legendTrafic"); leg.innerHTML = "";
+    var h = document.createElement("h4"); h.textContent = "Trafic 2025 (véh./jour)"; leg.appendChild(h);
+    TRAFIC_CLASSES.forEach(function (c) {
+      var row = document.createElement("div"), sw = document.createElement("i");
+      sw.style.background = c[1];
+      row.appendChild(sw); row.appendChild(document.createTextNode(c[2])); leg.appendChild(row);
+    });
+    leg.hidden = false;
+  }
+  function syncTrafic() {
+    var token = ++traficWanted;
+    if (!ov.trafic) {
+      if (traficLayerGeo) { map.removeLayer(traficLayerGeo); traficLayerGeo = null; }
+      $("legendTrafic").hidden = true; return;
+    }
+    if (traficLayerGeo) return;
+    loadJson("donnees/trafic.json").then(function (fc) {
+      if (token !== traficWanted || !ov.trafic || traficLayerGeo) return;
+      traficLayerGeo = L.geoJSON(fc, {
+        renderer: vecRenderer, bubblingMouseEvents: false,
+        style: function (f) { return { color: traficClass(f.properties.t)[1], weight: TRAFIC_WEIGHT, opacity: TRAFIC_OPACITY, lineCap: "butt", lineJoin: "round" }; },
+        onEachFeature: function (f, layer) {
+          var p = f.properties;
+          attachPopup(layer, function (ll) {
+            return "<b>Trafic" + (p.a ? " " + esc(p.a) : "") + "</b>"
+              + "<br>" + esc(shortRoute(p.axe)) + " (" + esc(p.axe) + ")"
+              + "<br><b>" + fmtNum(p.t) + " véhicules/jour</b>"
+              + (p.pl != null ? "<br>Poids lourds : <b>" + String(p.pl).replace(".", ",") + " %</b>" : "")
+              + (p.deb && p.fin ? "<br>PR " + esc(p.deb) + " &rarr; PR " + esc(p.fin) : "")
+              + (p.ch ? "<br>Chauss&eacute;e : " + esc(p.ch) : "")
+              + svLink(ll);
+          });
+        }
+      }).addTo(map);
+      vecOrder();
+      drawTraficLegend();
+    }).catch(function () { if (token === traficWanted) say("Trafics indisponibles : connexion nécessaire au premier chargement.", true); });
+  }
   function labelIcon(txt) { return L.divIcon({ className: "pr-label", html: "<span>" + esc(txt) + "</span>", iconSize: [0, 0], iconAnchor: [0, 0] }); }
   function renderPr() {
     prGroup.clearLayers();
@@ -4100,6 +4151,7 @@
   map.on("moveend", renderPr);
   $("ovRef").onchange = function () { ov.ref = this.checked; syncRef(); try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {} };
   $("ovAgglo").onchange = function () { ov.agglo = this.checked; syncAgglo(); try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {} };
+  $("ovTrafic").onchange = function () { ov.trafic = this.checked; syncTrafic(); try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {} };
   $("ovPr").onchange = function () { ov.pr = this.checked; syncPr(); try { localStorage.setItem(OKEY, JSON.stringify(ov)); } catch (e) {} };
 
   $("ovPcrs").onchange = function () { ov.pcrs = this.checked; syncOverlays(); if (ov.pcrs) zoomHint(); };
@@ -4332,13 +4384,13 @@
     $("offScan").checked = localStorage.getItem("vhmaps-off-scan") !== "0";
   } catch (e) {}
 
-  syncOverlays(); syncRef(); syncAgglo(); syncPr(); syncOld(); syncScan(false);
+  syncOverlays(); syncRef(); syncAgglo(); syncTrafic(); syncPr(); syncOld(); syncScan(false);
 
   $("offline").onclick = function () {
     $("offBase").value = baseKey; updateEst(); updateStorage();
     $("ovPcrs").checked = ov.pcrs; $("ovOp").value = ov.op;
     $("ovOld").checked = oldOn; $("ovOldOp").value = Math.round(oldOpacity * 100);
-    $("ovRef").checked = ov.ref; $("ovAgglo").checked = ov.agglo; $("ovPr").checked = ov.pr;
+    $("ovRef").checked = ov.ref; $("ovAgglo").checked = ov.agglo; $("ovTrafic").checked = ov.trafic; $("ovPr").checked = ov.pr;
     $("ovScan").checked = scanOn; $("ovScanOp").value = Math.round(scanOpacity * 100);
     scanIndex().then(function () { $("offScanRow").hidden = false; updateEst(); updateStorage(); })
       .catch(function () { $("offScanRow").hidden = true; });
