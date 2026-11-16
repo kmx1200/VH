@@ -208,6 +208,10 @@
   #vtHead #vtValue { flex:1 1 100%; min-width:0; font-size:.88rem; }
   #vtChoices { display:flex; flex-wrap:wrap; gap:6px; }
   #vtChoices button { flex:1 1 40%; }
+  #vtChoices .vt-v85 { flex:1 1 100%; display:flex; gap:6px; align-items:center; }
+  #vtChoices .vt-v85 label { white-space:nowrap; font-size:13px; }
+  #vtChoices .vt-v85 input { flex:1 1 auto; min-width:0; width:70px; padding:6px 8px; font:inherit; border:1px solid #9bb; border-radius:8px; }
+  #vtChoices .vt-v85 button { flex:0 0 auto; }
   .vt-sw { display:inline-block; width:.95em; height:.95em; border-radius:50%; flex:none; margin-right:6px; vertical-align:-2px; border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.4); }
   #vtList { max-height:11em !important; }
   #vtList li { align-items:stretch; }
@@ -303,7 +307,7 @@
   <button id="shot" class="tool" data-help="Enregistre une image de la carte seule, sans les boutons. Les mesures affichées et leurs valeurs y sont ajoutées." aria-label="Copie d'écran de la carte"></button>
   <button id="measureLine" class="tool" data-help="Posez des points pour mesurer une distance. Les poignées permettent d’ajuster le tracé." aria-label="Mesurer une distance"></button>
   <button id="measureArea" class="tool" data-help="Posez au moins 3 points pour mesurer une surface." aria-label="Mesurer une surface"></button>
-  <button id="vt" class="tool" data-secure data-help="Triangles de visibilité : choisissez l’accès (recul 2 m ou 4 m), la vitesse de référence et le temps de réaction, puis posez les points sur la carte. Chaque accès a sa couleur ; la liste du panneau permet de le retrouver, le modifier ou le supprimer." aria-label="Triangles de visibilité" aria-pressed="false"></button>
+  <button id="vt" class="tool" data-secure data-help="Triangles de visibilité : choisissez l’accès (recul 2 m ou 4 m), la vitesse de référence (prédéfinie ou V85 saisie) et le temps de réaction, puis posez les points sur la carte. Chaque accès a sa couleur ; la liste du panneau permet de le retrouver, le modifier ou le supprimer." aria-label="Triangles de visibilité" aria-pressed="false"></button>
 </div>
 <div id="vtPanel" class="measure-panel" hidden>
   <div id="vtHead"><b>Triangles de visibilité</b><span id="vtValue"></span></div>
@@ -2531,7 +2535,22 @@
       });
     }
     if (st === "access") { txt = "Choisissez le type d’accès."; opts([["Accès privé · recul 2 m", "prive"], ["Accès secondaire · recul 4 m", "secondaire"]], function (v) { vtCfg.access = v; }); }
-    else if (st === "speed") { txt = "Choisissez la vitesse de référence."; opts(VT_SPEEDS.map(function (v) { return [v + " km/h", v]; }), function (v) { vtCfg.speed = v; }); }
+    else if (st === "speed") {
+      txt = "Choisissez la vitesse de référence, ou saisissez la V85 si vous la connaissez.";
+      opts(VT_SPEEDS.map(function (v) { return [v + " km/h", v]; }), function (v) { vtCfg.speed = v; });
+      var rw = document.createElement("div"); rw.className = "vt-v85";
+      var lb = document.createElement("label"); lb.htmlFor = "vtV85"; lb.textContent = "V85 connue :";
+      var inp = document.createElement("input"); inp.type = "number"; inp.id = "vtV85"; inp.min = "10"; inp.max = "150"; inp.step = "1"; inp.inputMode = "numeric"; inp.placeholder = "km/h";
+      var ok = document.createElement("button"); ok.className = "ghost"; ok.textContent = "OK";
+      function setV85() {
+        var v = Math.round(parseFloat(String(inp.value).replace(",", ".")));
+        if (!(v >= 10 && v <= 150)) { inp.focus(); say("V85 : saisissez une vitesse entière entre 10 et 150 km/h."); return; }
+        vtCfg.speed = v; vtRender();
+      }
+      ok.onclick = setV85;
+      inp.onkeydown = function (e) { if (e.key === "Enter") { e.preventDefault(); setV85(); } };
+      rw.appendChild(lb); rw.appendChild(inp); rw.appendChild(ok); box.appendChild(rw);
+    }
     else if (st === "time") { txt = "Choisissez le temps de réaction."; opts(VT_TIMES.map(function (v) { return [v + " secondes", v]; }), function (v) { vtCfg.time = v; }); }
     else if (st === "p1") txt = "Cliquez le point sur la ligne d’effet.";
     else if (st === "p2") txt = "Cliquez le point d’observation sur le cercle (recul " + vtFmt(vtRecul()) + " m).";
@@ -3793,7 +3812,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 8.4";
+  $("appVer").textContent = "VHMaps — version 8.5";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }

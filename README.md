@@ -49,7 +49,7 @@ et le message de suivi indique le segment sur lequel on se trouve. Voir `itinera
 
 ## Triangles de visibilité (bouton triangle)
 
-Choisir l'accès (privé, recul 2 m ; secondaire, recul 4 m), la vitesse de référence (50 / 70 / 80 / 90 km/h) et le temps de réaction (6 ou 8 s),
+Choisir l'accès (privé, recul 2 m ; secondaire, recul 4 m), la vitesse de référence (50 / 70 / 80 / 90 km/h, ou la V85 saisie en km/h si elle est connue) et le temps de réaction (6 ou 8 s),
 puis poser P1 (ligne d'effet), P2 (point d'observation, ramené sur le cercle de recul) et deux points sur le cercle de distance de visibilité.
 
 - **Plusieurs accès** : chaque accès tracé reçoit une couleur différente (palette de 8 couleurs ; la première couleur libre est réutilisée après une suppression).
