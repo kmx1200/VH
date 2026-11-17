@@ -2756,13 +2756,28 @@
     for (var i = 0; i <= n; i++) { var f = i / n; out.push({ d: D * f, lat: a.lat + (b.lat - a.lat) * f, lng: a.lng + (b.lng - a.lng) * f }); }
     return out;
   }
-  function vtAlti(pts) {   // altitudes (m) des points, null si le service n'a pas de donnée
+  var vtAltiLast = 0;
+  function vtAltiGate() {   // espace les requêtes d'au moins 250 ms : la Géoplateforme limite à ≈ 5 requêtes/s (sinon HTTP 429)
+    var now = Date.now(), at = Math.max(now, vtAltiLast + 250); vtAltiLast = at;
+    return new Promise(function (r) { setTimeout(r, at - now); });
+  }
+  function vtAlti(pts, n) {   // avec nouvelle tentative (attente croissante) si le service répond 429 ou 503
+    n = n || 0;
+    return vtAltiGate().then(function () { return vtAltiOnce(pts); }).catch(function (err) {
+      if (err && (err.status === 429 || err.status === 503) && n < 5) {
+        var w = err.retryAfter || 1000 * (n + 1);
+        return new Promise(function (r) { setTimeout(r, w); }).then(function () { return vtAlti(pts, n + 1); });
+      }
+      throw err;
+    });
+  }
+  function vtAltiOnce(pts) {   // altitudes (m) des points, null si le service n'a pas de donnée
     var url = VT_ALTI + "?lon=" + encodeURIComponent(pts.map(function (p) { return p.lng.toFixed(6); }).join("|")) +
       "&lat=" + encodeURIComponent(pts.map(function (p) { return p.lat.toFixed(6); }).join("|")) +
       "&resource=" + VT_ALTI_RES + "&delimiter=" + encodeURIComponent("|") + "&indent=false&measures=false&zonly=true";
     var ctrl = window.AbortController ? new AbortController() : null, to = setTimeout(function () { if (ctrl) ctrl.abort(); }, 15000);
     return fetch(url, ctrl ? { signal: ctrl.signal } : {}).then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (!res.ok) { clearTimeout(to); var e = new Error("HTTP " + res.status), ra = parseInt(res.headers.get("Retry-After"), 10); e.status = res.status; if (ra > 0) e.retryAfter = Math.min(ra, 10) * 1000; throw e; }
       return res.json();
     }).then(function (j) {
       clearTimeout(to);
@@ -3006,7 +3021,7 @@
     for (j = 0; j < ny; j++) for (i = 0; i < nx; i++) { var x = x0 + i * step, y = y0 + j * step; pts.push({ lat: fr.lat0 + y / fr.ky, lng: fr.lng0 + x / fr.kx }); }
     var tasks = [];
     for (var o = 0; o < pts.length; o += 100) (function (sl) { tasks.push(function () { return vtAlti(sl); }); })(pts.slice(o, o + 100));
-    return vt3Pool(tasks, 4).then(function (parts) {
+    return vt3Pool(tasks, 2).then(function (parts) {
       var z = [].concat.apply([], parts), ok = z.filter(function (v) { return v !== null; });
       if (ok.length < z.length * 0.8) throw new Error("pas de données d'altitude à cet endroit");
       var mean = ok.reduce(function (a, b) { return a + b; }, 0) / ok.length;
