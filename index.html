@@ -474,6 +474,7 @@
     <p class="hint" id="vtp3dMsg" role="status"></p>
     <canvas id="vtp3dCv" aria-label="Vue 3D du relief, des triangles et des lignes de visée"></canvas>
     <div class="ms-modes vtp-views" role="group" aria-label="Point de vue"><button id="vtp3dViewPersp" class="ghost" aria-pressed="true">Perspective</button><button id="vtp3dViewTop" class="ghost" aria-pressed="false">Dessus</button><button id="vtp3dViewEye0" class="ghost" aria-pressed="false">Œil → A</button><button id="vtp3dViewEye1" class="ghost" aria-pressed="false">Œil → B</button></div>
+    <label class="vtp-exag" id="vtp3dMoveBox" hidden><span id="vtp3dMoveL">Avancer vers A</span><input id="vtp3dMove" type="range" min="0" max="97" step="1" value="0"><b id="vtp3dMoveV">0 m</b><button id="vtp3dPlay" class="ghost" type="button" aria-label="Lecture automatique">▶</button></label>
     <label class="vtp-exag" id="vtp3dExagBox">Relief exagéré<input id="vtp3dExag" type="range" min="1" max="5" step="0.5" value="2"><b id="vtp3dExagV">×2</b></label>
     <div id="vtp3dInfo"></div>
     <p class="hint">Glisser : tourner (ou regarder autour en vue depuis l’œil) · molette ou deux doigts : zoom. Les hauteurs d’œil et d’objet ci-dessus s’appliquent aussi à la 3D. Relief : grille RGE ALTI® sur la zone des triangles, terrain nu ; la vue depuis l’œil montre si une crête masque l’objet, mais sans végétation ni bâti.</p>
@@ -3054,7 +3055,33 @@
   function vt3Hex(h) { return [parseInt(h.substr(1, 2), 16), parseInt(h.substr(3, 2), 16), parseInt(h.substr(5, 2), 16)]; }
   function vt3Az(a, b) { return (Math.atan2(b[0] - a[0], b[1] - a[1]) * 180 / Math.PI + 360) % 360; }
 
+  var vt3Anim = 0;
+  function vt3Stop() { if (vt3Anim) { cancelAnimationFrame(vt3Anim); vt3Anim = 0; } var b = $("vtp3dPlay"); if (b) b.textContent = "▶"; }
+  function vt3Move(t) {   // œil placé à la fraction t (0 = P2, 1 = point A/B) de la droite, à hauteur d'œil au-dessus du terrain, regard vers l'objet
+    var c = vtProfCur, cam = vt3.cam, g = vt3.grid; if (!c || !cam || cam.mode !== "eye") return;
+    var k = cam.k, ln = c.lines[k], hh = vtProfHeights(), an = vtProfAnalyse(ln, hh[0], hh[1]), n = ln.pts.length - 1;
+    t = Math.max(0, Math.min(0.97, t)); cam.t = t;
+    var fi = t * n, i0 = Math.floor(fi), i1 = Math.min(n, i0 + 1), zg = ln.z[i0] + (ln.z[i1] - ln.z[i0]) * (fi - i0);
+    var q = vt3XY(g.fr, ln.pts[n]), D = ln.pts[n].d;
+    cam.pos = [q[0] * t, q[1] * t]; cam.zabs = zg + hh[0];
+    cam.pitch = Math.max(-60, Math.min(60, Math.atan2(an.zObj - cam.zabs, Math.max(0.5, D * (1 - t))) * 180 / Math.PI));
+    cam.yaw = vt3Az([0, 0], q);
+    $("vtp3dMove").value = Math.round(t * 100); $("vtp3dMoveV").textContent = Math.round(D * t) + " m";
+    vt3Redraw();
+  }
+  function vt3Play() {
+    var cam = vt3.cam; if (!cam || cam.mode !== "eye") return;
+    if (vt3Anim) { vt3Stop(); return; }
+    var t0 = cam.t >= 0.96 ? 0 : cam.t, T = 9000, st = performance.now();
+    $("vtp3dPlay").textContent = "❚❚";
+    (function tick(now) {
+      var t = t0 + (0.97 - t0) * Math.min(1, (now - st) / (T * (0.97 - t0) / 0.97));
+      vt3Move(t);
+      if (t < 0.97 && vt3.tab === "3") vt3Anim = requestAnimationFrame(tick); else vt3Stop();
+    })(st);
+  }
   function vt3Setup() {   // caméra de départ selon la vue choisie
+    vt3Stop();
     var c = vtProfCur, g = vt3.grid, fr = g.fr, s = c.s, v = vt3.view;
     var p1 = vt3XY(fr, s.p1), p2 = [0, 0], A = s.tris.map(function (a) { return vt3XY(fr, a); });
     var hh = vtProfHeights(), an = c.lines.map(function (ln) { return vtProfAnalyse(ln, hh[0], hh[1]); });
@@ -3063,7 +3090,7 @@
     var cam = { view: v, hfov: 60 };
     if (v === "eye0" || v === "eye1") {
       var k = v === "eye1" ? 1 : 0; if (!A[k]) k = 0;
-      cam.mode = "eye"; cam.zabs = c.lines[0].z[0] + hh[0]; cam.pos = [0, 0];
+      cam.mode = "eye"; cam.zabs = c.lines[0].z[0] + hh[0]; cam.pos = [0, 0]; cam.k = k; cam.t = 0;
       cam.yaw = vt3Az(p2, A[k]); cam.pitch = Math.atan2(an[k].zObj - an[k].zEye, an[k].D) * 180 / Math.PI; cam.hfov = 60;
     } else {
       cam.mode = "orbit"; cam.T = [mx, my, vt3Z(g, mx, my)];
@@ -3195,7 +3222,9 @@
     var n = vtProfCur ? vtProfCur.lines.length : 0;
     $("vtp3dViewEye1").hidden = n < 2;
     ["Persp", "Top", "Eye0", "Eye1"].forEach(function (k) { var b = $("vtp3dView" + k), v = { Persp: "persp", Top: "top", Eye0: "eye0", Eye1: "eye1" }[k]; b.setAttribute("aria-pressed", vt3.view === v ? "true" : "false"); });
-    $("vtp3dExagBox").hidden = vt3.view === "eye0" || vt3.view === "eye1";
+    var isEye = vt3.view === "eye0" || vt3.view === "eye1";
+    $("vtp3dExagBox").hidden = isEye; $("vtp3dMoveBox").hidden = !isEye;
+    if (isEye) { $("vtp3dMoveL").textContent = "Avancer vers " + (vt3.view === "eye1" ? "B" : "A"); $("vtp3dMove").value = 0; $("vtp3dMoveV").textContent = "0 m"; }
   }
   function vt3SetView(v) { vt3.view = v; vt3Setup(); vt3Views(); vt3Redraw(); }
   function vt3Show() {   // onglet « Vue 3D » : charge le relief au besoin
@@ -3215,7 +3244,7 @@
   }
   function vtProfKeyOf(s) { return [s.p2].concat(s.tris, [s.p1]).map(function (q) { return q.lat.toFixed(6) + "," + q.lng.toFixed(6); }).join(";"); }
   function vt3Tab(t) {
-    vt3.tab = t;
+    vt3Stop(); vt3.tab = t;
     $("vtProfBody").hidden = t === "3"; $("vtp3d").hidden = t !== "3";
     $("vtpTabP").setAttribute("aria-pressed", t === "p" ? "true" : "false"); $("vtpTab3").setAttribute("aria-pressed", t === "3" ? "true" : "false");
     $("vtProfShot").textContent = t === "3" ? "Enregistrer l’image 3D" : "Enregistrer l’image";
@@ -3228,8 +3257,10 @@
   $("vtp3dViewTop").onclick = function () { vt3SetView("top"); };
   $("vtp3dViewEye0").onclick = function () { vt3SetView("eye0"); };
   $("vtp3dViewEye1").onclick = function () { vt3SetView("eye1"); };
+  $("vtp3dMove").oninput = function () { vt3Stop(); vt3Move(parseFloat(this.value) / 100); };
+  $("vtp3dPlay").onclick = vt3Play;
   $("vtp3dExag").oninput = function () { vt3.exag = parseFloat(this.value) || 1; $("vtp3dExagV").textContent = "×" + vt3.exag.toString().replace(".", ","); vt3Redraw(); };
-  $("vtpEye").oninput = $("vtpObj").oninput = function () { vtProfRender(); if (vt3.tab === "3" && vt3.grid) { var v = vt3.view, cm = vt3.cam; if (cm && cm.mode === "eye") { var y = cm.yaw, hf = cm.hfov; vt3Setup(); vt3.cam.yaw = y; vt3.cam.hfov = hf; } vt3Info(); vt3Redraw(); } };
+  $("vtpEye").oninput = $("vtpObj").oninput = function () { vtProfRender(); if (vt3.tab === "3" && vt3.grid) { var v = vt3.view, cm = vt3.cam; if (cm && cm.mode === "eye") { var y = cm.yaw, hf = cm.hfov, tt = cm.t || 0; vt3Setup(); vt3.cam.yaw = y; vt3.cam.hfov = hf; if (tt > 0) vt3Move(tt); } vt3Info(); vt3Redraw(); } };
   (function () {   // gestes : un doigt tourne, deux doigts / molette zooment
     var cv = $("vtp3dCv"), ptr = {}, pd = 0;
     function cnt() { return Object.keys(ptr).length; }
