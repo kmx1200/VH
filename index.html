@@ -2835,7 +2835,7 @@
     o += '<line x1="' + X(0) + '" y1="' + Y(an.zEye) + '" x2="' + X(D) + '" y2="' + Y(an.zObj) + '" stroke="' + col + '" stroke-width="2" stroke-dasharray="6 4"/>';
     o += '<line x1="' + X(0) + '" y1="' + Y(an.z0) + '" x2="' + X(0) + '" y2="' + Y(an.zEye) + '" stroke="' + col + '" stroke-width="2.5"/><circle cx="' + X(0) + '" cy="' + Y(an.zEye) + '" r="3.5" fill="' + col + '"/>';
     o += '<line x1="' + X(D) + '" y1="' + Y(an.zn) + '" x2="' + X(D) + '" y2="' + Y(an.zObj) + '" stroke="' + col + '" stroke-width="2.5"/><circle cx="' + X(D) + '" cy="' + Y(an.zObj) + '" r="3.5" fill="' + col + '"/>';
-    an.bad.forEach(function (i) { o += '<circle cx="' + X(line.pts[i].d) + '" cy="' + Y(line.z[i]) + '" r="2.8" fill="#e03131"/>'; });
+    an.bad.forEach(function (i) { o += '<circle cx="' + X(line.pts[i].d) + '" cy="' + Y(line.z[i]) + '" r="4.2" fill="#e03131"/>'; });
     var ex = (ph / span) / (pw / D);
     o += '<text x="' + (W - mr - 2) + '" y="' + (mt + 10) + '" text-anchor="end" opacity=".7">échelle verticale ×' + (ex >= 1.05 ? Math.round(ex * 10) / 10 : 1).toString().replace(".", ",") + '</text></svg>';
     return o;
@@ -3184,7 +3184,7 @@
       for (var t = 0; t < N; t++) { var u0 = t / N, u1 = (t + 1) / N; if (t % 2 === 0) seg([pe[0] + (po[0] - pe[0]) * u0, pe[1] + (po[1] - pe[1]) * u0, pe[2] + (po[2] - pe[2]) * u0], [pe[0] + (po[0] - pe[0]) * u1, pe[1] + (po[1] - pe[1]) * u1, pe[2] + (po[2] - pe[2]) * u1], an.bad.length ? "#e03131" : col, 2.2, null, 0, true); }
       seg(Wd(0, 0, an.z0), pe, col, 3.5, null, bias, true); dot(pe, col, 3.5, bias);
       seg(Wd(q[0], q[1], an.zn), po, col, 3.5, null, bias, true); dot(po, col, 3.5, bias);
-      an.bad.forEach(function (ix) { var x = vt3XY(fr, lnn.pts[ix]); dot(Wd(x[0], x[1], lnn.z[ix]), "#e03131", 3.2, bias); });
+      an.bad.forEach(function (ix) { var x = vt3XY(fr, lnn.pts[ix]); dot(Wd(x[0], x[1], lnn.z[ix]), "#e03131", 5, bias); });
       label(Wd(q[0], q[1], an.zObj + 1.2 / E), k === 0 ? "A" : "B", col, bias);
     });
     label(Wd(p2[0], p2[1], c.lines[0].z[0] + hh[0] + 1.2 / E), "P2", col, bias);
