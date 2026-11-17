@@ -69,6 +69,11 @@ puis poser P1 (ligne d'effet), P2 (point d'observation, ramené sur le cercle de
   Hauteur d'œil 1,10 m et hauteur de l'objet vu 0,70 m par défaut, modifiables dans la fenêtre (recalcul immédiat, sans nouvelle requête).
   Limites : terrain nu (ni végétation, ni clôtures, ni bâtiments) ; connexion nécessaire (les résultats déjà obtenus restent en mémoire jusqu'au rechargement de la page) ;
   l'échelle verticale est exagérée et indiquée sur le graphique.
+- **Vue 3D (onglet « Vue 3D » de la fenêtre des profils)** : le relief autour de P1, P2, A et B est échantillonné en grille (≈ 1 500 points RGE ALTI®, requêtes de 100 points) et affiché en 3D,
+  sans bibliothèque (canvas). On y voit les triangles posés sur le relief (teinte de l'accès), les droites P1–P2, P2–A, P2–B, les lignes de visée œil → objet (en rouge si le relief les coupe),
+  les poteaux œil et objet, et les points de relief gênants. Quatre points de vue : *Perspective*, *Dessus*, *Œil → A* et *Œil → B* (vue depuis l'œil de P2 : une crête qui masque l'objet le cache réellement).
+  Un doigt ou la souris fait tourner la vue (ou regarder autour en vue œil), la molette ou deux doigts zooment, un curseur règle l'exagération verticale (×1 à ×5, hors vue œil).
+  Les hauteurs d'œil et d'objet de la fenêtre s'appliquent aussi à la 3D. « Enregistrer l'image 3D » exporte la vue en PNG. Même limites que les profils : terrain nu, connexion nécessaire.
 - **Copie d'écran** : la légende (couleur + paramètres de chaque accès) est ajoutée en haut à gauche de l'image.
 - « Terminer » ferme l'outil : les triangles restent affichés ; rouvrir l'outil réaffiche la liste.
 
