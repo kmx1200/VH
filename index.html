@@ -3266,11 +3266,11 @@
     var enc=new TextEncoder(),parts=[],central=[],offset=0,d=new Date();
     var dt=(d.getHours()<<11)|(d.getMinutes()<<5)|(d.getSeconds()>>1),dd=((d.getFullYear()-1980)<<9)|((d.getMonth()+1)<<5)|d.getDate();
     files.forEach(function(f){
-      var name=enc.encode(f.name),crc=crc32(f.data),sz=f.data.length;
+      var name=enc.encode(f.name),dat=f.data||enc.encode(f.text!=null?f.text:(f.txt!=null?f.txt:"")),crc=crc32(dat),sz=dat.length;
       var h=new DataView(new ArrayBuffer(30));
       h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(10,dt,true);h.setUint16(12,dd,true);
       h.setUint32(14,crc,true);h.setUint32(18,sz,true);h.setUint32(22,sz,true);h.setUint16(26,name.length,true);
-      parts.push(new Uint8Array(h.buffer),name,f.data);
+      parts.push(new Uint8Array(h.buffer),name,dat);
       var c=new DataView(new ArrayBuffer(46));
       c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(12,dt,true);c.setUint16(14,dd,true);
       c.setUint32(16,crc,true);c.setUint32(20,sz,true);c.setUint32(24,sz,true);c.setUint16(28,name.length,true);c.setUint32(42,offset,true);
@@ -3519,27 +3519,6 @@
     }).join("\n");
   }
   // Export Excel (.xlsx) généré sur place, sans bibliothèque : un classeur est une archive zip (stockage sans compression) de quelques fichiers XML
-  function crc32(u){
-    var t=crc32.t;
-    if(!t){t=crc32.t=[];for(var n=0;n<256;n++){var c=n;for(var k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0;}}
-    var r=0xFFFFFFFF;for(var i=0;i<u.length;i++)r=t[(r^u[i])&255]^(r>>>8);
-    return (r^0xFFFFFFFF)>>>0;
-  }
-  function zipStore(files){
-    var enc=new TextEncoder(),parts=[],cen=[],off=0;
-    function u16(v){return[v&255,(v>>>8)&255];}
-    function u32(v){return[v&255,(v>>>8)&255,(v>>>16)&255,(v>>>24)&255];}
-    files.forEach(function(f){
-      var nm=enc.encode(f.name),d=enc.encode(f.text),crc=crc32(d),n=d.length;
-      var lh=new Uint8Array([].concat(u32(0x04034b50),u16(20),u16(0x0800),u16(0),u16(0),u16(0x21),u32(crc),u32(n),u32(n),u16(nm.length),u16(0)));
-      parts.push(lh,nm,d);
-      cen.push(new Uint8Array([].concat(u32(0x02014b50),u16(20),u16(20),u16(0x0800),u16(0),u16(0),u16(0x21),u32(crc),u32(n),u32(n),u16(nm.length),u16(0),u16(0),u16(0),u16(0),u32(0),u32(off))),nm);
-      off+=lh.length+nm.length+n;
-    });
-    var cs=0;cen.forEach(function(c){cs+=c.length;});
-    var end=new Uint8Array([].concat(u32(0x06054b50),u16(0),u16(0),u16(files.length),u16(files.length),u32(cs),u32(off),u16(0)));
-    return new Blob(parts.concat(cen,[end]),{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
-  }
   function logXlsx(a){   // classeur « Main courante » : en-tête figée et filtrable, date/heure et coordonnées numériques
     function esc(v){return String(v==null?"":v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
     var heads=["Date et heure","Lieu","Latitude","Longitude","Route","PR","Abscisse (m)","Destinataire","Objet","Canal","Lien itinéraire"],L="ABCDEFGHIJK";
@@ -3812,7 +3791,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 8.5";
+  $("appVer").textContent = "VHMaps — version 8.6";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
