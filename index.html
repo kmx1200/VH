@@ -479,9 +479,9 @@
     <div class="vtp-exag" id="vtp3dPanBox"><span>Se déplacer vers</span><button id="vtp3dPanA" class="ghost" type="button" aria-pressed="true">A</button><button id="vtp3dPanB" class="ghost" type="button" aria-pressed="false">B</button><input id="vtp3dPan" type="range" min="0" max="100" step="1" value="0" aria-label="Déplacement de P2 vers A ou B"><b id="vtp3dPanV">P2</b></div>
     <label class="vtp-exag" id="vtp3dExagBox">Relief exagéré<input id="vtp3dExag" type="range" min="1" max="5" step="0.5" value="2"><b id="vtp3dExagV">×2</b></label>
     <div id="vtp3dInfo"></div>
-    <p class="hint">Glisser : tourner (ou regarder autour en vue depuis l’œil) · molette ou deux doigts : zoom. Les hauteurs d’œil et d’objet ci-dessus s’appliquent aussi à la 3D. Relief : grille RGE ALTI® sur la zone des triangles, terrain nu ; la vue depuis l’œil montre si une crête masque l’objet, mais sans végétation ni bâti.</p>
+    <p class="hint">Glisser : tourner · molette ou deux doigts : zoom · Maj + glisser : déplacer. Les hauteurs d’œil et d’objet s’appliquent aussi à la 3D ; en vue depuis l’œil, on voit si une crête masque l’objet.</p>
   </div>
-  <p class="hint" style="margin-top:10px">Altitudes : RGE ALTI® (IGN, service d’altimétrie de la Géoplateforme), terrain nu. Végétation, clôtures, murs et bâtiments ne sont pas pris en compte : une visée dégagée ici ne garantit pas la visibilité réelle.</p>
+  <p class="hint" style="margin-top:10px">Altitudes : RGE ALTI® (IGN, Géoplateforme), terrain nu. Végétation, clôtures, murs et bâtiments ne sont pas pris en compte : une visée dégagée ici ne garantit pas la visibilité réelle.</p>
   <p class="hint" id="vtProfMsg" role="status" hidden></p>
   <div class="row"><button id="vtProfShot" disabled>Enregistrer l’image</button><button id="vtProfClose" class="ghost">Fermer</button></div>
 </dialog>
@@ -2926,7 +2926,7 @@
       var rx = Math.max(0, Math.min(cap.W - cw, mx - cw / 2)), ry = Math.max(0, Math.min(cap.H - ch, my - ch / 2));
       var OW = 820, M = 20, rw = OW - 2 * M, rh = rw * ch / cw, chH = rw * 220 / 640;
       var date = new Date().toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
-      var NOTE = "Altitudes : RGE ALTI® (IGN, service d’altimétrie de la Géoplateforme), terrain nu. Végétation, clôtures, murs et bâtiments ne sont pas pris en compte : une visée dégagée ici ne garantit pas la visibilité réelle.";
+      var NOTE = "Altitudes : RGE ALTI® (IGN, Géoplateforme), terrain nu. Végétation, clôtures, murs et bâtiments ne sont pas pris en compte : une visée dégagée ici ne garantit pas la visibilité réelle.";
       function paint(c, draw) {   // une passe de mesure (draw = false), puis une passe de dessin
         var y = M;
         c.textBaseline = "top";
@@ -3115,6 +3115,8 @@
     var cv = $("vtp3dCv"), c = vtProfCur, g = vt3.grid, cam = vt3.cam;
     if (!cv || !c || !g || !cam || vt3.tab !== "3") return;
     var dpr = Math.min(2, window.devicePixelRatio || 1), cw = cv.clientWidth || 640, ch = Math.round(cw * 0.68);
+    var dlg = $("vtProf");   // la fenêtre s'adapte : la hauteur de la vue 3D laisse la place au reste du contenu, pour éviter l'ascenseur
+    if (dlg && dlg.open) { var others = dlg.scrollHeight - cv.offsetHeight, avail = Math.floor(window.innerHeight * 0.9 - others - 2); ch = Math.max(150, Math.min(ch, avail)); }
     if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); cv.style.height = ch + "px"; }
     var ctx = cv.getContext("2d"), W = cw, H = ch;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
