@@ -719,6 +719,12 @@
       shareRoute({ lat: lastFix.lat, lng: lastFix.lon, label: "ma position" });
     };
     box.appendChild(btn);
+    var lb = document.createElement("button"); lb.type = "button"; lb.textContent = "Localiseur"; lb.style.display = "block"; lb.style.margin = "8px 0 0";
+    lb.onclick = function () {
+      if (!lastFix) { say("Position GPS non disponible pour le moment.", true); return; }
+      lzPos = null; lzOpen(L.latLng(lastFix.lat, lastFix.lon));   // nouvel arbre : position GPS actuelle
+    };
+    box.appendChild(lb);
     return box;
   }
 
@@ -2044,6 +2050,9 @@
       box.innerHTML = html + svLink(L.latLng(res[0].lat, res[0].lon)).replace(/^<br>/, "");
       var rm = document.createElement("a"); rm.href = "#"; rm.textContent = "Retirer le repère"; rm.style.display = "block";
       rm.onclick = function (ev) { ev.preventDefault(); if (pkPin) { map.removeLayer(pkPin); pkPin = null; } };
+      var lbp = document.createElement("button"); lbp.type = "button"; lbp.textContent = "Localiseur"; lbp.style.display = "block"; lbp.style.margin = "8px 0";
+      lbp.onclick = function () { lzOpen(L.latLng(res[0].lat, res[0].lon)); };
+      box.appendChild(lbp);
       box.appendChild(rm);
       pkPin = L.marker([res[0].lat, res[0].lon], { icon: L.divIcon({ className: "", html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [13, 31] }), keyboard: false })
         .addTo(map).bindPopup(box).openPopup();
