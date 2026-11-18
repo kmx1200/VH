@@ -105,6 +105,8 @@
   dialog input[type="range"] { width: 100%; }
   dialog .hint { font-size: .8rem; opacity: .75; margin: 0 0 8px; }
   dialog input[type="text"], dialog input[type="search"] { width:100%; box-sizing:border-box; font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--ink); }
+  dialog textarea { width:100%; box-sizing:border-box; font:inherit; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--ink); resize:vertical; }
+  dialog input[type="file"] { width:100%; box-sizing:border-box; font:inherit; font-size:.85rem; }
   #logList { list-style:none; margin:8px 0; padding:0; display:grid; gap:6px; max-height:45vh; overflow:auto; }
   #logList li { border:1px solid var(--line); border-radius:10px; padding:8px 10px; font-size:.84rem; display:grid; gap:4px; background:var(--surface); }
   #logList .lg-h { font-weight:700; }
@@ -464,6 +466,24 @@
   <div class="row" style="margin-top:8px"><button id="shareLogOpen" class="ghost">Main courante</button><button id="shareClose" class="ghost">Fermer</button></div>
 </dialog>
 
+<dialog id="lzDlg">
+  <h2>Localiseur — arbre mort</h2>
+  <p class="hint" id="lzPos"></p>
+  <div class="row" style="margin:0 0 10px"><button id="lzGps" class="ghost" style="flex:1">Actualiser la position GPS</button></div>
+  <label>Observation<textarea id="lzNote" rows="4" placeholder="Ex. : chêne mort, branches sur la piste, à abattre"></textarea></label>
+  <label>Photo<input id="lzPhotoIn" type="file" accept="image/*" capture="environment"></label>
+  <img id="lzThumb" alt="Aperçu de la photo" hidden style="max-width:100%;max-height:30vh;border-radius:10px;margin:0 0 10px">
+  <h3>Parcelle</h3>
+  <p class="hint" id="lzParcel">Aucune parcelle sélectionnée.</p>
+  <div class="row"><button id="lzPick" class="ghost" style="flex:1">Toucher la parcelle sur la carte</button></div>
+  <p class="hint" style="margin-top:6px">La couche « Parcelles cadastrales » s’active automatiquement. Connexion Internet nécessaire pour identifier la parcelle.</p>
+  <div class="row" style="margin-top:10px">
+    <button id="lzPdf" style="flex:1;color:#fff;background:var(--go)">Créer le PDF</button>
+    <button id="lzShare" class="ghost" hidden>Partager le PDF</button>
+  </div>
+  <div class="row" style="margin-top:8px"><button id="lzReset" class="ghost">Nouveau repérage</button><button id="lzClose" class="ghost">Fermer</button></div>
+</dialog>
+
 <dialog id="vtProf">
   <h2 id="vtProfTitle">Profils en long</h2>
   <div class="vtp-in">
@@ -711,7 +731,7 @@
       marker.bindPopup(mePopup);
     }
     marker.setLatLng([p.lat, p.lon]);
-    lastFix = p;
+    lastFix = p; lzAcc = c.accuracy;
     if (following && (c.accuracy <= MAX_ACCURACY || firstCenter)) { centerOn(p, firstCenter); firstCenter = false; }
     if (c.accuracy > MAX_ACCURACY) { say("Signal GPS faible (±" + Math.round(c.accuracy) + " m)…"); return; }
     if (typeof c.heading === "number" && !isNaN(c.heading) && (c.speed == null || c.speed > 0.5)) setHeading(c.heading);
@@ -2100,6 +2120,7 @@
     box.appendChild(sv);
     var guide=document.createElement("button"); guide.type="button"; guide.textContent="Démarrer le guidage"; guide.style.display="block"; guide.style.margin="8px 0"; guide.onclick=function(){startGuidance(r);}; box.appendChild(guide);
     var share=document.createElement("button"); share.type="button"; share.textContent="Partager l’itinéraire"; share.style.display="block"; share.onclick=function(){shareRoute();}; box.appendChild(share);
+    var lzb=document.createElement("button"); lzb.type="button"; lzb.textContent="Localiseur"; lzb.style.display="block"; lzb.style.margin="8px 0"; lzb.onclick=function(){lzOpen(L.latLng(r.lat,r.lon));}; box.appendChild(lzb);
     box.appendChild(rm);
     qPin = L.marker([r.lat, r.lon], { icon: L.divIcon({ className: "", html: '<div class="pin"></div>', iconSize: [26, 26], iconAnchor: [13, 31] }), keyboard: false })
       .addTo(map).bindPopup(box);
@@ -3892,7 +3913,7 @@
   }
   // État des outils relevé au « preclick », avant que leurs propres gestionnaires de clic ne se désactivent
   // (Street View, Localiser un PR, mesures, triangles de visibilité, recherche ouverte) : ce toucher-là leur appartient.
-  map.on("preclick", function () { cadSkip = !!(measureMode || svArmed || pkArmed || vtOn || !$("searchbar").hidden); });
+  map.on("preclick", function () { cadSkip = !!(measureMode || svArmed || pkArmed || vtOn || lzPick || !$("searchbar").hidden); });
   map.on("click", function (e) {
     if (!cadastreOn || cadSkip) return;
     if (e.sourceTarget && e.sourceTarget !== map) return;   // clic sur un tracé, un PR, une OLD… : leur propre fenêtre
@@ -3900,6 +3921,298 @@
     cadIdentify(e.latlng);
   });
   $("ovCadastre").addEventListener("change", function () { if (!this.checked) { cadSeq++; cadClear(); } });
+
+  // ---------- Localiseur : repérage d'un arbre mort (observation, photo, parcelle, PDF) ----------
+  // Ouvert depuis la fenêtre de la punaise. Position = GPS si la géolocalisation est active, sinon position de la punaise.
+  // La parcelle se choisit en touchant la carte (la couche « Parcelles cadastrales » est activée automatiquement).
+  var lzPos = null, lzPinPos = null, lzParcel = null, lzPhoto = null, lzPick = false, lzBar = null, lzBlob = null, lzBlobName = "", lzAcc = null, lzSeq = 0;
+  // @@PDF-START
+  // Générateur PDF minimal (Helvetica, JPEG, tracés vectoriels) : aucune bibliothèque externe, fonctionne hors ligne
+  var LZ_CP = { 8217: 0x92, 8216: 0x91, 8211: 0x96, 8212: 0x97, 8220: 0x93, 8221: 0x94, 8230: 0x85, 339: 0x9c, 338: 0x8c, 8364: 0x80, 8226: 0x95, 160: 32, 8239: 32, 8201: 32 };
+  var LZ_W = [278,278,355,556,556,889,667,191,333,333,389,584,278,333,278,278,556,556,556,556,556,556,556,556,556,556,278,278,584,584,584,556,1015,667,667,722,722,667,611,778,722,278,500,667,556,833,722,778,667,778,722,667,611,722,667,944,667,667,611,278,278,278,469,556,333,556,556,500,556,556,278,556,556,222,222,500,222,833,556,556,556,556,333,500,278,556,500,722,500,500,500,334,260,334,584];
+  function lzEnc(s) {   // texte -> octets WinAnsi (un caractère = un octet)
+    var o = "";
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (LZ_CP[c] !== undefined) c = LZ_CP[c]; else if (c > 255) c = 63; else if (c < 32) c = 32;
+      o += String.fromCharCode(c);
+    }
+    return o;
+  }
+  function lzEsc(s) { return lzEnc(s).replace(/[\\()]/g, "\\$&"); }
+  function lzBytes(s) { var b = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 255; return b; }
+  function lzTW(s, size) { var w = 0, e = lzEnc(s); for (var i = 0; i < e.length; i++) { var c = e.charCodeAt(i); w += (c >= 32 && c <= 126 ? LZ_W[c - 32] : 556); } return w * size / 1000; }
+  function lzWrap(s, size, maxW) {
+    var out = [];
+    String(s).split(/\r?\n/).forEach(function (par) {
+      var line = "";
+      par.split(/\s+/).forEach(function (w) {
+        if (!w) return;
+        while (lzTW(w, size) > maxW) {   // mot plus large que la ligne (adresse web…) : coupé
+          var k = w.length; while (k > 1 && lzTW(w.slice(0, k), size) > maxW) k--;
+          if (line) { out.push(line); line = ""; }
+          out.push(w.slice(0, k)); w = w.slice(k);
+        }
+        var t = line ? line + " " + w : w;
+        if (!line || lzTW(t, size) <= maxW) line = t; else { out.push(line); line = w; }
+      });
+      out.push(line);
+    });
+    return out;
+  }
+  function lzDrawPlan(out, geom, pt, x, y, w, h) {   // plan schématique : contour de la parcelle, position, échelle, nord
+    var n2 = function (v) { return (Math.round(v * 100) / 100).toString(); };
+    function T(s, tx, ty, size, g) { out.push((g || "0 g") + " BT /F1 " + n2(size) + " Tf " + n2(tx) + " " + n2(ty) + " Td (" + lzEsc(s) + ") Tj ET"); }
+    out.push("0.75 G 0.8 w " + n2(x) + " " + n2(y) + " " + n2(w) + " " + n2(h) + " re S");
+    var polys = geom ? (geom.type === "Polygon" ? [geom.coordinates] : geom.type === "MultiPolygon" ? geom.coordinates : []) : [];
+    if (!polys.length) { T("Parcelle non sélectionnée", x + 10, y + h / 2, 9, "0.5 g"); return; }
+    var k = Math.cos(pt.lat * Math.PI / 180), minx = pt.lng * k, maxx = minx, miny = pt.lat, maxy = miny;
+    polys.forEach(function (p) { p.forEach(function (ring) { ring.forEach(function (c) {
+      var qx = c[0] * k; if (qx < minx) minx = qx; if (qx > maxx) maxx = qx; if (c[1] < miny) miny = c[1]; if (c[1] > maxy) maxy = c[1];
+    }); }); });
+    var pad = 16, sw = w - 2 * pad, sh = h - 2 * pad - 10, dx = (maxx - minx) || 1e-6, dy = (maxy - miny) || 1e-6;
+    var s = Math.min(sw / dx, sh / dy), ox = x + pad + (sw - dx * s) / 2, oy = y + pad + 10 + (sh - dy * s) / 2;
+    function X(lng) { return ox + (lng * k - minx) * s; }
+    function Y(lat) { return oy + (lat - miny) * s; }
+    polys.forEach(function (p) {
+      var d = "";
+      p.forEach(function (ring) { ring.forEach(function (c, i) { d += n2(X(c[0])) + " " + n2(Y(c[1])) + (i ? " l " : " m "); }); d += "h "; });
+      out.push("1 0.94 0.85 rg 0.9 0.4 0 RG 1.4 w " + d + "B*");
+    });
+    var cx = X(pt.lng), cy = Y(pt.lat), r = 4.5, b = r * 0.5523;   // position : disque rouge
+    out.push("0.85 0.02 0.16 rg 1 G 1.2 w " + n2(cx + r) + " " + n2(cy) + " m " +
+      n2(cx + r) + " " + n2(cy + b) + " " + n2(cx + b) + " " + n2(cy + r) + " " + n2(cx) + " " + n2(cy + r) + " c " +
+      n2(cx - b) + " " + n2(cy + r) + " " + n2(cx - r) + " " + n2(cy + b) + " " + n2(cx - r) + " " + n2(cy) + " c " +
+      n2(cx - r) + " " + n2(cy - b) + " " + n2(cx - b) + " " + n2(cy - r) + " " + n2(cx) + " " + n2(cy - r) + " c " +
+      n2(cx + b) + " " + n2(cy - r) + " " + n2(cx + r) + " " + n2(cy - b) + " " + n2(cx + r) + " " + n2(cy) + " c B");
+    var pm = s / 111320, steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000], len = steps[0];   // barre d'échelle
+    steps.forEach(function (v) { if (v * pm <= 90) len = v; });
+    var bw = len * pm;
+    out.push("0 G 1.5 w " + n2(x + pad) + " " + n2(y + 9) + " m " + n2(x + pad + bw) + " " + n2(y + 9) + " l S " +
+      n2(x + pad) + " " + n2(y + 6) + " m " + n2(x + pad) + " " + n2(y + 12) + " l S " + n2(x + pad + bw) + " " + n2(y + 6) + " m " + n2(x + pad + bw) + " " + n2(y + 12) + " l S");
+    T(len + " m", x + pad + bw + 4, y + 7, 7.5);
+    var ax = x + w - 18, ay = y + h - 12;   // flèche du nord
+    out.push("0 g " + n2(ax) + " " + n2(ay) + " m " + n2(ax - 5) + " " + n2(ay - 13) + " l " + n2(ax + 5) + " " + n2(ay - 13) + " l f");
+    T("N", ax - 2.6, ay + 2, 8);
+  }
+  function lzBuildPdf(d) {   // d : { date, pos, note, parcel, photo, road, fileTitle }
+    var PW = 595, PH = 842, M = 42, pages = [], cur, y, GREEN = "0.078 0.204 0.184 rg";
+    var n2 = function (v) { return (Math.round(v * 100) / 100).toString(); };
+    function np() { cur = []; pages.push(cur); y = PH - M; }
+    function T(s, x, yy, size, bold, col) { cur.push((col || "0 g") + " BT /F" + (bold ? 2 : 1) + " " + n2(size) + " Tf " + n2(x) + " " + n2(yy) + " Td (" + lzEsc(s) + ") Tj ET"); }
+    function H(title) {
+      if (y < M + 70) np();
+      T(title, M, y, 12, true, GREEN);
+      cur.push("0.8 G 0.5 w " + M + " " + n2(y - 5) + " m " + (PW - M) + " " + n2(y - 5) + " l S");
+      y -= 23;
+    }
+    function row(label, value) {
+      var lines = lzWrap(value, 10.5, PW - 2 * M - 125);
+      if (y - lines.length * 14 < M + 20) np();
+      T(label, M, y, 10.5, true);
+      lines.forEach(function (l) { T(l, M + 125, y, 10.5, false); y -= 14; });
+      y -= 3;
+    }
+    var when = ""; try { when = d.date.toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" }); } catch (e) { when = d.date.toISOString(); }
+    np();
+    cur.push(GREEN + " 0 " + (PH - 64) + " " + PW + " 64 re f");
+    T("Fiche de localisation — arbre mort", M, PH - 31, 17, true, "1 g");
+    T("VHMaps · " + when, M, PH - 51, 9.5, false, "0.85 g");
+    y = PH - 64 - 28;
+    H("Localisation");
+    row("Date et heure", when);
+    row("Coordonnées", d.pos.lat.toFixed(6) + ", " + d.pos.lng.toFixed(6) + "  (WGS 84, degrés décimaux)");
+    row("Source", d.pos.gps ? "GPS de l’appareil" + (d.pos.acc ? " (précision ± " + Math.round(d.pos.acc) + " m)" : "") : "Position de la punaise sur la carte (GPS inactif)");
+    if (d.road) row("Route / PR", d.road);
+    row("Lien carte", "https://www.google.com/maps?q=" + d.pos.lat.toFixed(6) + "," + d.pos.lng.toFixed(6));
+    y -= 6; H("Parcelle cadastrale");
+    if (d.parcel) {
+      var pr = d.parcel.properties || {}, num = /^\d+$/.test(pr.numero || "") ? String(parseInt(pr.numero, 10)) : (pr.numero || "?"), m2 = Number(pr.contenance) || 0;
+      row("Commune", (pr.nom_com || "—") + (pr.code_insee ? " (INSEE " + pr.code_insee + ")" : ""));
+      row("Section / numéro", (pr.section || "?").replace(/^0+(?=\w)/, "") + " " + num);
+      row("Contenance", m2 ? m2.toLocaleString("fr-FR") + " m² (" + (m2 / 10000).toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " ha)" : "non renseignée");
+      row("Référence (IDU)", pr.idu || "—");
+      T("Source : Parcellaire Express, IGN. Référence indicative, à confirmer au cadastre.", M, y + 2, 8, false, "0.45 g"); y -= 12;
+    } else row("Parcelle", "Non renseignée");
+    y -= 6; H("Observation");
+    var nl = d.note ? lzWrap(d.note, 11, PW - 2 * M) : ["—"];
+    nl.forEach(function (l) { if (y < M + 24) np(); T(l, M, y, 11, false); y -= 15; });
+    y -= 10;
+    if (y < M + 250) np();
+    H("Plan et photo");
+    var BW = 250, BH = 200, gap = PW - 2 * M - 2 * BW;
+    T("Plan schématique (nord en haut)", M, y, 8, false, "0.45 g");
+    T("Photo", M + BW + gap, y, 8, false, "0.45 g");
+    var by = y - 8 - BH;
+    lzDrawPlan(cur, d.parcel && d.parcel.geometry, d.pos, M, by, BW, BH);
+    var px = M + BW + gap;
+    cur.push("0.75 G 0.8 w " + px + " " + n2(by) + " " + BW + " " + BH + " re S");
+    if (d.photo) {
+      var sc = Math.min((BW - 4) / d.photo.w, (BH - 4) / d.photo.h), iw = d.photo.w * sc, ih = d.photo.h * sc;
+      cur.push("q " + n2(iw) + " 0 0 " + n2(ih) + " " + n2(px + (BW - iw) / 2) + " " + n2(by + (BH - ih) / 2) + " cm /Im1 Do Q");
+    } else T("Aucune photo", px + 10, by + BH / 2, 9, false, "0.5 g");
+    y = by - 14;
+    pages.forEach(function (p, i) { p.push("0 g"); var s = "VHMaps — fiche de localisation · page " + (i + 1) + "/" + pages.length; p.push("0.5 g BT /F1 8 Tf " + M + " 22 Td (" + lzEsc(s) + ") Tj ET"); });
+
+    var chunks = [], off = 0, xref = [], hasImg = !!d.photo, first = hasImg ? 6 : 5;
+    function put(s) { var b = typeof s === "string" ? lzBytes(s) : s; chunks.push(b); off += b.length; }
+    function obj(id, parts) { xref[id] = off; put(id + " 0 obj\n"); parts.forEach(put); put("\nendobj\n"); }
+    var kids = pages.map(function (p, i) { return (first + 2 * i) + " 0 R"; }).join(" ");
+    var res = "<< /Font << /F1 3 0 R /F2 4 0 R >>" + (hasImg ? " /XObject << /Im1 5 0 R >>" : "") + " >>";
+    put("%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n");
+    obj(1, ["<< /Type /Catalog /Pages 2 0 R >>"]);
+    obj(2, ["<< /Type /Pages /Kids [" + kids + "] /Count " + pages.length + " >>"]);
+    obj(3, ["<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"]);
+    obj(4, ["<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"]);
+    if (hasImg) obj(5, ["<< /Type /XObject /Subtype /Image /Width " + d.photo.w + " /Height " + d.photo.h + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + d.photo.bytes.length + " >>\nstream\n", d.photo.bytes, "\nendstream"]);
+    pages.forEach(function (p, i) {
+      var pid = first + 2 * i, s = p.join("\n");
+      obj(pid, ["<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] /Resources " + res + " /Contents " + (pid + 1) + " 0 R >>"]);
+      obj(pid + 1, ["<< /Length " + s.length + " >>\nstream\n", s, "\nendstream"]);
+    });
+    var infoId = first + 2 * pages.length, dt = d.date, p2 = function (v) { return (v < 10 ? "0" : "") + v; };
+    obj(infoId, ["<< /Title (" + lzEsc(d.fileTitle || "Fiche de localisation") + ") /Producer (VHMaps) /CreationDate (D:" + dt.getFullYear() + p2(dt.getMonth() + 1) + p2(dt.getDate()) + p2(dt.getHours()) + p2(dt.getMinutes()) + p2(dt.getSeconds()) + ") >>"]);
+    var xpos = off, size = infoId + 1, x = "xref\n0 " + size + "\n0000000000 65535 f \n";
+    for (var i = 1; i < size; i++) x += ("0000000000" + xref[i]).slice(-10) + " 00000 n \n";
+    put(x + "trailer\n<< /Size " + size + " /Root 1 0 R /Info " + infoId + " 0 R >>\nstartxref\n" + xpos + "\n%%EOF\n");
+    return new Blob(chunks, { type: "application/pdf" });
+  }
+  // @@PDF-END
+  function lzSetPos() {
+    if (locating && lastFix) lzPos = { lat: lastFix.lat, lng: lastFix.lon, acc: lzAcc, gps: true };
+    else if (lzPinPos) lzPos = { lat: lzPinPos.lat, lng: lzPinPos.lng, gps: false };
+    else lzPos = null;
+  }
+  function lzParcelText(f) {
+    var pr = f.properties || {}, r = cadRef(pr), m2 = Number(pr.contenance) || 0;
+    return (pr.nom_com || "Commune ?") + " — section " + r.sec + " n° " + r.num + (m2 ? " — " + m2.toLocaleString("fr-FR") + " m²" : "") + (pr.idu ? " (" + pr.idu + ")" : "");
+  }
+  function lzRender() {
+    $("lzPos").textContent = !lzPos ? "Position indisponible : activez la géolocalisation (bouton réticule) ou ouvrez le localiseur depuis la punaise."
+      : (lzPos.gps ? "Position GPS : " : "Position de la punaise (GPS inactif) : ") + lzPos.lat.toFixed(6) + ", " + lzPos.lng.toFixed(6) + (lzPos.acc ? " (± " + Math.round(lzPos.acc) + " m)" : "");
+    $("lzParcel").textContent = lzParcel ? lzParcelText(lzParcel) : "Aucune parcelle sélectionnée.";
+    var t = $("lzThumb");
+    if (lzPhoto) { t.src = lzPhoto.url; t.hidden = false; } else { t.hidden = true; t.removeAttribute("src"); }
+    $("lzShare").hidden = !lzBlob;
+  }
+  function lzShow() { lzRender(); var dlg = $("lzDlg"); if (!dlg.open) { if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", ""); } }
+  function lzDirty() { lzBlob = null; $("lzShare").hidden = true; }
+  function lzOpen(ll) {
+    lzPinPos = ll;
+    if (!lzPos || !lzPos.gps) lzSetPos();
+    map.closePopup();
+    lzShow();
+  }
+  function lzBarShow(on) {
+    if (on && !lzBar) {
+      lzBar = document.createElement("div");
+      lzBar.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sheet-h,0px) + 70px);z-index:1200;display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:14px;background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:0 2px 8px rgba(20,52,47,.3);font-size:.85rem";
+      var sp = document.createElement("span"), b = document.createElement("button");
+      sp.textContent = "Touchez la parcelle concernée";
+      b.type = "button"; b.textContent = "Annuler"; b.className = "ghost"; b.style.padding = "8px 12px";
+      b.onclick = function () { lzPick = false; lzBarShow(false); say("Sélection de la parcelle annulée."); lzShow(); };
+      lzBar.appendChild(sp); lzBar.appendChild(b); document.body.appendChild(lzBar);
+    }
+    if (lzBar) lzBar.hidden = !on;
+  }
+  function lzQueryParcel(ll) {   // même requête WFS que l'identification au toucher ; renvoie l'entité GeoJSON ou null
+    var d = 0.00002, q = new URLSearchParams({ SERVICE: "WFS", VERSION: "2.0.0", REQUEST: "GetFeature", TYPENAMES: CAD_TYPE,
+      OUTPUTFORMAT: "application/json", SRSNAME: "EPSG:4326", COUNT: "10",
+      BBOX: (ll.lat - d) + "," + (ll.lng - d) + "," + (ll.lat + d) + "," + (ll.lng + d) + ",urn:ogc:def:crs:EPSG::4326" });
+    return fetch(CAD_WFS + "?" + q).then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); }).then(function (gj) {
+      var fs = (gj && gj.features) || [];
+      for (var i = 0; i < fs.length; i++) if (fs[i].geometry && cadInGeom(ll.lng, ll.lat, fs[i].geometry)) return fs[i];
+      return null;
+    });
+  }
+  function lzRoad(ll) {   // route + PR si la position est à moins de 40 m du référentiel (données locales, hors ligne possible)
+    try {
+      return qIndex().then(function (idx) {
+        var res = pkFind(ll, idx, 40);
+        if (!res.length) return "";
+        var r = res[0];
+        return "Sur " + logRd({ route: shortRoute(r.e.axe), axe: r.e.axe, pr: r.pr, m: r.m, approx: !!r.approx });
+      }).catch(function () { return ""; });
+    } catch (e) { return Promise.resolve(""); }
+  }
+  $("lzPick").onclick = function () {
+    $("lzDlg").close();
+    if (!cadastreOn) {   // couche parcelles activée automatiquement
+      cadastreOn = true; $("ovCadastre").checked = true; syncCadastre();
+      try { localStorage.setItem("vhmaps-cadastre", "1"); } catch (e) {}
+    }
+    if (map.getZoom() < CAD_MINZOOM) map.setView(lzPos ? [lzPos.lat, lzPos.lng] : map.getCenter(), 17);
+    lzPick = true; lzBarShow(true);
+    say("Touchez la parcelle concernée sur la carte.");
+  };
+  map.on("click", function (e) {
+    if (!lzPick) return;
+    if (map.getZoom() < CAD_MINZOOM) { say("Zoomez davantage (niveau " + CAD_MINZOOM + " ou plus) puis touchez la parcelle.", true); return; }
+    lzPick = false; lzBarShow(false);
+    var seq = ++lzSeq;
+    say("Recherche de la parcelle…");
+    lzQueryParcel(e.latlng).then(function (f) {
+      if (seq !== lzSeq) return;
+      if (!f) say("Aucune parcelle à cet endroit (voirie ou domaine public non cadastré).", true);
+      else { lzParcel = f; lzDirty(); say("Parcelle : " + lzParcelText(f)); }
+      lzShow();
+    }).catch(function () {
+      if (seq !== lzSeq) return;
+      say("Parcelle : le service cadastral IGN ne répond pas (connexion Internet nécessaire).", true);
+      lzShow();
+    });
+  });
+  $("lzPhotoIn").onchange = function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    var url = URL.createObjectURL(f), img = new Image();
+    img.onload = function () {
+      var m = 1600, s = Math.min(1, m / Math.max(img.naturalWidth, img.naturalHeight)), w = Math.max(1, Math.round(img.naturalWidth * s)), h = Math.max(1, Math.round(img.naturalHeight * s));
+      var c = document.createElement("canvas"); c.width = w; c.height = h;
+      var x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, w, h); x.drawImage(img, 0, 0, w, h);
+      var data = c.toDataURL("image/jpeg", 0.82), bin = atob(data.split(",")[1]), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      lzPhoto = { w: w, h: h, bytes: bytes, url: data };
+      URL.revokeObjectURL(url); lzDirty(); lzRender(); say("Photo ajoutée.");
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); say("Photo illisible.", true); };
+    img.src = url;
+  };
+  $("lzNote").oninput = lzDirty;
+  $("lzGps").onclick = function () {
+    if (!(locating && lastFix)) { say("Position GPS non disponible : activez la géolocalisation (bouton réticule).", true); return; }
+    lzSetPos(); lzDirty(); lzRender(); say("Position actualisée.");
+  };
+  $("lzPdf").onclick = function () {
+    if (!lzPos) { say("Position indisponible : impossible de créer la fiche.", true); return; }
+    var btn = this; btn.disabled = true;
+    var now = new Date(), p2 = function (v) { return (v < 10 ? "0" : "") + v; };
+    var name = "arbre-mort-" + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + "-" + p2(now.getHours()) + p2(now.getMinutes()) + ".pdf";
+    say("Création du PDF…");
+    lzRoad(L.latLng(lzPos.lat, lzPos.lng)).then(function (road) {
+      var blob = lzBuildPdf({ date: now, pos: lzPos, note: $("lzNote").value.trim(), parcel: lzParcel, photo: lzPhoto, road: road, fileTitle: "Fiche de localisation — arbre mort" });
+      lzBlob = blob; lzBlobName = name;
+      var u = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(u); }, 5000);
+      var canShare = false;
+      try { canShare = !!(navigator.canShare && navigator.canShare({ files: [new File([blob], name, { type: "application/pdf" })] })); } catch (e) {}
+      $("lzShare").hidden = !canShare;
+      say("PDF créé : " + name);
+    }).catch(function (err) { say("Création du PDF impossible : " + (err && err.message || err), true); })
+      .then(function () { btn.disabled = false; });
+  };
+  $("lzShare").onclick = function () {
+    if (!lzBlob) return;
+    var f = new File([lzBlob], lzBlobName, { type: "application/pdf" });
+    navigator.share({ files: [f], title: "Fiche de localisation — arbre mort" }).catch(function (err) { if (err && err.name !== "AbortError") say("Partage impossible. Le PDF est dans vos téléchargements.", true); });
+  };
+  $("lzReset").onclick = function () {
+    if (!confirm("Effacer ce repérage (observation, photo, parcelle) ?")) return;
+    lzPos = null; lzParcel = null; lzPhoto = null; lzBlob = null; $("lzNote").value = ""; $("lzPhotoIn").value = "";
+    lzSetPos(); lzRender(); say("Repérage effacé.");
+  };
+  $("lzClose").onclick = function () { $("lzDlg").close(); };
 
   // ---------- Guidage et partage ----------
   var destination=null,guidanceLine=null,guidanceMarker=null,guidanceOrigin=null,guidanceWatch=null;
@@ -4194,7 +4507,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 8.9";
+  $("appVer").textContent = "VHMaps — version 9.0";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
