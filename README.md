@@ -11,7 +11,7 @@ manifest.json
 sw.js                 ← service worker (hors ligne)
 itineraires.json      ← liste des circuits (obligatoire hors GitHub Pages, ex. Cloudflare) ; générée par outils/generer_itineraires.py
 itineraires/          ← déposer ici les fichiers .gpx
-donnees/              ← dalle (fond de plan), référentiel routier, PR, carte SCAN 25 (donnees/scan25/)
+donnees/              ← dalle (fond de plan), référentiel routier, PR, carte SCAN 25 (donnees/scan25/), parcelles publiques (donnees/parcelles/)
 outils/               ← script de préparation des données (non publié obligatoirement)
 icons/
 .nojekyll
@@ -184,6 +184,23 @@ Fonctionne hors ligne (données enregistrées dans le téléphone après le prem
 
 ```
 python outils/preparer_trafic.py TraficSE2025.gpkg donnees/trafic.json
+```
+
+## Superposition : parcelles publiques
+
+Dans le dialogue « Cartes » : cocher « Parcelles publiques (couleur par propriétaire) » (curseur d'opacité juste dessous). Les parcelles de
+`donnees/parcelles/` (extrait `parcellePubliqueSe.gpkg`, 37 991 parcelles, 106 communes, source DGI) s'affichent **à partir du zoom 13**, colorées comme la
+légende QGIS « Cadastre parcelles mission publique » : Commune (orange clair), Département (violet), Etat (marron), Office HLM (turquoise),
+Région (bleu-violet), Mission publique (vert olive : établissements publics, EPCI, SNCF, SAFER, syndicats… c'est-à-dire tout ce qui n'est pas dans les cinq autres classes).
+La légende s'affiche à gauche. Toucher une parcelle affiche son numéro (section + numéro), sa catégorie, le propriétaire, sa surface et le code INSEE de la commune.
+La couche se place **sous** l'OLD, le référentiel, les agglomérations, les trafics et les PR. Réglages : `PARC_MINZOOM` dans `index.html`, couleurs et catégories dans `outils/preparer_parcelles.py`.
+
+Un fichier par commune (`donnees/parcelles/<INSEE>.json`, ≤ 1,1 Mo) est chargé à la demande pour la zone affichée, puis conservé dans le téléphone par le service worker
+(hors ligne : seules les communes déjà consultées sont disponibles). Pour mettre à jour la couche :
+
+```
+pip install pyproj shapely
+python outils/preparer_parcelles.py parcellePubliqueSe.gpkg
 ```
 
 ## Bouton position (réticule)
