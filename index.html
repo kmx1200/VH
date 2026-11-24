@@ -326,7 +326,7 @@
   <div id="vtHead"><b>Triangles de visibilité</b><span id="vtValue"></span></div>
   <div id="vtChoices"></div>
   <ul id="vtList" hidden></ul>
-  <div class="row"><button id="vtValid" class="ghost" data-tip="Valider la modification de cet accès" hidden>✓ Valider la modification</button><button id="vtUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="vtParams" class="ghost" data-tip="Changer l’accès, la vitesse ou le temps de réaction de l’accès en cours (les points sont ramenés sur les nouveaux cercles)">Paramètres</button><button id="vtReset" class="ghost" data-tip="Effacer tous les triangles de la carte">Effacer</button><button id="vtClose" class="ghost" data-tip="Terminer : ferme l’outil, les triangles restent affichés">Terminer</button></div>
+  <div class="row"><button id="vtValid" class="ghost" data-tip="Valider la modification de cet accès" hidden>✓ Valider la modification</button><button id="vtUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="vtParams" class="ghost" data-tip="Changer l’accès, la vitesse ou le temps de réaction de l’accès en cours (les points sont ramenés sur les nouveaux cercles)">Paramètres</button><button id="vtQgis" class="ghost" data-tip="Exporter les accès pour QGIS (zip : droites et points en GeoJSON WGS84 + style .qml, une couleur par accès)" disabled>Export QGIS</button><button id="vtReset" class="ghost" data-tip="Effacer tous les triangles de la carte">Effacer</button><button id="vtClose" class="ghost" data-tip="Terminer : ferme l’outil, les triangles restent affichés">Terminer</button></div>
 </div>
 <div id="measurePanel" class="measure-panel" hidden>
   <div id="measureHead"><b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span><button id="measureFold" class="ghost" aria-expanded="true" aria-label="Réduire la fenêtre de mesure" title="Réduire pour mieux voir la carte (les tracés sont conservés)">▾</button></div>
@@ -1800,7 +1800,12 @@
   $("rcXls").onclick = function () {
     try { recDownload(recBuildXlsx(), "vhmaps-recensement-" + recDay() + ".xlsx"); } catch (e) { shotToast("Échec de l’export Excel."); if (window.console) console.error(e); }
   };
-  $("rcGeo").onclick = function () { recDownload(new Blob([recBuildGeo()], { type: "application/geo+json" }), "vhmaps-recensement-" + recDay() + ".geojson"); };
+  $("rcGeo").onclick = function () {
+    try {
+      qgisZipDl([{ name: "recensement_lineaire.geojson", txt: recBuildGeo() }, { name: "recensement_lineaire.qml", txt: qgisQml("line", "142,36,170") }], "vhmaps-recensement-qgis-" + recDay() + ".zip");
+      shotToast("Export QGIS généré. Extrayez le zip avant d’ouvrir le .geojson dans QGIS.");
+    } catch (e) { shotToast("Échec de l’export QGIS."); if (window.console) console.error(e); }
+  };
   $("rcClear").onclick = function () {
     if (!rec.segs.length || !confirm("Effacer les " + rec.segs.length + " segment(s) recensé(s) ?")) return;
     rec.segs = []; recDrawAll(); recSave(); recUi(); recLive("Recensement effacé.");
@@ -2663,6 +2668,7 @@
     $("vtParams").disabled = false;
     $("vtUndo").disabled = !(vtCur.p1 || (vtDone.length && vtCur.at < 0));
     $("vtReset").disabled = !(vtCur.p1 || vtDone.length);
+    $("vtQgis").disabled = !vtAllSets().length;
   }
   function vtPick(ll) {
     if (!vtOn) return;
@@ -2803,6 +2809,37 @@
     vtDone = []; vtCur = vtNew(); vtRender();
   };
   $("vtClose").onclick = vtStop;
+  // Export QGIS des triangles de visibilité : droites (P1–P2 = recul ; P2–A / P2–B = distance de visibilité) + points, une couleur par accès
+  function vtAllSets() {   // accès validés + accès en cours s'il est exploitable, dans l'ordre de la liste (numérotation identique)
+    var r = vtDone.slice();
+    if (vtCur.p1 && vtCur.p2 && vtCur.tris.length && !vtCur.old.length) r.splice(vtCur.at >= 0 ? Math.min(vtCur.at, r.length) : r.length, 0, vtSet());
+    return r;
+  }
+  function vtBuildGeo() {
+    var sets = vtAllSets(), lf = [], pf = [], crs = { type: "name", properties: { name: "urn:ogc:def:crs:OGC:1.3:CRS84" } };
+    function xy(q) { return [Math.round(q.lng * 1e7) / 1e7, Math.round(q.lat * 1e7) / 1e7]; }
+    sets.forEach(function (s, i) {
+      var base = { acces: i + 1, couleur: s.color, type_acces: s.access ? VT_ACCESS[s.access].label : "", recul_m: Math.round(s.recul * 10) / 10, vitesse_kmh: s.speed || null, temps_s: s.time || null, dist_vis_m: Math.round((s.dist || 0) * 10) / 10 };
+      function L1(a, b, type, nom) { lf.push({ type: "Feature", properties: Object.assign({ nom: nom, type: type, long_m: Math.round(a.distanceTo(b) * 10) / 10 }, base), geometry: { type: "LineString", coordinates: [xy(a), xy(b)] } }); }
+      function P1(q, role) { pf.push({ type: "Feature", properties: { acces: i + 1, couleur: s.color, role: role }, geometry: { type: "Point", coordinates: xy(q) } }); }
+      L1(s.p1, s.p2, "recul", "Accès " + (i + 1) + " · recul P1–P2");
+      s.tris.forEach(function (t, k) { var n = k ? "B" : "A"; L1(s.p2, t, "visibilite", "Accès " + (i + 1) + " · visibilité " + n); P1(t, n); });
+      P1(s.p1, "P1"); P1(s.p2, "P2");
+    });
+    return { lines: JSON.stringify({ type: "FeatureCollection", name: "triangles_visibilite_droites", crs: crs, features: lf }),
+             points: JSON.stringify({ type: "FeatureCollection", name: "triangles_visibilite_points", crs: crs, features: pf }) };
+  }
+  $("vtQgis").onclick = function () {
+    if (!vtAllSets().length) { say("Aucun accès complet à exporter.", true); return; }
+    try {
+      var g = vtBuildGeo();
+      qgisZipDl([
+        { name: "triangles_visibilite_droites.geojson", txt: g.lines }, { name: "triangles_visibilite_droites.qml", txt: qgisQml("line", "124,58,237", "couleur") },
+        { name: "triangles_visibilite_points.geojson", txt: g.points }, { name: "triangles_visibilite_points.qml", txt: qgisQml("point", "124,58,237", "couleur") }
+      ], "vhmaps-triangles-visibilite-qgis-" + new Date().toISOString().slice(0, 10) + ".zip");
+      say("Export QGIS généré (" + vtAllSets().length + " accès). Extrayez le zip avant d’ouvrir les .geojson dans QGIS.");
+    } catch (e) { say("Échec de l'export QGIS.", true); if (window.console) console.error(e); }
+  };
   // Liste des accès : zoom, modification ou suppression individuelle
   $("vtList").onclick = function (e) {
     var t = e.target.closest("button"); if (!t) return;
@@ -3829,17 +3866,28 @@
 
   // ---------- Export QGIS : archive .zip = GeoJSON (WGS84) + style .qml rouge par type de mesure (lignes, surfaces) ----------
   // QGIS applique automatiquement le .qml de même nom que le .geojson à l'ouverture de la couche (extraire le zip d'abord).
-  function qgisQml(kind){
-    var X='<!DOCTYPE qgis PUBLIC \'http://mrcc.com/qgis.dtd\' \'SYSTEM\'>\n',O=function(n,v){return '<Option name="'+n+'" type="QString" value="'+v+'"/>';};
-    var sym=kind==="line"
-      ?'<symbol type="line" name="0" alpha="1" force_rhr="0" clip_to_extent="1"><layer class="SimpleLine" enabled="1" locked="0" pass="0"><Option type="Map">'+
-        O("line_color","217,4,41,255")+O("line_width","0.8")+O("line_width_unit","MM")+O("line_style","solid")+O("capstyle","round")+O("joinstyle","round")+O("use_custom_dash","0")+
-        '</Option></layer></symbol>'
-      :'<symbol type="fill" name="0" alpha="1" force_rhr="0" clip_to_extent="1"><layer class="SimpleFill" enabled="1" locked="0" pass="0"><Option type="Map">'+
-        O("color","217,4,41,70")+O("style","solid")+O("outline_color","217,4,41,255")+O("outline_style","solid")+O("outline_width","0.7")+O("outline_width_unit","MM")+O("joinstyle","round")+
+  function qgisQml(kind,rgb,ddField){   // kind : line | area | point ; rgb « r,g,b » (rouge par défaut) ; ddField : champ portant une couleur #rrggbb propre à chaque entité
+    var X='<!DOCTYPE qgis PUBLIC \'http://mrcc.com/qgis.dtd\' \'SYSTEM\'>\n',O=function(n,v){return '<Option name="'+n+'" type="QString" value="'+v+'"/>';},c=rgb||"217,4,41";
+    function dd(prop){return ddField?'<data_defined_properties><Option type="Map"><Option name="name" type="QString" value=""/><Option name="properties" type="Map"><Option name="'+prop+'" type="Map"><Option name="active" type="bool" value="true"/><Option name="field" type="QString" value="'+ddField+'"/><Option name="type" type="int" value="2"/></Option></Option><Option name="type" type="QString" value="collection"/></Option></data_defined_properties>':'';}
+    var sym;
+    if(kind==="line")sym='<symbol type="line" name="0" alpha="1" force_rhr="0" clip_to_extent="1"><layer class="SimpleLine" enabled="1" locked="0" pass="0"><Option type="Map">'+
+        O("line_color",c+",255")+O("line_width",ddField?"1":"0.8")+O("line_width_unit","MM")+O("line_style","solid")+O("capstyle","round")+O("joinstyle","round")+O("use_custom_dash","0")+
+        '</Option>'+dd("outlineColor")+'</layer></symbol>';
+    else if(kind==="point")sym='<symbol type="marker" name="0" alpha="1" force_rhr="0" clip_to_extent="1"><layer class="SimpleMarker" enabled="1" locked="0" pass="0"><Option type="Map">'+
+        O("name","circle")+O("color",c+",255")+O("outline_color","255,255,255,255")+O("outline_style","solid")+O("outline_width","0.5")+O("outline_width_unit","MM")+O("size","3")+O("size_unit","MM")+
+        '</Option>'+dd("fillColor")+'</layer></symbol>';
+    else sym='<symbol type="fill" name="0" alpha="1" force_rhr="0" clip_to_extent="1"><layer class="SimpleFill" enabled="1" locked="0" pass="0"><Option type="Map">'+
+        O("color",c+",70")+O("style","solid")+O("outline_color",c+",255")+O("outline_style","solid")+O("outline_width","0.7")+O("outline_width_unit","MM")+O("joinstyle","round")+
         '</Option></layer></symbol>';
     return X+'<qgis version="3.40.0" styleCategories="Symbology"><renderer-v2 type="singleSymbol" symbollevels="0" enableorderby="0" forceraster="0" referencescale="-1"><symbols>'+sym+
       '</symbols><rotation/><sizescale/></renderer-v2></qgis>';
+  }
+  function qgisZipDl(files,name){   // files : [{name, txt}] -> archive .zip téléchargée (GeoJSON + styles .qml)
+    var enc=new TextEncoder();
+    files.forEach(function(f){f.data=enc.encode(f.txt);});
+    var blob=new Blob([zipStore(files)],{type:"application/zip"}),u=URL.createObjectURL(blob),a=document.createElement("a");
+    a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(u);},4000);
   }
   function geoNum(v){return Math.round(v*1e7)/1e7;}
   function buildLinesGeo(lines){
@@ -4579,7 +4627,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 9.3";
+  $("appVer").textContent = "VHMaps — version 9.4";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
