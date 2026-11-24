@@ -332,7 +332,7 @@
   <div id="measureHead"><b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span><button id="measureFold" class="ghost" aria-expanded="true" aria-label="Réduire la fenêtre de mesure" title="Réduire pour mieux voir la carte (les tracés sont conservés)">▾</button></div>
   <div id="measureTotals" hidden></div>
   <ul id="measureList" hidden></ul>
-  <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx) ; en accrochage RD, les PR et abscisses sont calculés" disabled>Export Excel</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
+  <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx) ; en accrochage RD, les PR et abscisses sont calculés" disabled>Export Excel</button><button id="measureQgis" class="ghost" data-tip="Exporter les tracés linéaires pour QGIS (GeoJSON, WGS84) : géométrie suivant la route en accrochage RD, longueur, PR et abscisses en attributs" disabled>Export QGIS</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
   <div class="ms-modes" id="measureSnapRow" role="group" aria-label="Mode de la mesure linéaire">
     <button id="measureModeSnap" class="ghost" aria-pressed="true" data-tip="Les points s’accrochent au référentiel (RD) et la mesure suit la route">Accrochage RD</button>
     <button id="measureModeFree" class="ghost" aria-pressed="false" data-tip="Points libres : aucune contrainte d’accrochage, segments droits">Libre</button>
@@ -3452,7 +3452,7 @@
     var box=$("measureTotals");
     box.hidden=!(nl+na>1);   // un seul tracé : le total serait redondant
     box.textContent=parts.join(" · ");
-    $("measureXls").disabled=!(nl+na);
+    $("measureXls").disabled=!(nl+na);$("measureQgis").disabled=!nl;
   }
   function commitMeasure(){
     if(!measureValid(measureType,measurePoints))return false;
@@ -3826,6 +3826,36 @@
     say("Export Excel généré ("+all.length+" mesure"+(all.length>1?"s":"")+").");
   }
   $("measureXls").onclick=exportMeasuresXlsx;
+
+  // ---------- Export QGIS (GeoJSON, WGS84) des mesures linéaires ----------
+  function buildMeasuresGeo(lines){
+    return JSON.stringify({
+      type:"FeatureCollection",name:"mesures_lineaires",
+      crs:{type:"name",properties:{name:"urn:ogc:def:crs:OGC:1.3:CRS84"}},
+      features:lines.map(function(m,i){
+        var pts=m.points,d=r2(measureLength(pts)),c=msLineCells(pts[0],pts[pts.length-1]),g=measureGeom(pts);
+        var a=toLambert93(pts[0].lat,pts[0].lng),b=toLambert93(pts[pts.length-1].lat,pts[pts.length-1].lng);
+        return {type:"Feature",properties:{
+          num:i+1,nom:"Distance "+(i+1),long_m:d,long_km:Math.round(d)/1000,nb_points:pts.length,
+          route:c[0]||"",pr_deb:c[1],abs_deb_m:c[2],pr_fin:c[3],abs_fin_m:c[4],remarque:c[5]||"",
+          mode:pts.some(function(p){return p.snap;})?"accroche RD":"libre",
+          x_deb_l93:r2(a.x),y_deb_l93:r2(a.y),x_fin_l93:r2(b.x),y_fin_l93:r2(b.y)},
+          geometry:{type:"LineString",coordinates:g.map(function(p){return [Math.round(p.lng*1e7)/1e7,Math.round(p.lat*1e7)/1e7];})}};
+      })
+    });
+  }
+  function exportMeasuresQgis(){
+    var lines=allMeasures().filter(function(m){return m.type!=="area";});
+    if(!lines.length){say("Aucune mesure linéaire à exporter.",true);return;}
+    try{
+      var blob=new Blob([buildMeasuresGeo(lines)],{type:"application/geo+json"}),u=URL.createObjectURL(blob),a=document.createElement("a");
+      a.href=u;a.download="vhmaps-mesures-lineaires-"+new Date().toISOString().slice(0,10)+".geojson";
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(function(){URL.revokeObjectURL(u);},4000);
+      say("Export QGIS généré ("+lines.length+" tracé"+(lines.length>1?"s":"")+" linéaire"+(lines.length>1?"s":"")+").");
+    }catch(err){say("Échec de l'export QGIS.",true);if(window.console)console.error(err);}
+  }
+  $("measureQgis").onclick=exportMeasuresQgis;
 
   // ---------- Parcelles cadastrales IGN ----------
   var cadastreLayer=null,cadastreOn=false,cadastreOpacity=.85;
