@@ -332,7 +332,7 @@
   <div id="measureHead"><b id="measureTitle">Mesure</b><span id="measureValue">Cliquez sur la carte pour ajouter des points.</span><button id="measureFold" class="ghost" aria-expanded="true" aria-label="Réduire la fenêtre de mesure" title="Réduire pour mieux voir la carte (les tracés sont conservés)">▾</button></div>
   <div id="measureTotals" hidden></div>
   <ul id="measureList" hidden></ul>
-  <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx) ; en accrochage RD, les PR et abscisses sont calculés" disabled>Export Excel</button><button id="measureQgis" class="ghost" data-tip="Exporter les tracés linéaires pour QGIS (GeoJSON, WGS84) : géométrie suivant la route en accrochage RD, longueur, PR et abscisses en attributs" disabled>Export QGIS</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
+  <div class="row"><button id="measureAdd" data-tip="Valider ce tracé et en commencer un autre (cumulé au total)" disabled>+ Nouveau tracé</button><button id="measureUndo" class="ghost" data-tip="Retirer le dernier point posé">Annuler point</button><button id="measureDelete" class="ghost" data-tip="Supprimer le sommet sélectionné" disabled>Supprimer sommet</button><button id="measureReset" class="ghost" data-tip="Effacer le tracé en cours (les tracés validés sont conservés)">Réinitialiser</button><button id="measureXls" class="ghost" data-tip="Exporter les mesures au format Excel (.xlsx) ; en accrochage RD, les PR et abscisses sont calculés" disabled>Export Excel</button><button id="measureQgis" class="ghost" data-tip="Exporter les mesures pour QGIS (zip : GeoJSON WGS84 + style rouge .qml) : lignes suivant la route en accrochage RD avec PR et abscisses, et surfaces" disabled>Export QGIS</button><button id="measureClose" class="ghost" data-tip="Terminer : efface toutes les mesures et ferme le panneau">Terminer</button></div>
   <div class="ms-modes" id="measureSnapRow" role="group" aria-label="Mode de la mesure linéaire">
     <button id="measureModeSnap" class="ghost" aria-pressed="true" data-tip="Les points s’accrochent au référentiel (RD) et la mesure suit la route">Accrochage RD</button>
     <button id="measureModeFree" class="ghost" aria-pressed="false" data-tip="Points libres : aucune contrainte d’accrochage, segments droits">Libre</button>
@@ -3452,7 +3452,7 @@
     var box=$("measureTotals");
     box.hidden=!(nl+na>1);   // un seul tracé : le total serait redondant
     box.textContent=parts.join(" · ");
-    $("measureXls").disabled=!(nl+na);$("measureQgis").disabled=!nl;
+    $("measureXls").disabled=!(nl+na);$("measureQgis").disabled=!(nl+na);
   }
   function commitMeasure(){
     if(!measureValid(measureType,measurePoints))return false;
@@ -3827,8 +3827,22 @@
   }
   $("measureXls").onclick=exportMeasuresXlsx;
 
-  // ---------- Export QGIS (GeoJSON, WGS84) des mesures linéaires ----------
-  function buildMeasuresGeo(lines){
+  // ---------- Export QGIS : archive .zip = GeoJSON (WGS84) + style .qml rouge par type de mesure (lignes, surfaces) ----------
+  // QGIS applique automatiquement le .qml de même nom que le .geojson à l'ouverture de la couche (extraire le zip d'abord).
+  function qgisQml(kind){
+    var X='<!DOCTYPE qgis PUBLIC \'http://mrcc.com/qgis.dtd\' \'SYSTEM\'>\n',O=function(n,v){return '<Option name="'+n+'" type="QString" value="'+v+'"/>';};
+    var sym=kind==="line"
+      ?'<symbol type="line" name="0" alpha="1" force_rhr="0" clip_to_extent="1"><layer class="SimpleLine" enabled="1" locked="0" pass="0"><Option type="Map">'+
+        O("line_color","217,4,41,255")+O("line_width","0.8")+O("line_width_unit","MM")+O("line_style","solid")+O("capstyle","round")+O("joinstyle","round")+O("use_custom_dash","0")+
+        '</Option></layer></symbol>'
+      :'<symbol type="fill" name="0" alpha="1" force_rhr="0" clip_to_extent="1"><layer class="SimpleFill" enabled="1" locked="0" pass="0"><Option type="Map">'+
+        O("color","217,4,41,70")+O("style","solid")+O("outline_color","217,4,41,255")+O("outline_style","solid")+O("outline_width","0.7")+O("outline_width_unit","MM")+O("joinstyle","round")+
+        '</Option></layer></symbol>';
+    return X+'<qgis version="3.40.0" styleCategories="Symbology"><renderer-v2 type="singleSymbol" symbollevels="0" enableorderby="0" forceraster="0" referencescale="-1"><symbols>'+sym+
+      '</symbols><rotation/><sizescale/></renderer-v2></qgis>';
+  }
+  function geoNum(v){return Math.round(v*1e7)/1e7;}
+  function buildLinesGeo(lines){
     return JSON.stringify({
       type:"FeatureCollection",name:"mesures_lineaires",
       crs:{type:"name",properties:{name:"urn:ogc:def:crs:OGC:1.3:CRS84"}},
@@ -3840,19 +3854,34 @@
           route:c[0]||"",pr_deb:c[1],abs_deb_m:c[2],pr_fin:c[3],abs_fin_m:c[4],remarque:c[5]||"",
           mode:pts.some(function(p){return p.snap;})?"accroche RD":"libre",
           x_deb_l93:r2(a.x),y_deb_l93:r2(a.y),x_fin_l93:r2(b.x),y_fin_l93:r2(b.y)},
-          geometry:{type:"LineString",coordinates:g.map(function(p){return [Math.round(p.lng*1e7)/1e7,Math.round(p.lat*1e7)/1e7];})}};
+          geometry:{type:"LineString",coordinates:g.map(function(p){return [geoNum(p.lng),geoNum(p.lat)];})}};
+      })
+    });
+  }
+  function buildAreasGeo(areas){
+    return JSON.stringify({
+      type:"FeatureCollection",name:"mesures_surfaces",
+      crs:{type:"name",properties:{name:"urn:ogc:def:crs:OGC:1.3:CRS84"}},
+      features:areas.map(function(m,i){
+        var pts=m.points,sf=r2(areaMeters(pts)),per=r2(measureLength(pts)+pts[pts.length-1].distanceTo(pts[0]));
+        var ring=pts.map(function(p){return [geoNum(p.lng),geoNum(p.lat)];});ring.push(ring[0]);
+        return {type:"Feature",properties:{num:i+1,nom:"Surface "+(i+1),surf_m2:sf,surf_ha:Math.round(sf)/10000,perimetre_m:per,nb_sommets:pts.length},
+          geometry:{type:"Polygon",coordinates:[ring]}};
       })
     });
   }
   function exportMeasuresQgis(){
-    var lines=allMeasures().filter(function(m){return m.type!=="area";});
-    if(!lines.length){say("Aucune mesure linéaire à exporter.",true);return;}
+    var all=allMeasures(),lines=all.filter(function(m){return m.type!=="area";}),areas=all.filter(function(m){return m.type==="area";});
+    if(!lines.length&&!areas.length){say("Aucune mesure à exporter.",true);return;}
     try{
-      var blob=new Blob([buildMeasuresGeo(lines)],{type:"application/geo+json"}),u=URL.createObjectURL(blob),a=document.createElement("a");
-      a.href=u;a.download="vhmaps-mesures-lineaires-"+new Date().toISOString().slice(0,10)+".geojson";
+      var enc=new TextEncoder(),files=[];
+      if(lines.length){files.push({name:"mesures_lineaires.geojson",data:enc.encode(buildLinesGeo(lines))},{name:"mesures_lineaires.qml",data:enc.encode(qgisQml("line"))});}
+      if(areas.length){files.push({name:"mesures_surfaces.geojson",data:enc.encode(buildAreasGeo(areas))},{name:"mesures_surfaces.qml",data:enc.encode(qgisQml("area"))});}
+      var blob=new Blob([zipStore(files)],{type:"application/zip"}),u=URL.createObjectURL(blob),a=document.createElement("a");
+      a.href=u;a.download="vhmaps-mesures-qgis-"+new Date().toISOString().slice(0,10)+".zip";
       document.body.appendChild(a);a.click();a.remove();
       setTimeout(function(){URL.revokeObjectURL(u);},4000);
-      say("Export QGIS généré ("+lines.length+" tracé"+(lines.length>1?"s":"")+" linéaire"+(lines.length>1?"s":"")+").");
+      say("Export QGIS généré : "+(lines.length?lines.length+" tracé"+(lines.length>1?"s":"")+" linéaire"+(lines.length>1?"s":""):"")+(lines.length&&areas.length?" et ":"")+(areas.length?areas.length+" surface"+(areas.length>1?"s":""):"")+". Extrayez le zip avant d’ouvrir les .geojson dans QGIS.");
     }catch(err){say("Échec de l'export QGIS.",true);if(window.console)console.error(err);}
   }
   $("measureQgis").onclick=exportMeasuresQgis;
@@ -4550,7 +4579,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 9.2";
+  $("appVer").textContent = "VHMaps — version 9.3";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
