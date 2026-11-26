@@ -481,6 +481,12 @@
   <p class="hint" id="lzParcel">Aucune parcelle sélectionnée.</p>
   <div class="row"><button id="lzPick" class="ghost" style="flex:1">Toucher la parcelle sur la carte</button></div>
   <p class="hint" style="margin-top:6px">La couche « Parcelles cadastrales » s’active automatiquement. Connexion Internet nécessaire pour identifier la parcelle.</p>
+  <label style="margin-top:8px">Fond de la carte du PDF
+    <select id="lzBase">
+      <option value="ortho">Photographie aérienne IGN</option>
+      <option value="ign">Plan IGN</option>
+    </select>
+  </label>
   <div class="row" style="margin-top:10px">
     <button id="lzPdf" style="flex:1;color:#fff;background:var(--go)">Créer le PDF</button>
     <button id="lzShare" class="ghost" hidden>Partager le PDF</button>
@@ -4046,6 +4052,76 @@
   // Ouvert depuis la fenêtre de la punaise. Position = GPS si la géolocalisation est active, sinon position de la punaise.
   // La parcelle se choisit en touchant la carte (la couche « Parcelles cadastrales » est activée automatiquement).
   var lzPos = null, lzPinPos = null, lzParcel = null, lzPhoto = null, lzPick = false, lzBar = null, lzBlob = null, lzBlobName = "", lzAcc = null, lzSeq = 0;
+
+  // Carte du PDF : tuiles IGN (orthophoto ou plan) assemblées sur un canvas, avec contour de la parcelle, position, échelle et nord.
+  // Renvoie { w, h, bytes (JPEG), attr } ; rejette si aucune tuile n'a pu être chargée (le PDF utilise alors le plan schématique).
+  function lzMapImage(geom, pt, key) {
+    var b = BASES[key] || BASES.ortho, maxZ = Math.min(b.native || 18, 19);
+    var CW = 1280, CH = 700, TS = 256;
+    var polys = geom ? (geom.type === "Polygon" ? [geom.coordinates] : geom.type === "MultiPolygon" ? geom.coordinates : []) : [];
+    function mx(lng) { return (lng + 180) / 360; }                       // Mercator normalisé 0..1
+    function my(lat) { var r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2; }
+    var x0 = mx(pt.lng), x1 = x0, y0 = my(pt.lat), y1 = y0;
+    polys.forEach(function (p) { p.forEach(function (ring) { ring.forEach(function (c) {
+      var X = mx(c[0]), Y = my(c[1]); if (X < x0) x0 = X; if (X > x1) x1 = X; if (Y < y0) y0 = Y; if (Y > y1) y1 = Y;
+    }); }); });
+    var z = maxZ, padF = 0.8;                                             // marge : l'emprise occupe au plus 80 % du cadre
+    while (z > 12 && ((x1 - x0) * TS * Math.pow(2, z) > CW * padF || (y1 - y0) * TS * Math.pow(2, z) > CH * padF)) z--;
+    var N = TS * Math.pow(2, z), cx = (x0 + x1) / 2 * N, cy = (y0 + y1) / 2 * N, left = cx - CW / 2, top = cy - CH / 2;
+    var c = document.createElement("canvas"); c.width = CW; c.height = CH;
+    var g = c.getContext("2d"); g.fillStyle = "#e8e8e8"; g.fillRect(0, 0, CW, CH);
+    var tx0 = Math.floor(left / TS), tx1 = Math.floor((left + CW - 1) / TS), ty0 = Math.floor(top / TS), ty1 = Math.floor((top + CH - 1) / TS), jobs = [], okCount = 0;
+    var nT = Math.pow(2, z);
+    for (var ty = ty0; ty <= ty1; ty++) for (var tx = tx0; tx <= tx1; tx++) (function (tx, ty) {
+      if (ty < 0 || ty >= nT) return;
+      var txw = ((tx % nT) + nT) % nT;
+      var url = b.url.replace("{z}", z).replace("{x}", txw).replace("{y}", ty);
+      jobs.push(new Promise(function (res) {
+        var im = new Image(); im.crossOrigin = "anonymous";
+        var done = false, to = setTimeout(function () { if (!done) { done = true; res(); } }, 15000);
+        im.onload = function () { if (done) return; done = true; clearTimeout(to); try { g.drawImage(im, Math.round(tx * TS - left), Math.round(ty * TS - top), TS, TS); okCount++; } catch (e) {} res(); };
+        im.onerror = function () { if (done) return; done = true; clearTimeout(to); res(); };
+        im.src = url;
+      }));
+    })(tx, ty);
+    return Promise.all(jobs).then(function () {
+      if (!okCount) throw new Error("aucune tuile");
+      function PX(lng) { return mx(lng) * N - left; }
+      function PY(lat) { return my(lat) * N - top; }
+      g.lineJoin = "round";
+      polys.forEach(function (p) {
+        g.beginPath();
+        p.forEach(function (ring) { ring.forEach(function (q, i) { if (i) g.lineTo(PX(q[0]), PY(q[1])); else g.moveTo(PX(q[0]), PY(q[1])); }); g.closePath(); });
+        g.fillStyle = "rgba(255,140,0,0.22)"; g.fill("evenodd");
+        g.strokeStyle = "#fff"; g.lineWidth = 8; g.stroke();             // liseré blanc : le contour reste lisible sur la photo comme sur le plan
+        g.strokeStyle = "#e66a00"; g.lineWidth = 4; g.stroke();
+      });
+      var px = PX(pt.lng), py = PY(pt.lat);                               // position : disque rouge cerclé de blanc
+      g.beginPath(); g.arc(px, py, 13, 0, 2 * Math.PI); g.fillStyle = "#d90429"; g.fill(); g.lineWidth = 4; g.strokeStyle = "#fff"; g.stroke();
+      // échelle (barre alternée noir/blanc, valeur ronde ≤ 220 px)
+      var mpp = 156543.03392 * Math.cos(pt.lat * Math.PI / 180) / Math.pow(2, z), steps = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000], len = steps[0];
+      steps.forEach(function (v) { if (v / mpp <= 220) len = v; });
+      var bw = len / mpp, bx = 30, by = CH - 34;
+      g.fillStyle = "rgba(255,255,255,0.85)"; g.fillRect(bx - 12, by - 40, bw + 90, 62);
+      g.fillStyle = "#000"; g.fillRect(bx, by - 6, bw, 10); g.fillStyle = "#fff"; g.fillRect(bx + bw / 2, by - 6, bw / 2, 10);
+      g.strokeStyle = "#000"; g.lineWidth = 2; g.strokeRect(bx, by - 6, bw, 10);
+      g.fillStyle = "#000"; g.font = "bold 24px Helvetica, Arial, sans-serif"; g.textBaseline = "alphabetic"; g.fillText(len + " m", bx + bw + 12, by + 4);
+      g.font = "20px Helvetica, Arial, sans-serif"; g.fillText("0", bx - 3, by - 14);
+      // nord
+      var ax = CW - 50, ay = 30;
+      g.fillStyle = "rgba(255,255,255,0.85)"; g.fillRect(ax - 28, ay - 10, 56, 98);
+      g.fillStyle = "#000"; g.beginPath(); g.moveTo(ax, ay + 14); g.lineTo(ax - 12, ay + 62); g.lineTo(ax + 12, ay + 62); g.closePath(); g.fill();
+      g.font = "bold 26px Helvetica, Arial, sans-serif"; g.textAlign = "center"; g.fillText("N", ax, ay + 86); g.textAlign = "left";
+      // mention de source
+      var attr = (key === "ign" ? "Plan IGN" : "Photographies aériennes") + " © IGN / Géoplateforme · Parcellaire Express © IGN";
+      g.font = "18px Helvetica, Arial, sans-serif"; var aw = g.measureText(attr).width;
+      g.fillStyle = "rgba(255,255,255,0.8)"; g.fillRect(CW - aw - 16, CH - 28, aw + 16, 28);
+      g.fillStyle = "#222"; g.fillText(attr, CW - aw - 8, CH - 9);
+      var data = c.toDataURL("image/jpeg", 0.85), bin = atob(data.split(",")[1]), bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return { w: CW, h: CH, bytes: bytes, partial: okCount < jobs.length, key: key };
+    });
+  }
   // @@PDF-START
   // Générateur PDF minimal (Helvetica, JPEG, tracés vectoriels) : aucune bibliothèque externe, fonctionne hors ligne
   var LZ_CP = { 8217: 0x92, 8216: 0x91, 8211: 0x96, 8212: 0x97, 8220: 0x93, 8221: 0x94, 8230: 0x85, 339: 0x9c, 338: 0x8c, 8364: 0x80, 8226: 0x95, 160: 32, 8239: 32, 8201: 32 };
@@ -4115,7 +4191,7 @@
     out.push("0 g " + n2(ax) + " " + n2(ay) + " m " + n2(ax - 5) + " " + n2(ay - 13) + " l " + n2(ax + 5) + " " + n2(ay - 13) + " l f");
     T("N", ax - 2.6, ay + 2, 8);
   }
-  function lzBuildPdf(d) {   // d : { date, pos, note, parcel, photo, road, fileTitle }
+  function lzBuildPdf(d) {   // d : { date, pos, note, parcel, photo, map, road, fileTitle }
     var PW = 595, PH = 842, M = 42, pages = [], cur, y, GREEN = "0.078 0.204 0.184 rg";
     var n2 = function (v) { return (Math.round(v * 100) / 100).toString(); };
     function np() { cur = []; pages.push(cur); y = PH - M; }
@@ -4158,33 +4234,44 @@
     var nl = d.note ? lzWrap(d.note, 11, PW - 2 * M) : ["—"];
     nl.forEach(function (l) { if (y < M + 24) np(); T(l, M, y, 11, false); y -= 15; });
     y -= 10;
-    if (y < M + 250) np();
-    H("Plan et photo");
-    var BW = 250, BH = 200, gap = PW - 2 * M - 2 * BW;
-    T("Plan schématique (nord en haut)", M, y, 8, false, "0.45 g");
-    T("Photo", M + BW + gap, y, 8, false, "0.45 g");
-    var by = y - 8 - BH;
-    lzDrawPlan(cur, d.parcel && d.parcel.geometry, d.pos, M, by, BW, BH);
-    var px = M + BW + gap;
-    cur.push("0.75 G 0.8 w " + px + " " + n2(by) + " " + BW + " " + BH + " re S");
+    var BW = PW - 2 * M;
+    var MH = d.map ? Math.round(BW * d.map.h / d.map.w) : 230;
+    if (y < M + MH + 60) np();
+    H("Plan de situation");
+    var by = y - MH + 4;
+    if (d.map) {
+      cur.push("q " + n2(BW) + " 0 0 " + n2(MH) + " " + n2(M) + " " + n2(by) + " cm /Im2 Do Q");
+      cur.push("0.75 G 0.8 w " + M + " " + n2(by) + " " + BW + " " + MH + " re S");
+      T("Contour orange : parcelle cadastrale · point rouge : position relevée" + (d.map.partial ? " · fond partiellement chargé (connexion)" : ""), M, by - 11, 8, false, "0.45 g");
+    } else {
+      lzDrawPlan(cur, d.parcel && d.parcel.geometry, d.pos, M, by, BW, MH);
+      T("Plan schématique (nord en haut) — fond de carte indisponible", M, by - 11, 8, false, "0.45 g");
+    }
+    y = by - 30;
+    if (d.photo ? y < M + 190 : y < M + 60) np();
+    H("Photo");
     if (d.photo) {
-      var sc = Math.min((BW - 4) / d.photo.w, (BH - 4) / d.photo.h), iw = d.photo.w * sc, ih = d.photo.h * sc;
-      cur.push("q " + n2(iw) + " 0 0 " + n2(ih) + " " + n2(px + (BW - iw) / 2) + " " + n2(by + (BH - ih) / 2) + " cm /Im1 Do Q");
-    } else T("Aucune photo", px + 10, by + BH / 2, 9, false, "0.5 g");
+      var avail = y - M - 6, PHh = Math.min(300, avail), py0 = y - PHh + 4;
+      cur.push("0.75 G 0.8 w " + M + " " + n2(py0) + " " + BW + " " + n2(PHh) + " re S");
+      var sc = Math.min((BW - 4) / d.photo.w, (PHh - 4) / d.photo.h), iw = d.photo.w * sc, ih = d.photo.h * sc;
+      cur.push("q " + n2(iw) + " 0 0 " + n2(ih) + " " + n2(M + (BW - iw) / 2) + " " + n2(py0 + (PHh - ih) / 2) + " cm /Im1 Do Q");
+      by = py0;
+    } else { T("Aucune photo", M, y, 9, false, "0.5 g"); by = y - 6; }
     y = by - 14;
     pages.forEach(function (p, i) { p.push("0 g"); var s = "VHMaps — fiche de localisation · page " + (i + 1) + "/" + pages.length; p.push("0.5 g BT /F1 8 Tf " + M + " 22 Td (" + lzEsc(s) + ") Tj ET"); });
 
-    var chunks = [], off = 0, xref = [], hasImg = !!d.photo, first = hasImg ? 6 : 5;
+    var chunks = [], off = 0, xref = [], hasImg = !!d.photo, hasMap = !!d.map, mapId = hasImg ? 6 : 5, first = 5 + (hasImg ? 1 : 0) + (hasMap ? 1 : 0);
     function put(s) { var b = typeof s === "string" ? lzBytes(s) : s; chunks.push(b); off += b.length; }
     function obj(id, parts) { xref[id] = off; put(id + " 0 obj\n"); parts.forEach(put); put("\nendobj\n"); }
     var kids = pages.map(function (p, i) { return (first + 2 * i) + " 0 R"; }).join(" ");
-    var res = "<< /Font << /F1 3 0 R /F2 4 0 R >>" + (hasImg ? " /XObject << /Im1 5 0 R >>" : "") + " >>";
+    var res = "<< /Font << /F1 3 0 R /F2 4 0 R >>" + ((hasImg || hasMap) ? " /XObject << " + (hasImg ? "/Im1 5 0 R " : "") + (hasMap ? "/Im2 " + mapId + " 0 R " : "") + ">>" : "") + " >>";
     put("%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n");
     obj(1, ["<< /Type /Catalog /Pages 2 0 R >>"]);
     obj(2, ["<< /Type /Pages /Kids [" + kids + "] /Count " + pages.length + " >>"]);
     obj(3, ["<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"]);
     obj(4, ["<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"]);
     if (hasImg) obj(5, ["<< /Type /XObject /Subtype /Image /Width " + d.photo.w + " /Height " + d.photo.h + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + d.photo.bytes.length + " >>\nstream\n", d.photo.bytes, "\nendstream"]);
+    if (hasMap) obj(mapId, ["<< /Type /XObject /Subtype /Image /Width " + d.map.w + " /Height " + d.map.h + " /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length " + d.map.bytes.length + " >>\nstream\n", d.map.bytes, "\nendstream"]);
     pages.forEach(function (p, i) {
       var pid = first + 2 * i, s = p.join("\n");
       obj(pid, ["<< /Type /Page /Parent 2 0 R /MediaBox [0 0 " + PW + " " + PH + "] /Resources " + res + " /Contents " + (pid + 1) + " 0 R >>"]);
@@ -4309,8 +4396,15 @@
     var now = new Date(), p2 = function (v) { return (v < 10 ? "0" : "") + v; };
     var name = "arbre-mort-" + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate()) + "-" + p2(now.getHours()) + p2(now.getMinutes()) + ".pdf";
     say("Création du PDF…");
+    var mapKey = $("lzBase").value || "ortho", mapFailed = false;
     lzRoad(L.latLng(lzPos.lat, lzPos.lng)).then(function (road) {
-      var blob = lzBuildPdf({ date: now, pos: lzPos, note: $("lzNote").value.trim(), parcel: lzParcel, photo: lzPhoto, road: road, fileTitle: "Fiche de localisation — arbre mort" });
+      say("Chargement du fond de carte…");
+      return lzMapImage(lzParcel && lzParcel.geometry, lzPos, mapKey).catch(function () { mapFailed = true; return null; })
+        .then(function (mapImg) { return { road: road, map: mapImg }; });
+    }).then(function (r) {
+      var road = r.road;
+      if (mapFailed) say("Fond de carte indisponible (connexion Internet nécessaire) : plan schématique utilisé.", true);
+      var blob = lzBuildPdf({ date: now, pos: lzPos, note: $("lzNote").value.trim(), parcel: lzParcel, photo: lzPhoto, map: r.map, road: road, fileTitle: "Fiche de localisation — arbre mort" });
       lzBlob = blob; lzBlobName = name;
       var u = URL.createObjectURL(blob), a = document.createElement("a");
       a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
@@ -4318,7 +4412,7 @@
       var canShare = false;
       try { canShare = !!(navigator.canShare && navigator.canShare({ files: [new File([blob], name, { type: "application/pdf" })] })); } catch (e) {}
       $("lzShare").hidden = !canShare;
-      say("PDF créé : " + name);
+      if (!mapFailed) say("PDF créé : " + name);
     }).catch(function (err) { say("Création du PDF impossible : " + (err && err.message || err), true); })
       .then(function () { btn.disabled = false; });
   };
@@ -4627,7 +4721,7 @@
   // ---------- Cartes hors ligne ----------
   var OFFLINE = "vhmaps-offline-tiles", MAX_TILES = 8000;
   var offBusy = false, offAbort = null;
-  $("appVer").textContent = "VHMaps — version 9.4";
+  $("appVer").textContent = "VHMaps — version 9.5";
   $("offline").innerHTML = ICON("M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14");
 
   function lon2x(lon, z) { return Math.floor((lon + 180) / 360 * Math.pow(2, z)); }
